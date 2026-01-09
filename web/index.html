@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FactGrid</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <span class="date" id="date"></span>
+            <span class="sources-count" id="sources-count"></span>
+        </div>
+        <h1 class="logo">FactGrid</h1>
+        <p class="motto">Fakta separerat från åsikter</p>
+    </header>
+
+    <nav class="nav">
+        <span class="nav-item active">Nyheter</span>
+        <span class="nav-item">Politik</span>
+        <span class="nav-item">Ekonomi</span>
+        <span class="nav-item">Världen</span>
+    </nav>
+
+    <div class="refresh-bar" id="refresh-bar">
+        <span class="refresh-dot"></span>
+        <span id="refresh-status">Live · Uppdateras automatiskt</span>
+    </div>
+
+    <main id="main">
+        <div class="loading">Laddar nyheter...</div>
+    </main>
+
+    <!-- Article view -->
+    <div id="article-view" class="article-view hidden">
+        <nav class="article-nav">
+            <button id="back-btn" class="back-btn">‹ Alla nyheter</button>
+        </nav>
+        <article id="article-content"></article>
+    </div>
+
+    <footer>
+        <p>Data från multipla källor · AI-analys för faktaseparering</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
