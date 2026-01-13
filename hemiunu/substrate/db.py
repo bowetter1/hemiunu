@@ -56,6 +56,27 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (task_id) REFERENCES tasks(id)
         );
+
+        -- Deploy Log: Historik över deploy-cykler
+        CREATE TABLE IF NOT EXISTS deploy_log (
+            id TEXT PRIMARY KEY,
+            branches TEXT NOT NULL,
+            status TEXT NOT NULL,
+            commit_hash TEXT,
+            error TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Conflicts: Merge-konflikter att lösa
+        CREATE TABLE IF NOT EXISTS conflicts (
+            id TEXT PRIMARY KEY,
+            branch_a TEXT NOT NULL,
+            branch_b TEXT NOT NULL,
+            file_path TEXT,
+            status TEXT DEFAULT 'PENDING',
+            resolution TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     conn.commit()
     conn.close()
@@ -177,6 +198,67 @@ def get_all_tasks() -> list[dict]:
 
 # Initiera DB vid import
 init_db()
+
+
+# === DEPLOY LOG ===
+
+def save_deploy(branches: list, status: str, commit_hash: str = None, error: str = None) -> str:
+    """Spara deploy-resultat."""
+    deploy_id = str(uuid.uuid4())[:8]
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO deploy_log (id, branches, status, commit_hash, error) VALUES (?, ?, ?, ?, ?)",
+        (deploy_id, json.dumps(branches), status, commit_hash, error)
+    )
+    conn.commit()
+    conn.close()
+    return deploy_id
+
+
+def get_deploy_log(limit: int = 10) -> list[dict]:
+    """Hämta senaste deploys."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM deploy_log ORDER BY created_at DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# === CONFLICTS ===
+
+def save_conflict(branch_a: str, branch_b: str, file_path: str = None) -> str:
+    """Spara en merge-konflikt."""
+    conflict_id = str(uuid.uuid4())[:8]
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO conflicts (id, branch_a, branch_b, file_path) VALUES (?, ?, ?, ?)",
+        (conflict_id, branch_a, branch_b, file_path)
+    )
+    conn.commit()
+    conn.close()
+    return conflict_id
+
+
+def get_pending_conflicts() -> list[dict]:
+    """Hämta olösta konflikter."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM conflicts WHERE status = 'PENDING' ORDER BY created_at"
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def resolve_conflict(conflict_id: str, resolution: str):
+    """Markera konflikt som löst."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE conflicts SET status = 'RESOLVED', resolution = ? WHERE id = ?",
+        (resolution, conflict_id)
+    )
+    conn.commit()
+    conn.close()
 
 
 if __name__ == "__main__":
