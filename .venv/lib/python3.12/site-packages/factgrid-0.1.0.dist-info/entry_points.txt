@@ -1,2 +1,0 @@
-[console_scripts]
-factgrid = factgrid.cli.main:main
