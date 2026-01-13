@@ -245,7 +245,8 @@ def show_status():
             "WORKING": "[~]",
             "GREEN": "[✓]",
             "RED": "[✗]",
-            "SPLIT": "[/]"
+            "SPLIT": "[/]",
+            "DEPLOYED": "[★]"
         }.get(task["status"], "[?]")
 
         worker = task.get("worker_status", "-")

@@ -22,9 +22,20 @@ from substrate.db import (
     update_task,
     save_deploy,
     save_conflict,
-    get_deploy_log
+    get_deploy_log,
+    get_pending_conflicts,
+    resolve_conflict,
+    get_master
 )
-from core.git import run_git, get_current_branch, checkout_main
+from core.git import (
+    run_git,
+    get_current_branch,
+    checkout_main,
+    start_merge,
+    get_conflict_files,
+    abort_merge
+)
+from agents.integrator import IntegratorAgent
 
 
 def pull_main() -> dict:
@@ -37,33 +48,93 @@ def pull_main() -> dict:
     }
 
 
-def merge_branch(branch_name: str) -> dict:
+def merge_branch(branch_name: str, use_integrator: bool = True) -> dict:
     """
     Försök merga en branch till main.
+    Om konflikt och use_integrator=True, försök lösa med Integratör.
 
     Returns:
-        dict med {success, conflict, error}
+        dict med {success, conflict, resolved_by_integrator, error}
     """
     result = run_git(f"merge {branch_name} --no-edit", check=False)
 
     if result["success"]:
-        return {"success": True, "conflict": False, "error": None}
+        return {"success": True, "conflict": False, "resolved_by_integrator": False, "error": None}
 
     # Kolla om det är en konflikt
     if "CONFLICT" in result["stdout"] or "CONFLICT" in result["stderr"]:
-        # Avbryt mergen
+        conflict_files = get_conflict_files()
+
+        if use_integrator and conflict_files:
+            print(f"[DEPLOY] Konflikt upptäckt, försöker lösa med Integratör...")
+            print(f"[DEPLOY] Konfliktfiler: {', '.join(conflict_files)}")
+
+            # Försök lösa med Integratör
+            integrator_result = try_resolve_with_integrator(
+                branch_a="main",
+                branch_b=branch_name,
+                conflict_files=conflict_files
+            )
+
+            if integrator_result["success"]:
+                return {
+                    "success": True,
+                    "conflict": True,
+                    "resolved_by_integrator": True,
+                    "error": None
+                }
+            else:
+                # Integratör kunde inte lösa - avbryt merge
+                abort_merge()
+                return {
+                    "success": False,
+                    "conflict": True,
+                    "resolved_by_integrator": False,
+                    "error": f"Integratör kunde inte lösa: {integrator_result.get('error')}"
+                }
+
+        # Ingen integratör eller inga konfliktfiler - avbryt
         run_git("merge --abort", check=False)
         return {
             "success": False,
             "conflict": True,
+            "resolved_by_integrator": False,
             "error": result["stdout"] + result["stderr"]
         }
 
     return {
         "success": False,
         "conflict": False,
+        "resolved_by_integrator": False,
         "error": result["stderr"]
     }
+
+
+def try_resolve_with_integrator(branch_a: str, branch_b: str, conflict_files: list) -> dict:
+    """
+    Försök lösa en konflikt med Integratör-agenten.
+
+    Returns:
+        dict med {success, result, error}
+    """
+    vision = get_master() or "Inget projekt definierat"
+
+    conflict = {
+        "id": f"{branch_a}-{branch_b}",
+        "branch_a": branch_a,
+        "branch_b": branch_b,
+        "conflict_files": conflict_files
+    }
+
+    integrator = IntegratorAgent(conflict, context={"vision": vision})
+    result = integrator.run()
+
+    if result["status"] == "resolved":
+        print(f"[INTEGRATOR] ✓ Konflikt löst: {result['result'].get('summary', 'OK')}")
+        return {"success": True, "result": result["result"], "error": None}
+    else:
+        print(f"[INTEGRATOR] ✗ Kunde inte lösa: {result.get('error', 'Okänt fel')}")
+        return {"success": False, "result": None, "error": result.get("error")}
 
 
 def run_integration_tests() -> dict:
@@ -207,10 +278,13 @@ def run_deploy_cycle(dry_run: bool = False) -> dict:
         merge_result = merge_branch(branch)
 
         if merge_result["success"]:
-            print(f"[DEPLOY] ✓ Mergad: {branch}")
+            if merge_result.get("resolved_by_integrator"):
+                print(f"[DEPLOY] ✓ Mergad (konflikt löst av Integratör): {branch}")
+            else:
+                print(f"[DEPLOY] ✓ Mergad: {branch}")
             merged.append(branch)
         elif merge_result["conflict"]:
-            print(f"[DEPLOY] ✗ Konflikt: {branch}")
+            print(f"[DEPLOY] ✗ Konflikt kunde inte lösas: {branch}")
             conflicts.append(branch)
             # Spara konflikt i DB
             save_conflict("main", branch)
