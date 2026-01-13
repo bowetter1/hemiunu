@@ -11,6 +11,7 @@ from substrate.db import (
     init_db
 )
 from agent_loop import run_tick, show_status
+from agents.vesir import break_down_request
 
 
 def cmd_init(vision: str):
@@ -49,6 +50,33 @@ def cmd_status():
     show_status()
 
 
+def cmd_plan(request: str):
+    """Bryt ner ett stort uppdrag till atomära tasks via Vesir."""
+    print(f"\n{'='*60}")
+    print("VESIR - Strategisk nedbrytning")
+    print(f"{'='*60}")
+    print(f"\nUppdrag: {request}\n")
+
+    result = break_down_request(request)
+
+    if result["status"] == "completed":
+        print(f"\n{'='*60}")
+        print("PLAN KLAR")
+        print(f"{'='*60}")
+        print(f"\nSammanfattning: {result['result'].get('summary', 'OK')}")
+        print(f"Antal tasks: {result['result'].get('total_tasks', 0)}")
+        print("\nSkapade tasks:")
+        for task in result['result'].get('tasks', []):
+            print(f"  [{task['id']}] {task['description'][:50]}")
+            print(f"           CLI: {task['cli_test']}")
+            print(f"           LOC: ~{task.get('estimated_loc', '?')}")
+        print(f"\nKör 'python cli.py run' för att starta implementation.")
+    elif result["status"] == "rejected":
+        print(f"\nVesir avvisade uppdraget: {result.get('error')}")
+    else:
+        print(f"\nFel: {result.get('error', 'Okänt fel')}")
+
+
 def main():
     if len(sys.argv) < 2:
         print("""
@@ -57,15 +85,17 @@ Hemiunu - AI Agent System
 
 Kommandon:
   init <vision>                    - Starta nytt projekt
-  add <beskrivning> [cli_test]     - Lägg till uppgift
+  plan <stort uppdrag>             - Bryt ner uppdrag till tasks (via Vesir)
+  add <beskrivning> [cli_test]     - Lägg till enskild uppgift
   tick                             - Kör nästa uppgift
   run                              - Kör alla uppgifter
   status                           - Visa status
 
 Exempel:
   python cli.py init "E-handelsplattform"
+  python cli.py plan "Bygg en kalkylator med grundläggande operationer"
   python cli.py add "Implementera is_prime(n)" "python3 -c 'from src.prime import is_prime; print(is_prime(7))'"
-  python cli.py tick
+  python cli.py run
 """)
         return
 
@@ -93,6 +123,12 @@ Exempel:
 
     elif cmd == "status":
         cmd_status()
+
+    elif cmd == "plan":
+        if len(sys.argv) < 3:
+            print("Användning: python cli.py plan <stort uppdrag>")
+            return
+        cmd_plan(" ".join(sys.argv[2:]))
 
     else:
         print(f"Okänt kommando: {cmd}")

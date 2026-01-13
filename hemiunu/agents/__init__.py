@@ -5,5 +5,6 @@ from .base import BaseAgent
 from .worker import WorkerAgent
 from .tester import TesterAgent
 from .integrator import IntegratorAgent
+from .vesir import VesirAgent
 
-__all__ = ["BaseAgent", "WorkerAgent", "TesterAgent", "IntegratorAgent"]
+__all__ = ["BaseAgent", "WorkerAgent", "TesterAgent", "IntegratorAgent", "VesirAgent"]
