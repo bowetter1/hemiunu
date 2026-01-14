@@ -34,7 +34,7 @@ def init_contacts_db(db_path: Optional[str] = None) -> str:
         # Create the contacts table with the specified schema
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS contacts (
-                id TEXT PRIMARY KEY,
+                id TEXT NOT NULL PRIMARY KEY,
                 name TEXT NOT NULL,
                 phone TEXT,
                 email TEXT,
