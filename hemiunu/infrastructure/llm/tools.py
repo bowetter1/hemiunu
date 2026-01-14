@@ -208,6 +208,65 @@ def db_schema(arguments: dict) -> dict:
         return {"success": False, "error": str(e)}
 
 
+# === Codebase Index Tools ===
+
+def codebase_summary(arguments: dict) -> dict:
+    """Hämta sammanfattning av kodbasen."""
+    from infrastructure.codebase import get_project_summary
+    try:
+        summary = get_project_summary()
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def codebase_search(arguments: dict) -> dict:
+    """Sök efter funktioner eller klasser i kodbasen."""
+    from infrastructure.codebase import find_function, find_class
+
+    query = arguments.get("query", "")
+    search_type = arguments.get("type", "all")  # "function", "class", eller "all"
+
+    if not query:
+        return {"success": False, "error": "Du måste ange en sökterm (query)"}
+
+    try:
+        results = {"functions": [], "classes": []}
+
+        if search_type in ["function", "all"]:
+            results["functions"] = find_function(query)
+
+        if search_type in ["class", "all"]:
+            results["classes"] = find_class(query)
+
+        total = len(results["functions"]) + len(results["classes"])
+        return {
+            "success": True,
+            "query": query,
+            "total_matches": total,
+            "results": results
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def codebase_file_info(arguments: dict) -> dict:
+    """Hämta information om en specifik fil."""
+    from infrastructure.codebase import get_file_summary
+
+    path = arguments.get("path", "")
+    if not path:
+        return {"success": False, "error": "Du måste ange en sökväg (path)"}
+
+    try:
+        info = get_file_summary(path)
+        if info is None:
+            return {"success": False, "error": f"Filen finns inte i indexet: {path}"}
+        return {"success": True, "path": path, "info": info}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 # Standard tool handlers
 STANDARD_TOOLS = {
     "run_command": run_command,
@@ -215,7 +274,10 @@ STANDARD_TOOLS = {
     "write_file": write_file,
     "list_files": list_files,
     "db_execute": db_execute,
-    "db_schema": db_schema
+    "db_schema": db_schema,
+    "codebase_summary": codebase_summary,
+    "codebase_search": codebase_search,
+    "codebase_file_info": codebase_file_info
 }
 
 
@@ -320,6 +382,48 @@ STANDARD_TOOL_DEFINITIONS = [
                 }
             },
             "required": ["db_path"]
+        }
+    },
+    {
+        "name": "codebase_summary",
+        "description": "Hämta en sammanfattning av kodbasen: antal filer, funktioner, klasser, och de viktigaste modulerna. Använd detta FÖRST för att förstå projektets struktur.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "codebase_search",
+        "description": "Sök efter funktioner eller klasser i kodbasen. Returnerar filsökväg, namn, och signatur för matchningar.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Sökterm (t.ex. 'add', 'User', 'test')"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": ["function", "class", "all"],
+                    "description": "Typ av sökning: 'function', 'class', eller 'all' (default)"
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "codebase_file_info",
+        "description": "Hämta detaljerad information om en specifik fil: funktioner, klasser, imports, och docstrings.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Relativ sökväg till filen (t.ex. 'domain/agents/worker.py')"
+                }
+            },
+            "required": ["path"]
         }
     }
 ]

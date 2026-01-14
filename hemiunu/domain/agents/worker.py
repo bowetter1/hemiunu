@@ -15,6 +15,9 @@ from infrastructure.llm.tools import (
     list_files,
     db_execute,
     db_schema,
+    codebase_summary,
+    codebase_search,
+    codebase_file_info,
     STANDARD_TOOL_DEFINITIONS
 )
 
@@ -140,6 +143,12 @@ Implementera denna uppgift. Skriv kod, testa den, och markera som klar."""
             return db_execute(arguments)
         elif name == "db_schema":
             return db_schema(arguments)
+        elif name == "codebase_summary":
+            return codebase_summary(arguments)
+        elif name == "codebase_search":
+            return codebase_search(arguments)
+        elif name == "codebase_file_info":
+            return codebase_file_info(arguments)
         elif name == "task_done":
             return {
                 "success": True,

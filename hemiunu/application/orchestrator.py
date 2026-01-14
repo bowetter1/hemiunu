@@ -12,6 +12,7 @@ Flöde:
 from domain.agents import WorkerAgent, TesterAgent
 from infrastructure.db import TaskRepository, get_master
 from infrastructure.git import create_branch, commit_changes, checkout_main
+from infrastructure.codebase import update_index
 
 
 class Orchestrator:
@@ -78,6 +79,14 @@ class Orchestrator:
                     output=tester_result["result"].get("summary", "OK"),
                     tester_tests=tester_result["result"].get("test_path")
                 )
+
+                # Uppdatera codebase index efter framgångsrik task
+                try:
+                    update_index()
+                    print("[ORCH] Codebase index uppdaterat")
+                except Exception as e:
+                    print(f"[ORCH] Varning: Kunde inte uppdatera index: {e}")
+
                 return {
                     "status": "GREEN",
                     "worker_result": worker_result,

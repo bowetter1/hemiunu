@@ -13,7 +13,7 @@ Filosofi: Vi mäter verifierbarhet, inte storlek.
 """
 from .base import BaseAgent
 from infrastructure.db import TaskRepository, get_master
-from infrastructure.llm.tools import read_file, list_files
+from infrastructure.llm.tools import read_file, list_files, codebase_summary, codebase_search, codebase_file_info
 
 # Verifierbarhetsgräns: max testfall för full täckning
 MAX_TEST_CASES = 7
@@ -22,6 +22,48 @@ LOC_WARNING = 150
 
 # Vesir-specifika tools
 VESIR_TOOLS = [
+    {
+        "name": "codebase_summary",
+        "description": "Hämta en sammanfattning av kodbasen: antal filer, funktioner, klasser, och de viktigaste modulerna. BÖRJA MED DETTA för att förstå projektet.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "codebase_search",
+        "description": "Sök efter funktioner eller klasser i kodbasen. Snabbare än att läsa filer manuellt.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Sökterm (t.ex. 'add', 'User', 'test')"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": ["function", "class", "all"],
+                    "description": "Typ av sökning: 'function', 'class', eller 'all' (default)"
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "codebase_file_info",
+        "description": "Hämta detaljerad information om en specifik fil utan att läsa hela innehållet.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Relativ sökväg till filen"
+                }
+            },
+            "required": ["path"]
+        }
+    },
     {
         "name": "list_files",
         "description": "Lista filer i en katalog för att förstå kodbasen.",
@@ -38,7 +80,7 @@ VESIR_TOOLS = [
     },
     {
         "name": "read_file",
-        "description": "Läs en fil för att förstå existerande kod.",
+        "description": "Läs en fil för att förstå existerande kod. Använd codebase_file_info först för att se vad filen innehåller.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -190,11 +232,13 @@ HUR RÄKNA TESTFALL:
 - Om summan > {MAX_TEST_CASES}: bryt ner ytterligare
 
 STRATEGI:
-1. Analysera kodbasen med list_files och read_file
-2. Förstå vad som redan finns
-3. Bryt ner uppdraget i logiska steg
-4. Skapa tasks med create_subtask
-5. Avsluta med complete_breakdown
+1. BÖRJA med codebase_summary för att förstå projektets struktur
+2. Använd codebase_search för att hitta relevanta funktioner/klasser
+3. Använd codebase_file_info för detaljer om specifika filer
+4. Läs filer med read_file endast vid behov
+5. Bryt ner uppdraget i logiska steg
+6. Skapa tasks med create_subtask
+7. Avsluta med complete_breakdown
 
 EXEMPEL PÅ BRA TASK:
 - Description: "Implementera is_prime(n) som returnerar True om n är primtal"
@@ -219,7 +263,16 @@ Skapa sedan atomära tasks med tydliga kontrakt."""
     def execute_tool(self, name: str, arguments: dict) -> dict:
         """Exekvera ett Vesir-tool."""
 
-        if name == "list_files":
+        if name == "codebase_summary":
+            return codebase_summary(arguments)
+
+        elif name == "codebase_search":
+            return codebase_search(arguments)
+
+        elif name == "codebase_file_info":
+            return codebase_file_info(arguments)
+
+        elif name == "list_files":
             return list_files(arguments)
 
         elif name == "read_file":
