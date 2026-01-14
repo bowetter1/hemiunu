@@ -90,8 +90,9 @@ class WorkerAgent(BaseAgent):
     def get_system_prompt(self) -> str:
         """Bygg system-prompten för Worker."""
         vision = self.context.get("vision", "Inget projekt definierat")
+        is_retry = self.context.get("is_retry", False)
 
-        return f"""Du är en WORKER i Hemiunu-systemet.
+        base_prompt = f"""Du är en WORKER i Hemiunu-systemet.
 
 PROJEKTETS VISION:
 {vision}
@@ -119,15 +120,59 @@ ARBETSFLÖDE:
 
 Du har tillgång till hela projektmappen. Skriv riktig, fungerande kod."""
 
+        if is_retry:
+            retry_prompt = """
+
+⚠️ VIKTIGT: DETTA ÄR EN RETRY ⚠️
+
+Din tidigare kod avvisades av Testern. Du MÅSTE:
+1. Läsa den befintliga koden (den finns redan i filsystemet)
+2. Förstå exakt vad som gick fel baserat på feedback nedan
+3. FIXA det specifika problemet - gör INTE om allt från början
+4. Testa din fix ordentligt innan task_done"""
+            base_prompt += retry_prompt
+
+        return base_prompt
+
     def get_initial_message(self) -> str:
         """Bygg första meddelandet."""
         cli_test = self.task.get("cli_test", "Inget specifikt test")
+        is_retry = self.context.get("is_retry", False)
 
-        return f"""UPPGIFT: {self.task['description']}
+        base_message = f"""UPPGIFT: {self.task['description']}
 
-CLI-TEST: {cli_test}
+CLI-TEST: {cli_test}"""
 
-Implementera denna uppgift. Skriv kod, testa den, och markera som klar."""
+        if is_retry:
+            attempt = self.context.get("attempt", 1)
+            rejection_reason = self.context.get("rejection_reason", "Okänd anledning")
+            failed_tests = self.context.get("failed_tests", [])
+
+            retry_message = f"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 RETRY FÖRSÖK {attempt} - DIN KOD AVVISADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ANLEDNING TILL AVVISNING:
+{rejection_reason}
+
+MISSLYCKADE TESTER:
+{chr(10).join(f'  - {t}' for t in failed_tests) if failed_tests else '  (inga specifika tester angivna)'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+INSTRUKTIONER:
+1. Läs din befintliga kod med read_file
+2. Analysera vad som behöver fixas baserat på feedbacken ovan
+3. Gör MINIMALA ändringar för att fixa problemet
+4. Testa att fixen fungerar
+5. Markera som klar med task_done"""
+            base_message += retry_message
+        else:
+            base_message += "\n\nImplementera denna uppgift. Skriv kod, testa den, och markera som klar."
+
+        return base_message
 
     def execute_tool(self, name: str, arguments: dict) -> dict:
         """Exekvera ett Worker-tool."""
