@@ -133,7 +133,7 @@ class TesterAgent(BaseAgent):
     """
 
     role = "tester"
-    model = "claude-haiku-3-5-20241022"  # Haiku för snabb verifiering
+    model = "claude-3-5-haiku-20241022"  # Haiku 3.5 för snabb verifiering
 
     def __init__(self, task: dict, context: dict = None):
         super().__init__(task, context)

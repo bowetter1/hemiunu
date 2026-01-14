@@ -21,7 +21,7 @@ MAX_ITERATIONS = 20
 # Integrator: Sonnet 4 (merge-konflikter)
 MODEL_OPUS = "claude-opus-4-5-20251101"
 MODEL_SONNET = "claude-sonnet-4-20250514"
-MODEL_HAIKU = "claude-haiku-3-5-20241022"
+MODEL_HAIKU = "claude-3-5-haiku-20241022"
 DEFAULT_MODEL = MODEL_SONNET
 
 
