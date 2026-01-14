@@ -13,6 +13,8 @@ from infrastructure.llm.tools import (
     read_file,
     write_file,
     list_files,
+    db_execute,
+    db_schema,
     STANDARD_TOOL_DEFINITIONS
 )
 
@@ -134,6 +136,10 @@ Implementera denna uppgift. Skriv kod, testa den, och markera som klar."""
             return write_file(arguments)
         elif name == "list_files":
             return list_files(arguments)
+        elif name == "db_execute":
+            return db_execute(arguments)
+        elif name == "db_schema":
+            return db_schema(arguments)
         elif name == "task_done":
             return {
                 "success": True,

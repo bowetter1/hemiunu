@@ -133,12 +133,89 @@ def list_files(arguments: dict) -> dict:
         return {"success": False, "error": str(e)}
 
 
+# === SQLite Tools ===
+
+def db_execute(arguments: dict) -> dict:
+    """Kör SQL mot en SQLite-databas."""
+    import sqlite3
+
+    db_path = arguments.get("db_path", "app.db")
+    sql = arguments.get("sql", "")
+    params = arguments.get("params", [])
+
+    full_path = PROJECT_ROOT / db_path
+
+    try:
+        # Skapa mapp om den inte finns
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+
+        conn = sqlite3.connect(full_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute(sql, params)
+
+        # Om det är en SELECT, returnera rader
+        if sql.strip().upper().startswith("SELECT"):
+            rows = cursor.fetchall()
+            result = [dict(row) for row in rows]
+            conn.close()
+            return {"success": True, "rows": result, "count": len(result)}
+        else:
+            conn.commit()
+            affected = cursor.rowcount
+            conn.close()
+            return {"success": True, "affected_rows": affected}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def db_schema(arguments: dict) -> dict:
+    """Visa schema för en SQLite-databas."""
+    import sqlite3
+
+    db_path = arguments.get("db_path", "app.db")
+    full_path = PROJECT_ROOT / db_path
+
+    try:
+        if not full_path.exists():
+            return {"success": False, "error": f"Database not found: {db_path}"}
+
+        conn = sqlite3.connect(full_path)
+        cursor = conn.cursor()
+
+        # Hämta alla tabeller
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        tables = [row[0] for row in cursor.fetchall()]
+
+        # Hämta schema för varje tabell
+        schema = {}
+        for table in tables:
+            cursor.execute(f"PRAGMA table_info({table})")
+            columns = [{
+                "name": row[1],
+                "type": row[2],
+                "nullable": not row[3],
+                "primary_key": bool(row[5])
+            } for row in cursor.fetchall()]
+            schema[table] = columns
+
+        conn.close()
+        return {"success": True, "tables": tables, "schema": schema}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 # Standard tool handlers
 STANDARD_TOOLS = {
     "run_command": run_command,
     "read_file": read_file,
     "write_file": write_file,
-    "list_files": list_files
+    "list_files": list_files,
+    "db_execute": db_execute,
+    "db_schema": db_schema
 }
 
 
@@ -206,6 +283,43 @@ STANDARD_TOOL_DEFINITIONS = [
                 }
             },
             "required": ["path"]
+        }
+    },
+    {
+        "name": "db_execute",
+        "description": "Kör SQL mot en SQLite-databas. Skapar databasen automatiskt om den inte finns. Använd för CREATE TABLE, INSERT, UPDATE, DELETE, SELECT.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "db_path": {
+                    "type": "string",
+                    "description": "Sökväg till databasen (t.ex. 'data/app.db')"
+                },
+                "sql": {
+                    "type": "string",
+                    "description": "SQL-sats att köra"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Parametrar för prepared statement (optional)"
+                }
+            },
+            "required": ["db_path", "sql"]
+        }
+    },
+    {
+        "name": "db_schema",
+        "description": "Visa schema för en SQLite-databas. Visar alla tabeller och deras kolumner.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "db_path": {
+                    "type": "string",
+                    "description": "Sökväg till databasen"
+                }
+            },
+            "required": ["db_path"]
         }
     }
 ]
