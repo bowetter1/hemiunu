@@ -123,9 +123,12 @@ VESIR_TOOLS = [
 class VesirAgent(BaseAgent):
     """
     Vesir-agent som bryter ner stora uppdrag till atomära tasks.
+
+    Använder Opus för bättre strategiskt resonemang och arkitekturbeslut.
     """
 
     role = "vesir"
+    model = "claude-opus-4-5-20251101"  # Opus 4.5 för komplex planering
 
     def __init__(self, request: str, context: dict = None):
         """

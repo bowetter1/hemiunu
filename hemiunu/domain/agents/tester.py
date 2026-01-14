@@ -128,9 +128,12 @@ class TesterAgent(BaseAgent):
 
     VIKTIGT: Testaren ska skriva egna tester INNAN den ser Worker's kod.
     Detta säkerställer oberoende validering.
+
+    Använder Haiku för snabb och kostnadseffektiv verifiering.
     """
 
     role = "tester"
+    model = "claude-haiku-3-5-20241022"  # Haiku för snabb verifiering
 
     def __init__(self, task: dict, context: dict = None):
         super().__init__(task, context)
