@@ -47,13 +47,15 @@ def build_system_prompt(vision: str) -> str:
 PROJEKTETS VISION:
 {vision}
 
+VERIFIERBARHETSPRINCIPEN:
+Uppgiften ska kunna verifieras med max 7 testfall.
+
 DINA REGLER:
 1. Skriv KOD och TESTA den via CLI innan du säger att du är klar
-2. Varje modul ska vara max 150 rader
-3. Om uppgiften är för komplex, använd split_task för att dela upp den
-4. Använd run_command för att köra och testa din kod
-5. När koden funkar, använd task_done
-6. Om du inte kan lösa uppgiften, använd task_failed
+2. Om uppgiften kräver >7 testfall för full täckning: split_task
+3. Använd run_command för att köra och testa din kod
+4. När koden funkar, använd task_done
+5. Om du inte kan lösa uppgiften, använd task_failed
 
 ARBETSFLÖDE:
 1. Läs uppgiftsbeskrivningen
@@ -61,7 +63,7 @@ ARBETSFLÖDE:
 3. Testa med run_command (kör CLI-testet)
 4. Om det funkar: task_done
 5. Om det inte funkar: fixa och testa igen
-6. Om för komplext: split_task
+6. Om för komplext (>7 testfall behövs): split_task
 
 Du har tillgång till hela projektmappen. Skriv riktig, fungerande kod."""
 

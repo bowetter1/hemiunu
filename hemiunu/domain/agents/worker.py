@@ -1,5 +1,5 @@
 """
-Hemiunu Worker Agent - Skriver kod och testar via CLI.
+Worker Agent - Skriver kod och testar via CLI.
 
 Worker:
 - Får en uppgift med beskrivning + CLI-test
@@ -8,13 +8,67 @@ Worker:
 - Markerar med task_done, task_failed, eller split_task
 """
 from .base import BaseAgent
-from core.tools import (
+from infrastructure.llm.tools import (
     run_command,
     read_file,
     write_file,
     list_files,
-    TOOL_DEFINITIONS
+    STANDARD_TOOL_DEFINITIONS
 )
+
+# Worker-specifika tools (standard + action tools)
+WORKER_TOOLS = STANDARD_TOOL_DEFINITIONS + [
+    {
+        "name": "task_done",
+        "description": "Markera uppgiften som klar. Anropa detta när du har implementerat och testat koden.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": "Kort sammanfattning av vad du gjorde"
+                }
+            },
+            "required": ["summary"]
+        }
+    },
+    {
+        "name": "task_failed",
+        "description": "Markera uppgiften som misslyckad. Anropa om du inte kan lösa uppgiften.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Varför uppgiften misslyckades"
+                }
+            },
+            "required": ["reason"]
+        }
+    },
+    {
+        "name": "split_task",
+        "description": "Dela upp uppgiften i mindre delar. Anropa om uppgiften är för komplex.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "subtasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {"type": "string"},
+                            "cli_test": {"type": "string"}
+                        },
+                        "required": ["description", "cli_test"]
+                    },
+                    "description": "Lista av sub-uppgifter"
+                }
+            },
+            "required": ["subtasks"]
+        }
+    }
+]
 
 
 class WorkerAgent(BaseAgent):
@@ -25,8 +79,8 @@ class WorkerAgent(BaseAgent):
     role = "worker"
 
     def get_tools(self) -> list:
-        """Worker har alla bas-tools."""
-        return TOOL_DEFINITIONS
+        """Worker har standard tools + action tools."""
+        return WORKER_TOOLS
 
     def get_system_prompt(self) -> str:
         """Bygg system-prompten för Worker."""
@@ -73,13 +127,13 @@ Implementera denna uppgift. Skriv kod, testa den, och markera som klar."""
     def execute_tool(self, name: str, arguments: dict) -> dict:
         """Exekvera ett Worker-tool."""
         if name == "run_command":
-            return run_command(arguments["command"])
+            return run_command(arguments)
         elif name == "read_file":
-            return read_file(arguments["path"])
+            return read_file(arguments)
         elif name == "write_file":
-            return write_file(arguments["path"], arguments["content"])
+            return write_file(arguments)
         elif name == "list_files":
-            return list_files(arguments.get("path", "."))
+            return list_files(arguments)
         elif name == "task_done":
             return {
                 "success": True,
@@ -125,18 +179,3 @@ Implementera denna uppgift. Skriv kod, testa den, och markera som klar."""
             }
 
         return None  # Fortsätt
-
-
-if __name__ == "__main__":
-    # Test
-    from substrate.db import get_master, get_next_todo
-
-    task = get_next_todo()
-    if task:
-        print(f"Testar Worker på: {task['description']}")
-        vision = get_master() or "Testprojekt"
-        worker = WorkerAgent(task, context={"vision": vision})
-        result = worker.run()
-        print(f"Resultat: {result}")
-    else:
-        print("Inga uppgifter att testa.")

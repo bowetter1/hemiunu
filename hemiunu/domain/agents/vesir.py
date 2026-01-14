@@ -1,5 +1,5 @@
 """
-Hemiunu Vesir Agent - Strategisk nedbrytning av stora uppgifter.
+Vesir Agent - Strategisk nedbrytning av stora uppgifter.
 
 Vesir:
 - Tar emot stort uppdrag från användare
@@ -12,8 +12,8 @@ Regel: Vesir skriver INGEN kod, bara planerar.
 Filosofi: Vi mäter verifierbarhet, inte storlek.
 """
 from .base import BaseAgent
-from substrate.db import create_task, get_master, get_all_tasks
-from core.tools import read_file, list_files
+from infrastructure.db import TaskRepository, get_master
+from infrastructure.llm.tools import read_file, list_files
 
 # Verifierbarhetsgräns: max testfall för full täckning
 MAX_TEST_CASES = 7
@@ -149,7 +149,7 @@ class VesirAgent(BaseAgent):
     def get_system_prompt(self) -> str:
         """Bygg system-prompten för Vesir."""
         vision = self.context.get("vision", "Inget projekt definierat")
-        existing_tasks = get_all_tasks()
+        existing_tasks = TaskRepository.get_all()
 
         existing_summary = "Inga existerande tasks."
         if existing_tasks:
@@ -217,10 +217,10 @@ Skapa sedan atomära tasks med tydliga kontrakt."""
         """Exekvera ett Vesir-tool."""
 
         if name == "list_files":
-            return list_files(arguments["path"])
+            return list_files(arguments)
 
         elif name == "read_file":
-            return read_file(arguments["path"])
+            return read_file(arguments)
 
         elif name == "create_subtask":
             # Validera estimated_test_cases (verifierbarhet)
@@ -238,7 +238,7 @@ Skapa sedan atomära tasks med tydliga kontrakt."""
                 }
 
             # Skapa task i databasen
-            task_id = create_task(
+            task_id = TaskRepository.create(
                 description=arguments["description"],
                 cli_test=arguments["cli_test"]
             )
@@ -320,9 +320,3 @@ def break_down_request(request: str) -> dict:
     result = vesir.run()
 
     return result
-
-
-if __name__ == "__main__":
-    print("Vesir agent redo.")
-    print("Använd: from agents.vesir import break_down_request")
-    print("        result = break_down_request('Bygg en kalkylator')")

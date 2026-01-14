@@ -61,7 +61,7 @@ Fil: agents/worker.py (~80 LOC)
 Input:  Task med beskrivning + kontrakt
 Output: Kod + CLI-kommando för testning
 Tools:  read_file, write_file, run_command, task_done, task_failed, split_task
-Regel:  Max 150 LOC, annars split_task
+Regel:  Max 7 testfall för full täckning, annars split_task
 ```
 
 ### 1.3 Testare-agent (ny)
@@ -162,7 +162,7 @@ Regel:  Varje task måste ha:
         - Beskrivning
         - Input/Output-schema
         - CLI-test
-        - Max 150 LOC estimat
+        - Max 7 testfall estimat (verifierbarhet)
 ```
 
 ### 4.2 Golden Thread

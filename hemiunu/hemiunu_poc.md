@@ -43,7 +43,7 @@ AI gissar ──► Fel            AI löser ──► Testar själv ──► V
    └───────────┘        └───────────┘        └───────────┘
          │                    │                    │
          │   Delegerar        │   Bygger           │   Validerar
-         │   kontrakt         │   max 150 LOC      │   mot kontrakt
+         │   kontrakt         │   ≤7 testfall      │   mot kontrakt
          ▼                    ▼                    ▼
    ┌─────────────────────────────────────────────────────────┐
    │                    SCORE ENGINE                         │
@@ -91,10 +91,23 @@ Funkar? ──► Ja ──► Commit
 
 | # | Lag | Beskrivning | Implementation |
 |---|-----|-------------|----------------|
-| 1 | **Atomgränsen** | Max 150 rader kod per modul | `validate_loc(code) <= 150` |
+| 1 | **Verifierbarhetsgränsen** | Max 7 testfall för full täckning | `estimated_test_cases <= 7` |
 | 2 | **Eliminerings-prioritet** | Radera > Addera. Förenkling ger högst status | `score += lines_deleted * 2` |
 | 3 | **Idé-meritokrati** | Två lösningar tävlar. Lägst komplexitet vinner | `adversarial_solve(contract)` |
 | 4 | **Transparens** | Alla ser allt. Worker kan flagga Vesirs fel | `visibility = "all"` |
+
+### Varför Testfall istället för LOC?
+
+Vi mäter **verifierbarhet**, inte storlek. 150 LOC var godtyckligt och uppmuntrade "code golf".
+
+```
+Hur räkna testfall:
+- Normalfall (happy path): 1-2 testfall
+- Edge cases (gränsvärden, tomma inputs): 1-3 testfall
+- Felhantering (ogiltig input): 1-2 testfall
+
+Om summan > 7: bryt ner uppgiften ytterligare
+```
 
 ---
 
@@ -203,7 +216,7 @@ class Vesir:
 ```python
 class Worker:
     """
-    Atomär kodare. Max 150 rader.
+    Atomär kodare. Max 7 testfall för full täckning.
     Ser BARA sitt kontrakt + Master-vision.
     """
 
@@ -212,7 +225,7 @@ class Worker:
         1. Läs master_link - förstå varför detta behövs
         2. Implementera enligt input/output schema
         3. Självvalidera mot acceptance_criteria
-        4. STOPPA om LOC > 150 → returnera NEEDS_SPLIT
+        4. STOPPA om testfall > 7 → returnera NEEDS_SPLIT
         """
 
     def flag_contract_error(self, contract: Contract, issue: str) -> Flag:
@@ -261,11 +274,11 @@ class Controller:
 ┌─────────────────────────────────────────────────────────────┐
 │ STEG 1: VESIR ANALYSERAR                                    │
 │                                                             │
-│   Uppgift ──► Jämför med Master ──► Estimera komplexitet    │
+│   Uppgift ──► Jämför med Master ──► Estimera testfall       │
 │                                            │                │
 │                        ┌───────────────────┴───────────────┐│
 │                        ▼                                   ▼│
-│                   [< 150 LOC]                        [> 150]│
+│                   [≤7 testfall]                      [>7]   │
 │                        │                                   ││
 │                        ▼                                   ▼│
 │                   DELEGATE                              SPLIT│
@@ -278,7 +291,7 @@ class Controller:
 │   Läs kontrakt + master_link    │    ┌────────────────────┘
 │            │                    │    │
 │            ▼                    │    ▼
-│   Skriv kod (max 150 LOC)       │  Skapa 2-10 nya kontrakt
+│   Skriv kod (verifierbar)       │  Skapa 2-10 nya kontrakt
 │            │                    │  Rekursivt tillbaka till STEG 1
 │            ▼                    │
 │   Självtest mot criteria        │
@@ -353,7 +366,7 @@ SCORE_RULES = {
     # Negativa actions
     "SOLVE_RED":        -5,     # Levererade kod som failade
     "BREAK_CONTRACT":   -20,    # Ändrade låst kontrakt
-    "EXCEED_LOC":       -10,    # Överskred 150-radersgränsen
+    "EXCEED_TESTS":     -10,    # Behövde >7 testfall (för komplex)
     "ADD_COMPLEXITY":   -3,     # Ökade cyklomatisk komplexitet
     "CIRCULAR_DEP":     -15,    # Skapade cirkelberoende
 }
@@ -643,7 +656,7 @@ def deploy_cycle():
 
 | Kriterie | Mätning |
 |----------|---------|
-| Atomär kod | Ingen modul > 150 LOC |
+| Verifierbar kod | Ingen task kräver > 7 testfall |
 | Oberoende validering | Controller ser aldrig Worker's prompt |
 | Rekursiv delning | Komplex uppgift delas automatiskt |
 | Meritokrati | Poängsystem styr, inte "vem som pratade högst" |
