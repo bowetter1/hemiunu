@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hemiunu's Infinite Pyramid</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Hemiunu</h1>
+            <div id="hud">
+                <span>Blocks: <span id="block-count">0</span></span> | 
+                <span>Stone: <span id="stone-count">0</span></span> | 
+                <span>Players: <span id="player-count">0</span></span>
+            </div>
+        </header>
+
+        <main>
+            <canvas id="game-canvas"></canvas>
+        </main>
+
+        <footer>
+            <button id="btn-mine">⛏️ Mine Stone</button>
+            <button id="btn-place">🧱 Place Block</button>
+            <div id="status-bar">Connecting...</div>
+        </footer>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
