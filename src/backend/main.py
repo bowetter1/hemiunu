@@ -55,6 +55,12 @@ async def _build_state_payload(manager: ConnectionManager) -> Dict[str, Any]:
 
 app = FastAPI(default_response_class=ORJSONResponse)
 
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 static_directory = Path(__file__).resolve().parent / "static"
 app.mount("/", StaticFiles(directory=str(static_directory), html=True), name="static")
 
