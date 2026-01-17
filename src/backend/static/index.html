@@ -13,11 +13,13 @@
             <div id="hud">
                 <span>Blocks: <span id="block-count">0</span></span> | 
                 <span>Stone: <span id="stone-count">0</span></span> | 
-                <span>Players: <span id="player-count">0</span></span>
+                <span>Players: <span id="player-count">0</span></span> | 
+                <span>Next milestone: <span id="milestone-progress">0/100</span></span>
             </div>
         </header>
 
         <main>
+            <div id="milestone-notification" aria-live="polite"></div>
             <canvas id="game-canvas"></canvas>
         </main>
 

@@ -2,10 +2,29 @@ import gameState from "../state/gameState.js";
 
 let socket = null;
 let statusHandler = () => {};
+let milestoneHandler = () => {};
 
 const updateStatus = (value) => {
   if (typeof statusHandler === "function") {
     statusHandler(value);
+  }
+};
+
+const updateMilestone = (data) => {
+  if (typeof milestoneHandler === "function") {
+    milestoneHandler(data);
+  }
+};
+
+const showError = (message) => {
+  const text = message ? `Error: ${message}` : "Error";
+  updateStatus(text);
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    window.setTimeout(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        updateStatus("Connected");
+      }
+    }, 2500);
   }
 };
 
@@ -47,13 +66,20 @@ const handleMessage = (event) => {
     case "block_placed":
       addBlock(message.data);
       break;
+    case "milestone-event":
+      updateMilestone(message.data);
+      break;
+    case "error":
+      showError(message?.data?.message);
+      break;
     default:
       break;
   }
 };
 
-export const connect = ({ onStatusChange } = {}) => {
+export const connect = ({ onStatusChange, onMilestone, userId } = {}) => {
   statusHandler = typeof onStatusChange === "function" ? onStatusChange : () => {};
+  milestoneHandler = typeof onMilestone === "function" ? onMilestone : () => {};
   updateStatus("Connecting...");
 
   const scheme = window.location.protocol === "https:" ? "wss://" : "ws://";
@@ -61,7 +87,12 @@ export const connect = ({ onStatusChange } = {}) => {
   const socketUrl = `${scheme}${host}/ws`;
 
   socket = new WebSocket(socketUrl);
-  socket.addEventListener("open", () => updateStatus("Connected"));
+  socket.addEventListener("open", () => {
+    updateStatus("Connected");
+    if (userId) {
+      socket.send(JSON.stringify({ type: "init", user_id: userId }));
+    }
+  });
   socket.addEventListener("message", handleMessage);
   socket.addEventListener("close", () => updateStatus("Disconnected"));
   socket.addEventListener("error", () => updateStatus("Connection error"));

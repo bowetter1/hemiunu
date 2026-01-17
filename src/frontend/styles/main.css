@@ -50,6 +50,7 @@ button {
     border: none;
     color: #000;
     font-weight: bold;
+    transition: transform 0.1s ease-out, box-shadow 0.15s ease-out, background 0.1s ease;
 }
 
 button:hover {
@@ -64,4 +65,26 @@ button:active {
     margin-left: auto;
     font-size: 12px;
     color: #888;
+}
+
+#milestone-notification {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translate(-50%, -10px);
+    padding: 8px 14px;
+    background: #d4a017;
+    color: #111;
+    border-radius: 6px;
+    font-weight: bold;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 2;
+}
+
+#milestone-notification.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
 }

@@ -2,10 +2,17 @@ import gameState from "../state/gameState.js";
 
 let socket = null;
 let statusHandler = () => {};
+let milestoneHandler = () => {};
 
 const updateStatus = (value) => {
   if (typeof statusHandler === "function") {
     statusHandler(value);
+  }
+};
+
+const updateMilestone = (data) => {
+  if (typeof milestoneHandler === "function") {
+    milestoneHandler(data);
   }
 };
 
@@ -47,13 +54,17 @@ const handleMessage = (event) => {
     case "block_placed":
       addBlock(message.data);
       break;
+    case "milestone-event":
+      updateMilestone(message.data);
+      break;
     default:
       break;
   }
 };
 
-export const connect = ({ onStatusChange } = {}) => {
+export const connect = ({ onStatusChange, onMilestone } = {}) => {
   statusHandler = typeof onStatusChange === "function" ? onStatusChange : () => {};
+  milestoneHandler = typeof onMilestone === "function" ? onMilestone : () => {};
   updateStatus("Connecting...");
 
   const scheme = window.location.protocol === "https:" ? "wss://" : "ws://";
