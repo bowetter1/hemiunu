@@ -859,8 +859,8 @@ const showAchievementToast = (achievement) => {
   `;
   
   achievementToast.classList.add("show");
-  audioManager.playSound("milestone"); // Reuse milestone sound or add new one
-  
+  audioManager.playSound("achievement"); // Play achievement-specific sound
+
   setTimeout(() => {
     achievementToast.classList.remove("show");
   }, 4000);

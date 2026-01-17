@@ -8,6 +8,7 @@ class AudioManager {
       place: "data:audio/wav;base64,",
       error: "data:audio/wav;base64,",
       milestone: "data:audio/wav;base64,",
+      achievement: "data:audio/wav;base64,",
     };
   }
 
@@ -45,6 +46,9 @@ class AudioManager {
         break;
       case "milestone":
         this._playMilestoneSound();
+        break;
+      case "achievement":
+        this._playAchievementSound();
         break;
     }
   }
@@ -124,6 +128,27 @@ class AudioManager {
       osc.frequency.value = freq;
       osc.start(now + i * 0.1);
       osc.stop(now + 1.0);
+    });
+  }
+
+  _playAchievementSound() {
+    const now = this.ctx.currentTime;
+    const gain = this.ctx.createGain();
+    gain.connect(this.ctx.destination);
+
+    // Create pleasant "pling" sound for achievement unlock
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+    // Play a quick ascending arpeggio (short and pleasant)
+    const frequencies = [523.25, 659.25, 783.99]; // C-E-G (C major chord)
+    frequencies.forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      osc.start(now + i * 0.05);
+      osc.stop(now + 0.4);
     });
   }
 }
