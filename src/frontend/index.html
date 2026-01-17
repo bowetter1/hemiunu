@@ -32,7 +32,7 @@
         <aside id="chat-panel" aria-label="Chat">
             <div class="panel-header">
                 <h2 class="panel-title">Chat</h2>
-                <button id="chat-toggle" type="button" aria-expanded="true" aria-controls="chat-body" title="Toggle chat"><<</button>
+                <button id="chat-toggle" type="button" aria-expanded="true" aria-controls="chat-body" title="Toggle chat">&lt;&lt;</button>
             </div>
             <div id="chat-body" class="chat-body">
                 <ol id="chat-messages" aria-live="polite" aria-relevant="additions"></ol>
@@ -54,11 +54,45 @@
         <aside id="control-panel" aria-label="Controls">
             <button id="btn-mine" title="Click to mine 1 stone">⛏️ Mine Stone</button>
             <button id="btn-place" title="Click to place a block (Cost: 1 Stone)">🧱 Place Block</button>
+            <div class="block-type-panel" aria-label="Blocktyp">
+                <div class="block-type-header">
+                    <span class="block-type-title">Blocktyp</span>
+                    <span class="block-type-hint">Välj innan placering</span>
+                </div>
+                <div class="block-type-options" role="radiogroup" aria-label="Välj blocktyp">
+                    <button type="button" class="block-type-option" data-block-type="granite" aria-pressed="false">Granit</button>
+                    <button type="button" class="block-type-option is-selected" data-block-type="limestone" aria-pressed="true">Kalksten</button>
+                    <button type="button" class="block-type-option" data-block-type="sandstone" aria-pressed="false">Sandsten</button>
+                </div>
+                <div id="block-type-info" class="block-type-info" aria-live="polite">
+                    Standardblock. Vanligast i pyramiden.
+                </div>
+            </div>
             <div id="place-warning" aria-live="polite"></div>
             <div id="status-bar">Connecting...</div>
             <button id="btn-debug-clear" style="margin-top: 20px; background: #444; color: #f66;">💣 Clear All (Debug)</button>
             <button id="btn-mute" style="margin-top: 10px;">🔊 Sound On</button>
         </aside>
+    </div>
+
+    <div id="tutorial-overlay" class="tutorial-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+        <div class="tutorial-card" role="document">
+            <header class="tutorial-header">
+                <h2 id="tutorial-title">Välkommen till Hemiunu!</h2>
+                <p class="tutorial-intro">Mine stone, place blocks, build pyramid together.</p>
+            </header>
+            <div class="tutorial-body">
+                <p class="tutorial-rule">Block på z&gt;0 behöver 4 stödblock i hörnen.</p>
+                <div class="tutorial-diagram" aria-hidden="true">
+                    <div class="diagram-block support top-left"></div>
+                    <div class="diagram-block support top-right"></div>
+                    <div class="diagram-block support bottom-left"></div>
+                    <div class="diagram-block support bottom-right"></div>
+                    <div class="diagram-block top"></div>
+                </div>
+            </div>
+            <button id="tutorial-close" type="button">Börja bygga!</button>
+        </div>
     </div>
 
     <script type="module" src="js/main.js"></script>

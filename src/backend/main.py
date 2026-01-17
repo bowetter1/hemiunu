@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 
 import orjson
@@ -22,13 +22,17 @@ def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def is_valid_pyramid_placement(x: Any, y: Any, z: Any, blocks: List[Dict[str, Any]]) -> bool:
+def is_valid_pyramid_placement(
+    x: Any, y: Any, z: Any, blocks: List[Dict[str, Any]]
+) -> Tuple[bool, Optional[str]]:
     if not all(isinstance(value, int) for value in (x, y, z)):
-        return False
+        return False, "Koordinater måste vara heltal"
     if z < 0:
-        return False
+        return False, "Z-koordinat kan inte vara negativ"
     if z == 0:
-        return abs(x) <= 100 and abs(y) <= 100
+        if abs(x) > 100 or abs(y) > 100:
+            return False, "Placering utanför basområdet"
+        return True, None
 
     required_support = {
         (x - 1, y - 1, z - 1),
@@ -45,7 +49,9 @@ def is_valid_pyramid_placement(x: Any, y: Any, z: Any, blocks: List[Dict[str, An
         bz = block.get("z")
         if isinstance(bx, int) and isinstance(by, int) and isinstance(bz, int):
             existing_positions.add((bx, by, bz))
-    return required_support.issubset(existing_positions)
+    if not required_support.issubset(existing_positions):
+        return False, "Block måste ha 4 stödblock under sig"
+    return True, None
 
 
 class ConnectionManager:
@@ -216,10 +222,13 @@ async def handle_place_block(message: Dict[str, Any], websocket: WebSocket) -> N
         z = block_data.get("z")
         block_type = block_data.get("type")
 
-        if not is_valid_pyramid_placement(x, y, z, pyramid_blocks):
+        is_valid, error_message = is_valid_pyramid_placement(x, y, z, pyramid_blocks)
+        if not is_valid:
             error_payload = {
                 "type": "error",
-                "data": {"message": "Invalid block placement."},
+                "data": {
+                    "message": error_message or "Ogiltig blockplacering.",
+                },
             }
         else:
             current_stones = user_stones.get(user_id, DEFAULT_STARTING_STONE)

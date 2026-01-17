@@ -12,6 +12,9 @@ body {
     --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     --panel-accent: #d4a017;
     --panel-muted: #9c9c9c;
+    --block-granite: #7f7f7f;
+    --block-limestone: #d4c29d;
+    --block-sandstone: #c2803c;
 }
 
 #app {
@@ -107,6 +110,7 @@ button:disabled {
     top: 50%;
     transform: translateY(-50%);
     width: 300px;
+    height: 60vh;
     max-height: 70vh;
 }
 
@@ -121,6 +125,8 @@ button:disabled {
 #chat-panel.collapsed {
     width: 56px;
     padding: 10px;
+    height: auto;
+    max-height: none;
 }
 
 #chat-panel.collapsed .chat-body,
@@ -186,6 +192,10 @@ button:disabled {
 .chat-user {
     font-weight: bold;
     color: #f0f0f0;
+}
+
+.chat-time {
+    font-variant-numeric: tabular-nums;
 }
 
 .chat-text {
@@ -314,6 +324,100 @@ button:disabled {
     align-self: center;
 }
 
+.block-type-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(26, 26, 26, 0.9);
+    border: 1px solid #444;
+    border-radius: 8px;
+}
+
+.block-type-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.block-type-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #f0f0f0;
+    font-weight: bold;
+}
+
+.block-type-hint {
+    font-size: 10px;
+    color: var(--panel-muted);
+}
+
+.block-type-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.block-type-option {
+    padding: 6px 6px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 6px;
+    background: #242424;
+    color: #f0f0f0;
+    border: 1px solid #555;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: transform 0.1s ease-out, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.block-type-option::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1px solid #111;
+    background: var(--block-color, #777);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.block-type-option[data-block-type="granite"] {
+    --block-color: var(--block-granite);
+}
+
+.block-type-option[data-block-type="limestone"] {
+    --block-color: var(--block-limestone);
+}
+
+.block-type-option[data-block-type="sandstone"] {
+    --block-color: var(--block-sandstone);
+}
+
+.block-type-option:hover {
+    background: #2f2f2f;
+}
+
+.block-type-option:active {
+    background: #1f1f1f;
+}
+
+.block-type-option.is-selected {
+    border-color: var(--panel-accent);
+    box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.8), 0 6px 14px rgba(0, 0, 0, 0.4);
+    transform: translateY(-1px);
+}
+
+.block-type-info {
+    font-size: 11px;
+    color: #e2e2e2;
+    line-height: 1.3;
+    min-height: 32px;
+}
+
 @media (max-width: 900px) {
     #control-panel {
         top: 72px;
@@ -343,6 +447,15 @@ button:disabled {
         width: 100%;
     }
 
+    .block-type-panel {
+        flex: 1 1 100%;
+        order: 1;
+    }
+
+    .block-type-options {
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    }
+
     #chat-panel {
         top: auto;
         bottom: 12px;
@@ -350,6 +463,7 @@ button:disabled {
         right: 12px;
         width: auto;
         transform: none;
+        height: 36vh;
         max-height: 36vh;
     }
 
@@ -418,4 +532,143 @@ button:disabled {
 
 #place-warning.show {
     display: inline-flex;
+}
+
+.tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+        radial-gradient(circle at top, rgba(212, 160, 23, 0.18), rgba(0, 0, 0, 0.88) 55%),
+        rgba(8, 8, 8, 0.85);
+    backdrop-filter: blur(2px);
+}
+
+.tutorial-overlay.is-hidden {
+    display: none;
+}
+
+.tutorial-card {
+    width: min(640px, 94vw);
+    background: #1a1a1a;
+    border: 2px solid #4a4a4a;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    padding: 26px 28px;
+    text-align: center;
+    animation: tutorial-rise 0.35s ease-out;
+}
+
+.tutorial-header h2 {
+    margin: 0 0 10px;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    color: #f4d27a;
+}
+
+.tutorial-intro {
+    margin: 0 0 18px;
+    color: #d8d8d8;
+    font-size: 15px;
+}
+
+.tutorial-rule {
+    margin: 0;
+    font-weight: bold;
+    color: #f0f0f0;
+}
+
+.tutorial-body {
+    margin-bottom: 22px;
+}
+
+.tutorial-card button {
+    min-width: 200px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+}
+
+.tutorial-diagram {
+    margin: 18px auto 0;
+    display: grid;
+    grid-template-columns: repeat(3, 36px);
+    grid-template-rows: repeat(3, 36px);
+    gap: 8px;
+    width: max-content;
+    align-items: center;
+    justify-items: center;
+}
+
+.diagram-block {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 2px solid #5a5a5a;
+    background: linear-gradient(145deg, #2a2a2a, #1c1c1c);
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+.diagram-block.support.top-left {
+    grid-row: 1;
+    grid-column: 1;
+}
+
+.diagram-block.support.top-right {
+    grid-row: 1;
+    grid-column: 3;
+}
+
+.diagram-block.support.bottom-left {
+    grid-row: 3;
+    grid-column: 1;
+}
+
+.diagram-block.support.bottom-right {
+    grid-row: 3;
+    grid-column: 3;
+}
+
+.diagram-block.top {
+    grid-row: 2;
+    grid-column: 2;
+    background: linear-gradient(145deg, #f1c94d, #b88410);
+    border-color: #f6d573;
+    box-shadow: 0 0 14px rgba(212, 160, 23, 0.6);
+    transform: translateY(-6px);
+}
+
+@keyframes tutorial-rise {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 600px) {
+    .tutorial-card {
+        padding: 22px 18px;
+    }
+
+    .tutorial-header h2 {
+        font-size: 24px;
+    }
+
+    .tutorial-diagram {
+        grid-template-columns: repeat(3, 30px);
+        grid-template-rows: repeat(3, 30px);
+        gap: 6px;
+    }
+
+    .diagram-block {
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+    }
 }

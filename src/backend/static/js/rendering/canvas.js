@@ -19,11 +19,28 @@ const getCycleFactor = () => {
   return (Math.cos(progress * Math.PI * 2) * -1 + 1) / 2;
 };
 
-const colorMap = {
-  granite: "#7f7f7f",
-  limestone: "#d4c29d",
-  sandstone: "#c2803c",
+const blockStyles = {
+  granite: {
+    fill: "#7f7f7f",
+    stroke: "#1f1f1f",
+    lineWidth: 1.6,
+    pattern: "speckle",
+  },
+  limestone: {
+    fill: "#d4c29d",
+    stroke: "#8a7c5c",
+    lineWidth: 1,
+    pattern: "layers",
+  },
+  sandstone: {
+    fill: "#c2803c",
+    stroke: "#6f3f1b",
+    lineWidth: 1.3,
+    dash: [4, 2],
+    pattern: "strata",
+  },
 };
+const DEFAULT_BLOCK_STYLE = blockStyles.limestone;
 
 const GRID_SIZE = 10;
 const ANIM_DURATION = 400;
@@ -33,6 +50,97 @@ const ERROR_FLASH_DURATION = 300;
 let errorFlashStart = 0;
 
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+const getBlockStyle = (type) => blockStyles[type] ?? DEFAULT_BLOCK_STYLE;
+
+const hexToRgba = (hex, alpha) => {
+  if (typeof hex !== "string") {
+    return `rgba(159, 168, 176, ${alpha})`;
+  }
+  const normalized = hex.startsWith("#") ? hex.slice(1) : hex;
+  const value =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
+  if (value.length !== 6) {
+    return `rgba(159, 168, 176, ${alpha})`;
+  }
+  const r = Number.parseInt(value.slice(0, 2), 16);
+  const g = Number.parseInt(value.slice(2, 4), 16);
+  const b = Number.parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const drawBlockDiamondPath = (ctx, isoX, isoY, half) => {
+  ctx.beginPath();
+  ctx.moveTo(isoX, isoY - half);
+  ctx.lineTo(isoX + half, isoY);
+  ctx.lineTo(isoX, isoY + half);
+  ctx.lineTo(isoX - half, isoY);
+  ctx.closePath();
+};
+
+const seededRandom = (seed) => {
+  const value = Math.sin(seed) * 10000;
+  return value - Math.floor(value);
+};
+
+const drawBlockPattern = (ctx, isoX, isoY, half, style, seed) => {
+  if (!style.pattern) {
+    return;
+  }
+  ctx.save();
+  drawBlockDiamondPath(ctx, isoX, isoY, half);
+  ctx.clip();
+
+  switch (style.pattern) {
+    case "speckle": {
+      const dotRadius = Math.max(0.6, half * 0.05);
+      ctx.fillStyle = "rgba(20, 20, 20, 0.35)";
+      for (let i = 0; i < 7; i += 1) {
+        const randX = seededRandom(seed + i * 11.17);
+        const randY = seededRandom(seed + i * 23.71);
+        const px = isoX - half + randX * half * 2;
+        const py = isoY - half + randY * half * 2;
+        ctx.beginPath();
+        ctx.arc(px, py, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "layers": {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = Math.max(0.6, half * 0.04);
+      const gap = half * 0.35;
+      for (let offset = -half; offset <= half; offset += gap) {
+        ctx.beginPath();
+        ctx.moveTo(isoX - half, isoY + offset);
+        ctx.lineTo(isoX + half, isoY + offset);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "strata": {
+      ctx.strokeStyle = "rgba(255, 225, 185, 0.25)";
+      ctx.lineWidth = Math.max(0.6, half * 0.05);
+      const gap = half * 0.4;
+      for (let offset = -half; offset <= half; offset += gap) {
+        ctx.beginPath();
+        ctx.moveTo(isoX - half, isoY + half + offset);
+        ctx.lineTo(isoX + half, isoY - half + offset);
+        ctx.stroke();
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  ctx.restore();
+};
 
 export const animateNewBlock = (index, isOwn = false) => {
   gameState.blockAnimations.set(index, {
@@ -203,18 +311,22 @@ export const draw = () => {
       ctx.shadowColor = "rgba(255, 215, 0, 0.8)";
     }
 
-    ctx.beginPath();
-    ctx.moveTo(isoX, isoY - half);
-    ctx.lineTo(isoX + half, isoY);
-    ctx.lineTo(isoX, isoY + half);
-    ctx.lineTo(isoX - half, isoY);
-    ctx.closePath();
+    const style = getBlockStyle(type);
+    const seed = x * 12.9898 + y * 78.233 + z * 37.719;
 
-    ctx.fillStyle = colorMap[type] ?? "#9fa8b0";
+    ctx.save();
+    ctx.fillStyle = style.fill;
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = style.lineWidth ?? 1;
+    if (style.dash) {
+      ctx.setLineDash(style.dash);
+    }
+    drawBlockDiamondPath(ctx, isoX, isoY, half);
     ctx.fill();
-    ctx.strokeStyle = "#1b1b1b";
-    ctx.lineWidth = 1;
     ctx.stroke();
+    ctx.setLineDash([]);
+    drawBlockPattern(ctx, isoX, isoY, half, style, seed);
+    ctx.restore();
 
     if (isLast) {
       ctx.restore();
@@ -292,7 +404,7 @@ export const getValidPlacements = (blocks) => {
   return valid;
 };
 
-export const renderGhostBlock = (x, y, z, isValid) => {
+export const renderGhostBlock = (x, y, z, isValid, type) => {
   if (!canvas || !ctx) {
     return;
   }
@@ -306,17 +418,23 @@ export const renderGhostBlock = (x, y, z, isValid) => {
   const half = blockSize / 2;
 
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(isoX, isoY - half);
-  ctx.lineTo(isoX + half, isoY);
-  ctx.lineTo(isoX, isoY + half);
-  ctx.lineTo(isoX - half, isoY);
-  ctx.closePath();
+  const style = getBlockStyle(type);
+  const fillColor = isValid
+    ? hexToRgba(style.fill, 0.45)
+    : "rgba(200, 70, 70, 0.35)";
+  const strokeColor = isValid
+    ? hexToRgba(style.stroke, 0.9)
+    : "rgba(170, 60, 60, 0.9)";
 
-  ctx.fillStyle = isValid ? "rgba(90, 190, 120, 0.45)" : "rgba(200, 70, 70, 0.35)";
-  ctx.strokeStyle = isValid ? "rgba(80, 150, 100, 0.9)" : "rgba(170, 60, 60, 0.9)";
+  if (isValid && style.dash) {
+    ctx.setLineDash(style.dash);
+  }
+  drawBlockDiamondPath(ctx, isoX, isoY, half);
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
   ctx.lineWidth = 1;
   ctx.fill();
   ctx.stroke();
+  ctx.setLineDash([]);
   ctx.restore();
 };

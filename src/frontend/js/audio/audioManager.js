@@ -11,19 +11,25 @@ class AudioManager {
     };
   }
 
-  toggleMute() {
-    this.muted = !this.muted;
+  _ensureContext() {
     if (this.ctx.state === "suspended") {
       this.ctx.resume();
     }
+  }
+
+  unlock() {
+    this._ensureContext();
+  }
+
+  toggleMute() {
+    this.muted = !this.muted;
+    this._ensureContext();
     return this.muted;
   }
 
   playSound(name) {
     if (this.muted) return;
-    if (this.ctx.state === "suspended") {
-      this.ctx.resume();
-    }
+    this._ensureContext();
 
     // In a full implementation with assets, we would load/play from this.soundUrls[name]
     // For this prototype, we synthesize sounds using oscillators.

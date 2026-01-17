@@ -1,5 +1,6 @@
 import gameState from "../state/gameState.js";
 import { animateNewBlock } from "../rendering/canvas.js";
+import audioManager from "../audio/audioManager.js";
 
 let socket = null;
 let statusHandler = () => {};
@@ -20,10 +21,13 @@ const updateMilestone = (data) => {
 };
 
 const showError = (message) => {
-  const text = message ? `Error: ${message}` : "Error";
-  updateStatus(text);
+  const normalized =
+    typeof message === "string" && message.trim() ? message.trim() : null;
+  const statusText = normalized ? `Fel: ${normalized}` : "Fel";
+  updateStatus(statusText);
+  audioManager.playSound("error");
   if (typeof errorHandler === "function") {
-    errorHandler(message);
+    errorHandler(normalized);
   }
   if (socket && socket.readyState === WebSocket.OPEN) {
     window.setTimeout(() => {
@@ -79,10 +83,12 @@ const handleMessage = (event) => {
             message?.data?.user_id &&
             message.data.user_id === currentUserId;
           animateNewBlock(index, isOwn);
+          audioManager.playSound("place");
         }
       }
       break;
     case "milestone-event":
+      audioManager.playSound("milestone");
       updateMilestone(message.data);
       break;
     case "error":
