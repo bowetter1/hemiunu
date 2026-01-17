@@ -18,6 +18,8 @@
             </div>
         </header>
 
+        <div id="activity-feed" aria-live="polite" aria-relevant="additions"></div>
+
         <main>
             <div id="milestone-notification" aria-live="polite"></div>
             <div id="error-notification" role="alert" aria-live="assertive"></div>
@@ -53,6 +55,7 @@
 
         <aside id="control-panel" aria-label="Controls">
             <button id="btn-mine" title="Click to mine 1 stone">⛏️ Mine Stone</button>
+            <button id="btn-auto-mine">⚙️ Auto-Mine: OFF</button>
             <button id="btn-place" title="Click to place a block (Cost: 1 Stone)">🧱 Place Block</button>
             <div class="block-type-panel" aria-label="Blocktyp">
                 <div class="block-type-header">
@@ -70,7 +73,7 @@
             </div>
             <div id="place-warning" aria-live="polite"></div>
             <div id="status-bar">Connecting...</div>
-            <button id="btn-debug-clear" style="margin-top: 20px; background: #444; color: #f66;">💣 Clear All (Debug)</button>
+            <button id="btn-debug-clear" style="margin-top: 20px; background: #444; color: #f66;" hidden>💣 Clear All (Debug)</button>
             <button id="btn-mute" style="margin-top: 10px;">🔊 Sound On</button>
         </aside>
     </div>

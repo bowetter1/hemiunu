@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
@@ -333,6 +334,15 @@ async def handle_set_username(message: Dict[str, Any], websocket: WebSocket) -> 
 
 
 async def handle_debug_clear(message: Dict[str, Any], websocket: WebSocket) -> None:
+    admin_key = message.get("admin_key")
+    if admin_key is None and isinstance(message.get("data"), dict):
+        admin_key = message["data"].get("admin_key")
+    expected_key = os.getenv("ADMIN_KEY") or "hemiunu-admin-2026"
+    if not isinstance(admin_key, str) or admin_key.strip() != expected_key:
+        await websocket.send_text(
+            _serialize_message({"type": "error", "data": {"message": "Unauthorized"}})
+        )
+        return
     user_id = message.get("user_id", "unknown")
     async with state_lock:
         pyramid_blocks.clear()

@@ -181,29 +181,61 @@ OUTPUT:
 ```
 
 ### 4. Creative Director
+**VIKTIGT: CD måste SPELA spelet innan beslut om nästa sprint!**
+
 ```bash
+# Steg 1: CD spelar spelet via WebSocket (som en riktig spelare)
+codex exec "
+ROLL: Creative Director - Playtest Session
+UPPGIFT: SPELA spelet som en ny spelare i 2-3 minuter.
+
+PLAYTEST SCRIPT:
+1. Anslut till wss://hemiunu-production.up.railway.app/ws
+2. Sätt ett kreativt username
+3. Läs tutorial (om det finns)
+4. Mine 5-10 stones
+5. Placera blocks - testa alla 3 typer
+6. Försök bygga på höjden (z > 0)
+7. Chatta något
+8. Vänta och se dag/natt-cykeln
+
+NOTERA UNDER SPEL:
+- Första intryck (0-30 sek)
+- 'Aha moments'
+- Förvirrande moment
+- Vad saknas?
+- Vad är kul?
+- Vad är tråkigt?
+
+OUTPUT: Råa playtest-anteckningar
+" 2>&1 | tee analysis/cd_playtest.md
+
+# Steg 2: CD analyserar och föreslår features baserat på playtest
 gemini -y "
-ROLL: Creative Director
-UPPGIFT: Granska spelets VISION och KÄNSLA.
+ROLL: Creative Director - Sprint Planning
+KONTEXT: Du har just spelat Hemiunu. Läs dina playtest-anteckningar.
 
-ANALYS:
-1. Är temat konsekvent? (Ancient Egypt, pyramid-building)
-2. Stämmer UI/UX med tonen?
-3. Berättar spelet en historia?
-4. Vad är 'the hook'? Varför kommer folk spela?
-5. Vad skiljer detta från andra multiplayer-builders?
+$(cat analysis/cd_playtest.md)
 
-VISION-CHECK:
-- Core fantasy: 'Bygg pyramiden tillsammans'
-- Emotional payoff: Vad känner spelaren?
-- Social hook: Varför bjuder man in vänner?
+UPPGIFT: Baserat på din FAKTISKA spelupplevelse, föreslå nästa sprint.
+
+FRÅGOR:
+1. Vad var roligt? (Bygg på detta)
+2. Vad var frustrerande? (Fixa detta)
+3. Vad saknades mest? (Lägg till detta)
+4. Vad är 'the hook'? (Förstärk detta)
 
 OUTPUT:
-- Vision clarity score (1-10)
-- Brand identity feedback
-- Förslag på starkare narrative
+- Top 3 prioriterade features
+- Varför just dessa (baserat på playtest)
+- Vision för hur spelet känns efter sprint
 "
 ```
+
+**Varför playtest först?**
+- Verkliga problem > antagna problem
+- CD fattar beslut baserat på upplevelse, inte spec
+- Fångar saker som kod-analys missar
 
 ---
 
@@ -214,16 +246,15 @@ OUTPUT:
 │                    GAME STUDIO SPRINT                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  PRE-SPRINT (Analys)                                        │
+│  PRE-SPRINT (Analys) ⭐ OBLIGATORISK                        │
 │  ─────────────────────────────────────────────              │
-│  🔍 Codebase Analyst → Rapport                              │
+│  🔍 Codebase Analyst → Rapport (ALLTID FÖRST!)              │
 │  🎮 Live Tester → Bug report                                │
-│  👤 UX Reviewer → Player feedback                           │
+│  🎨 Creative Director → Nästa sprint-vision                 │
 │                                                             │
 │  SPRINT (Implementation)                                    │
 │  ─────────────────────────────────────────────              │
 │  👨‍💻 Codex Workers → Implementerar fixes/features           │
-│  🎨 Creative Director → Validerar vision                    │
 │                                                             │
 │  POST-SPRINT (Verification)                                 │
 │  ─────────────────────────────────────────────              │
@@ -233,6 +264,35 @@ OUTPUT:
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Mandatory Pre-Sprint: Codebase Analyst
+**VARJE sprint börjar med Codebase Analyst!** Kör med output till fil:
+
+```bash
+gemini -y "
+ROLL: Codebase Analyst
+UPPGIFT: Läs HELA kodbasen och ge sprint-förberedande analys.
+
+LÄS FILER:
+$(find src -name '*.py' -o -name '*.js' -o -name '*.css' -o -name '*.html')
+
+ANALYS:
+1. Nuvarande arkitektur-översikt
+2. Senaste ändringarna sedan förra sprint
+3. Teknisk skuld som bör åtgärdas
+4. Performance/säkerhetsproblem
+5. Kodkvalitet-betyg (1-10)
+6. Rekommenderade sprint-prioriteringar
+
+OUTPUT: Strukturerad rapport
+" > analysis/sprint_X_analysis.md
+```
+
+**Varför obligatoriskt?**
+- Ger baseline för varje sprint
+- Fångar regressioner tidigt
+- CD får bättre underlag för planering
+- Historik av kodkvalitet över tid
 
 ---
 
@@ -431,6 +491,17 @@ Problem: Claude Task agent kan inte skriva filer
 Lösning: Reassign till Codex
 Kommando: codex exec "[samma spec]"
 ```
+
+### Codex kan inte göra nätverksanrop
+```
+Problem: Codex exec kan INTE ansluta till externa URLs (WebSocket, HTTP)
+Orsak: Sandbox-restriktioner blockerar utgående nätverkstrafik
+Lösning:
+- Kör nätverkstester med Node.js/Python LOKALT (utanför Codex)
+- Använd Chef för manuella playtests
+- Eller: Skriv testscript med Codex, kör scriptet manuellt
+```
+**Lärdom från Sprint 4 PRE-SPRINT:** Live Tester och CD Playtest via Codex misslyckades pga nätverksbegränsning.
 
 ### Worker ignorerar instruktioner
 ```
@@ -691,10 +762,12 @@ railway up --detach
 
 Denna handbook är ett levande dokument. Uppdatera den efter varje projekt med nya lärdomar.
 
-**Version:** 1.1
+**Version:** 1.3
 **Uppdaterad:** 2026-01-17
 **Av:** Chef Claude, Hemiunu Project
 
 ### Changelog
+- v1.3: CD playtest-first, Codex nätverksbegränsning dokumenterad
+- v1.2: Mandatory Pre-Sprint Codebase Analyst, uppdaterad Sprint Structure
 - v1.1: Lade till Worker Timing, Optimal Sprint Size, Verification Protocol, Chef Mindset
 - v1.0: Initial version

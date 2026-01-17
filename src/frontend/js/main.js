@@ -16,6 +16,8 @@ const milestoneProgressEl = document.getElementById("milestone-progress");
 const milestoneNoticeEl = document.getElementById("milestone-notification");
 const errorNoticeEl = document.getElementById("error-notification");
 const placeWarningEl = document.getElementById("place-warning");
+const mineBtn = document.getElementById("btn-mine");
+const autoMineBtn = document.getElementById("btn-auto-mine");
 const placeBtn = document.getElementById("btn-place");
 const canvas = document.getElementById("game-canvas");
 const chatPanel = document.getElementById("chat-panel");
@@ -28,6 +30,7 @@ const blockTypeButtons = document.querySelectorAll(".block-type-option");
 const blockTypeInfoEl = document.getElementById("block-type-info");
 const tutorialOverlay = document.getElementById("tutorial-overlay");
 const tutorialCloseBtn = document.getElementById("tutorial-close");
+const activityFeedEl = document.getElementById("activity-feed");
 
 const USER_ID_KEY = "hemiunu-user-id";
 const CHAT_COLLAPSED_KEY = "hemiunu-chat-collapsed";
@@ -37,6 +40,10 @@ const ERROR_NOTICE_DURATION = 3000;
 const GRID_SIZE = 10;
 const MAX_CHAT_MESSAGES = 60;
 const LEADERBOARD_LIMIT = 10;
+const ACTIVITY_FEED_LIMIT = 3;
+const ACTIVITY_FEED_FADE_DELAY = 5000;
+const ACTIVITY_FEED_FADE_DURATION = 500;
+const AUTO_MINE_INTERVAL = 3000;
 const DEFAULT_BLOCK_TYPE = "limestone";
 const BLOCK_TYPE_INFO = {
   granite: {
@@ -87,6 +94,8 @@ const currentUserLabel = getUserLabel(userId);
 const currentUserName = getUserName(userId);
 const chatMessages = [];
 let lastLeaderboardSource = null;
+let autoMineEnabled = false;
+let autoMineInterval = null;
 
 const toTimestamp = (value) => {
   if (value instanceof Date) {
@@ -239,6 +248,62 @@ const setChatMessages = (messages) => {
   });
   chatMessagesEl.appendChild(fragment);
   scrollChatToLatest();
+};
+
+const formatBlockTypeLabel = (blockType) => {
+  if (typeof blockType !== "string") {
+    return "block";
+  }
+  const normalized = blockType.trim().toLowerCase();
+  const labels = {
+    granite: "granit",
+    limestone: "kalksten",
+    sandstone: "sandsten",
+  };
+  return labels[normalized] ?? normalized || "block";
+};
+
+const removeActivityItem = (item) => {
+  if (!item) {
+    return;
+  }
+  const fadeTimer = Number(item.dataset.fadeTimer);
+  const removeTimer = Number(item.dataset.removeTimer);
+  if (Number.isFinite(fadeTimer)) {
+    window.clearTimeout(fadeTimer);
+  }
+  if (Number.isFinite(removeTimer)) {
+    window.clearTimeout(removeTimer);
+  }
+  item.remove();
+};
+
+const appendActivityItem = ({ username, blockType }) => {
+  if (!activityFeedEl) {
+    return;
+  }
+  const label = typeof username === "string" && username.trim() ? username.trim() : "Player";
+  const typeLabel = formatBlockTypeLabel(blockType);
+  const item = document.createElement("div");
+  item.className = "activity-item";
+  item.textContent = `${label} placerade ett ${typeLabel}-block`;
+  activityFeedEl.appendChild(item);
+  requestAnimationFrame(() => {
+    item.classList.add("is-visible");
+  });
+
+  const fadeTimer = window.setTimeout(() => {
+    item.classList.add("is-fading");
+    const remove = () => removeActivityItem(item);
+    item.addEventListener("transitionend", remove, { once: true });
+    const removeTimer = window.setTimeout(remove, ACTIVITY_FEED_FADE_DURATION + 50);
+    item.dataset.removeTimer = String(removeTimer);
+  }, ACTIVITY_FEED_FADE_DELAY);
+  item.dataset.fadeTimer = String(fadeTimer);
+
+  while (activityFeedEl.children.length > ACTIVITY_FEED_LIMIT) {
+    removeActivityItem(activityFeedEl.firstElementChild);
+  }
 };
 
 const extractLeaderboardEntries = (payload) => {
@@ -622,6 +687,22 @@ const handleSocketMessage = (event) => {
       }
       break;
     }
+    case "block_placed": {
+      const payload = message.data ?? {};
+      const eventUserId = payload.user_id ?? payload.userId ?? null;
+      if (!eventUserId || eventUserId === userId) {
+        break;
+      }
+      const username =
+        typeof payload.username === "string" && payload.username.trim()
+          ? payload.username.trim()
+          : getUserLabel(eventUserId);
+      appendActivityItem({
+        username,
+        blockType: payload.type ?? payload.block_type ?? payload.blockType,
+      });
+      break;
+    }
     default:
       break;
   }
@@ -635,6 +716,40 @@ const flashButton = (button) => {
     button.style.transform = "";
     button.style.boxShadow = "";
   }, 150);
+};
+
+const mineStone = () => {
+  if (mineBtn) {
+    flashButton(mineBtn);
+  }
+  audioManager.playSound("mine");
+  send({ type: "mine_stone", user_id: userId });
+};
+
+const updateAutoMineButton = () => {
+  if (!autoMineBtn) {
+    return;
+  }
+  const label = autoMineEnabled ? "Auto-Mine: ON" : "Auto-Mine: OFF";
+  autoMineBtn.textContent = `⚙️ ${label}`;
+  autoMineBtn.classList.toggle("is-on", autoMineEnabled);
+};
+
+const startAutoMine = () => {
+  if (autoMineInterval) {
+    window.clearInterval(autoMineInterval);
+  }
+  autoMineInterval = window.setInterval(() => {
+    mineStone();
+  }, AUTO_MINE_INTERVAL);
+};
+
+const stopAutoMine = () => {
+  if (!autoMineInterval) {
+    return;
+  }
+  window.clearInterval(autoMineInterval);
+  autoMineInterval = null;
 };
 
 const positionKey = (x, y, z) => `${x},${y},${z}`;
@@ -896,7 +1011,6 @@ const calculatePlacement = () => {
 };
 
 const lockButtons = () => {
-  const mineBtn = document.getElementById("btn-mine");
   const debugClearBtn = document.getElementById("btn-debug-clear");
   const muteBtn = document.getElementById("btn-mute");
 
@@ -909,10 +1023,21 @@ const lockButtons = () => {
 
   if (mineBtn) {
     mineBtn.addEventListener("click", () => {
-      flashButton(mineBtn);
-      audioManager.playSound("mine");
-      send({ type: "mine_stone", user_id: userId });
+      mineStone();
     });
+  }
+
+  if (autoMineBtn) {
+    autoMineBtn.addEventListener("click", () => {
+      autoMineEnabled = !autoMineEnabled;
+      if (autoMineEnabled) {
+        startAutoMine();
+      } else {
+        stopAutoMine();
+      }
+      updateAutoMineButton();
+    });
+    updateAutoMineButton();
   }
 
   if (placeBtn) {
@@ -935,7 +1060,15 @@ const lockButtons = () => {
       ) {
         return;
       }
-      send({ type: "debug_clear_all", user_id: userId });
+      const adminKey = window.prompt("Admin key required to clear the pyramid.");
+      if (!adminKey || !adminKey.trim()) {
+        return;
+      }
+      send({
+        type: "debug_clear_all",
+        user_id: userId,
+        admin_key: adminKey.trim(),
+      });
     });
   }
 };
