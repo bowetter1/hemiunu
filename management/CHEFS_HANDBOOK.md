@@ -1,5 +1,16 @@
 # Chef's Handbook
-> AI Organization Management Guide v1.0
+> AI Organization Management Guide v2.0
+
+## Dokumentation
+
+| Dokument | Syfte |
+|----------|-------|
+| **[ONBOARDING.md](ONBOARDING.md)** | Läs först - 5 min quick start |
+| **CHEFS_HANDBOOK.md** | Denna fil - komplett referens |
+| **[specs/TEMPLATE.md](specs/TEMPLATE.md)** | Mall för worker-specs |
+| **[workers/WORKER_MATRIX.md](workers/WORKER_MATRIX.md)** | Vilken worker för vad |
+
+---
 
 ## Filosofi
 
@@ -36,19 +47,31 @@ Kör reviewer, fixa issues, deploya
 
 ## Worker Capabilities Matrix
 
-| Worker | Kan skriva filer | Bäst för | Varning |
-|--------|------------------|----------|---------|
-| **Codex** | ✅ Ja | Implementation, refactoring | Följer spec strikt |
-| **Gemini** | ✅ Ja | Kreativa lösningar, UI | Kan ignorera "koda inte" instruktioner |
-| **Claude Task** | ❌ Sandbox | Research, analys, planning | KAN INTE SKRIVA FILER |
-| **Claude Opus** | ❌ Sandbox | Komplex research, arkitektur | KAN INTE SKRIVA FILER |
-| **Claude Haiku** | ❌ Sandbox | Snabba frågor, validering | KAN INTE SKRIVA FILER |
+> Fullständig guide: [workers/WORKER_MATRIX.md](workers/WORKER_MATRIX.md)
+
+| Worker | CLI | Kan skriva | Bäst för |
+|--------|-----|------------|----------|
+| **Codex** | `codex exec "..."` | ✅ Ja | Implementation, refactoring |
+| **Codex o3** | `codex exec -m o3 "..."` | ✅ Ja | Komplexa uppgifter |
+| **Codex o4-mini** | `codex exec -m o4-mini "..."` | ✅ Ja | Snabba enkla tasks |
+| **Gemini** | `gemini -y "..."` | ✅ Ja | Kreativt, UI, 2M context |
+| **Qwen** | `qwen -y "..."` | ✅ Ja | Backup, noggrann |
+| **Claude Task** | (inbyggd) | ❌ Sandbox | Research, analys |
 
 ### Tumregel
 ```
-Implementation → Codex
-Research → Claude Task
-Wild card → Gemini
+Implementation     → Codex (eller Gemini/Qwen)
+Komplex arkitektur → Codex -m o3
+Snabb enkel fix    → Codex -m o4-mini
+Kreativ/UI         → Gemini
+Backup             → Qwen
+Research           → Claude Task
+```
+
+### VIKTIGT
+```
+Codex, Gemini, Qwen  →  KAN skriva filer (använd för implementation)
+Claude Task agents   →  KAN INTE skriva filer (använd för research)
 ```
 
 ---
@@ -762,11 +785,12 @@ railway up --detach
 
 Denna handbook är ett levande dokument. Uppdatera den efter varje projekt med nya lärdomar.
 
-**Version:** 1.3
+**Version:** 2.0
 **Uppdaterad:** 2026-01-17
-**Av:** Chef Claude, Hemiunu Project
+**Av:** Chef Claude Opus, Hemiunu Project
 
 ### Changelog
+- v2.0: Ny dokumentationsstruktur (ONBOARDING, specs/, workers/), lade till Qwen + Codex modellval
 - v1.3: CD playtest-first, Codex nätverksbegränsning dokumenterad
 - v1.2: Mandatory Pre-Sprint Codebase Analyst, uppdaterad Sprint Structure
 - v1.1: Lade till Worker Timing, Optimal Sprint Size, Verification Protocol, Chef Mindset
