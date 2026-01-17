@@ -93,9 +93,6 @@ async def health_check():
     return {"status": "ok"}
 
 
-static_directory = Path(__file__).resolve().parent / "static"
-app.mount("/", StaticFiles(directory=str(static_directory), html=True), name="static")
-
 connection_manager = ConnectionManager()
 persistence_manager = PersistenceManager()
 
@@ -155,6 +152,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         pass
     finally:
         connection_manager.disconnect(websocket)
+
+
+static_directory = Path(__file__).resolve().parent / "static"
+app.mount("/", StaticFiles(directory=str(static_directory), html=True), name="static")
 
 
 async def handle_mine_stone(message: Dict[str, Any], websocket: WebSocket) -> None:
