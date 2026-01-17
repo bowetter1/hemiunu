@@ -3,6 +3,22 @@ import gameState from "../state/gameState.js";
 const canvas = document.getElementById("game-canvas");
 const ctx = canvas?.getContext("2d");
 
+const DAY_CYCLE_DURATION = 60000; // 60 seconds
+const SKY_DAY_TOP = [135, 206, 235];
+const SKY_DAY_BOTTOM = [255, 255, 255];
+const SKY_NIGHT_TOP = [10, 10, 40];
+const SKY_NIGHT_BOTTOM = [20, 20, 60];
+
+const lerpColor = (c1, c2, t) => c1.map((v, i) => Math.round(v + (c2[i] - v) * t));
+const rgb = (arr) => `rgb(${arr.join(",")})`;
+
+const getCycleFactor = () => {
+  const now = Date.now();
+  const progress = (now % DAY_CYCLE_DURATION) / DAY_CYCLE_DURATION;
+  // 0 = Night, 1 = Day. Using cosine to oscillate.
+  return (Math.cos(progress * Math.PI * 2) * -1 + 1) / 2;
+};
+
 const colorMap = {
   granite: "#7f7f7f",
   limestone: "#d4c29d",
@@ -119,7 +135,23 @@ export const draw = () => {
     return;
   }
   const { displayWidth, displayHeight, blockSize, centerX, baseY } = metrics;
-  ctx.clearRect(0, 0, displayWidth, displayHeight);
+  
+  // Day/Night Cycle Background
+  const cycleFactor = getCycleFactor(); // 0 (Night) to 1 (Day)
+  const bgTop = lerpColor(SKY_NIGHT_TOP, SKY_DAY_TOP, cycleFactor);
+  const bgBottom = lerpColor(SKY_NIGHT_BOTTOM, SKY_DAY_BOTTOM, cycleFactor);
+  
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, displayHeight);
+  bgGrad.addColorStop(0, rgb(bgTop));
+  bgGrad.addColorStop(1, rgb(bgBottom));
+  
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, displayWidth, displayHeight);
+
+  // Apply brightness filter for scene elements
+  // Brightness: 0.5 (Night) to 1.0 (Day)
+  const brightness = 0.5 + 0.5 * cycleFactor;
+  ctx.filter = `brightness(${brightness})`;
 
   drawGrid(ctx, centerX, baseY, blockSize);
   drawPyramidShadow(ctx, centerX, baseY, blockSize);
@@ -192,6 +224,9 @@ export const draw = () => {
       ctx.restore();
     }
   });
+
+  // Reset filter before UI/Overlays
+  ctx.filter = "none";
 
   const elapsed = errorFlashStart ? Date.now() - errorFlashStart : 0;
   if (elapsed > 0 && elapsed <= ERROR_FLASH_DURATION) {

@@ -1,9 +1,11 @@
 import gameState from "../state/gameState.js";
+import { animateNewBlock } from "../rendering/canvas.js";
 
 let socket = null;
 let statusHandler = () => {};
 let milestoneHandler = () => {};
 let errorHandler = () => {};
+let currentUserId = null;
 
 const updateStatus = (value) => {
   if (typeof statusHandler === "function") {
@@ -53,6 +55,7 @@ const addBlock = (block) => {
     return;
   }
   gameState.pyramid.push(block);
+  return gameState.pyramid.length - 1;
 };
 
 const handleMessage = (event) => {
@@ -68,7 +71,16 @@ const handleMessage = (event) => {
       overrideState(message.data);
       break;
     case "block_placed":
-      addBlock(message.data);
+      {
+        const index = addBlock(message.data);
+        if (typeof index === "number") {
+          const isOwn =
+            currentUserId &&
+            message?.data?.user_id &&
+            message.data.user_id === currentUserId;
+          animateNewBlock(index, isOwn);
+        }
+      }
       break;
     case "milestone-event":
       updateMilestone(message.data);
@@ -81,18 +93,24 @@ const handleMessage = (event) => {
   }
 };
 
-export const connect = ({ onStatusChange, onMilestone, onError } = {}) => {
+export const connect = ({ onStatusChange, onMilestone, onError, userId } = {}) => {
   statusHandler = typeof onStatusChange === "function" ? onStatusChange : () => {};
   milestoneHandler = typeof onMilestone === "function" ? onMilestone : () => {};
   errorHandler = typeof onError === "function" ? onError : () => {};
   updateStatus("Connecting...");
+  currentUserId = userId ?? null;
 
   const scheme = window.location.protocol === "https:" ? "wss://" : "ws://";
   const host = window.location.host;
   const socketUrl = `${scheme}${host}/ws`;
 
   socket = new WebSocket(socketUrl);
-  socket.addEventListener("open", () => updateStatus("Connected"));
+  socket.addEventListener("open", () => {
+    updateStatus("Connected");
+    if (userId) {
+      socket.send(JSON.stringify({ type: "init", user_id: userId }));
+    }
+  });
   socket.addEventListener("message", handleMessage);
   socket.addEventListener("close", () => updateStatus("Disconnected"));
   socket.addEventListener("error", () => updateStatus("Connection error"));

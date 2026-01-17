@@ -22,7 +22,34 @@
             <div id="milestone-notification" aria-live="polite"></div>
             <div id="error-notification" role="alert" aria-live="assertive"></div>
             <canvas id="game-canvas"></canvas>
+            
+            <!-- Audio Placeholders -->
+            <audio id="audio-bgm" loop preload="auto" style="display: none;"></audio>
+            <audio id="audio-place" preload="auto" style="display: none;"></audio>
+            <audio id="audio-mine" preload="auto" style="display: none;"></audio>
         </main>
+
+        <aside id="chat-panel" aria-label="Chat">
+            <div class="panel-header">
+                <h2 class="panel-title">Chat</h2>
+                <button id="chat-toggle" type="button" aria-expanded="true" aria-controls="chat-body" title="Toggle chat"><<</button>
+            </div>
+            <div id="chat-body" class="chat-body">
+                <ol id="chat-messages" aria-live="polite" aria-relevant="additions"></ol>
+                <form id="chat-form" autocomplete="off">
+                    <input id="chat-input" type="text" maxlength="200" placeholder="Skriv ett meddelande..." aria-label="Chat message">
+                    <button id="chat-send" type="submit">Skicka</button>
+                </form>
+            </div>
+        </aside>
+
+        <aside id="leaderboard-panel" aria-label="Leaderboard">
+            <div class="panel-header">
+                <h2 class="panel-title">Leaderboard</h2>
+                <span class="panel-subtitle">Top 10</span>
+            </div>
+            <ol id="leaderboard-list" aria-live="polite"></ol>
+        </aside>
 
         <aside id="control-panel" aria-label="Controls">
             <button id="btn-mine" title="Click to mine 1 stone">⛏️ Mine Stone</button>
@@ -30,6 +57,7 @@
             <div id="place-warning" aria-live="polite"></div>
             <div id="status-bar">Connecting...</div>
             <button id="btn-debug-clear" style="margin-top: 20px; background: #444; color: #f66;">💣 Clear All (Debug)</button>
+            <button id="btn-mute" style="margin-top: 10px;">🔊 Sound On</button>
         </aside>
     </div>
 

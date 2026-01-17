@@ -34,6 +34,12 @@ class PersistenceManager:
                     stones INTEGER
                 )
             """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS usernames (
+                    user_id TEXT PRIMARY KEY,
+                    username TEXT
+                )
+            """)
             await db.commit()
             logger.info("Database initialized.")
 
@@ -85,5 +91,30 @@ class PersistenceManager:
         """Retrieve all user stone counts (for initialization)."""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.execute("SELECT user_id, stones FROM user_stones") as cursor:
+                rows = await cursor.fetchall()
+                return {row[0]: row[1] for row in rows}
+
+    async def save_username(self, user_id: str, username: str) -> None:
+        """Update or insert the username for a user."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO usernames (user_id, username) VALUES (?, ?)",
+                (user_id, username)
+            )
+            await db.commit()
+
+    async def get_username(self, user_id: str) -> Optional[str]:
+        """Get the username for a specific user."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT username FROM usernames WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return row[0]
+                return None
+
+    async def get_all_usernames(self) -> Dict[str, str]:
+        """Retrieve all usernames (for initialization)."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT user_id, username FROM usernames") as cursor:
                 rows = await cursor.fetchall()
                 return {row[0]: row[1] for row in rows}

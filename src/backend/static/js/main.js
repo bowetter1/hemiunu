@@ -1,6 +1,12 @@
 import gameState from "./state/gameState.js";
+import audioManager from "./audio/audioManager.js";
 import { connect, send } from "./network/websocket.js";
-import { draw, flashError } from "./rendering/canvas.js";
+import {
+  draw,
+  flashError,
+  getValidPlacements,
+  renderGhostBlock,
+} from "./rendering/canvas.js";
 
 const blockCountEl = document.getElementById("block-count");
 const stoneCountEl = document.getElementById("stone-count");
@@ -11,10 +17,21 @@ const milestoneNoticeEl = document.getElementById("milestone-notification");
 const errorNoticeEl = document.getElementById("error-notification");
 const placeWarningEl = document.getElementById("place-warning");
 const placeBtn = document.getElementById("btn-place");
+const canvas = document.getElementById("game-canvas");
+const chatPanel = document.getElementById("chat-panel");
+const chatToggleBtn = document.getElementById("chat-toggle");
+const chatMessagesEl = document.getElementById("chat-messages");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+const leaderboardListEl = document.getElementById("leaderboard-list");
 
 const USER_ID_KEY = "hemiunu-user-id";
+const CHAT_COLLAPSED_KEY = "hemiunu-chat-collapsed";
 const MILESTONE_INTERVAL = 100;
 const ERROR_NOTICE_DURATION = 3000;
+const GRID_SIZE = 10;
+const MAX_CHAT_MESSAGES = 60;
+const LEADERBOARD_LIMIT = 10;
 
 const getUserId = () => {
   const stored = window.localStorage.getItem(USER_ID_KEY);
@@ -38,6 +55,7 @@ const setStatus = (value) => {
 
 let milestoneTimer = null;
 let errorNoticeTimer = null;
+let hoverPlacement = null;
 
 const getTotalBlocks = () => {
   const statsTotal = gameState.stats?.total_blocks;
@@ -117,25 +135,282 @@ const updatePlacementState = () => {
   }
 };
 
-const calculatePlacement = () => {
-  const maxHeight =
-    gameState.pyramid.reduce((currentMax, block) => {
-      const y = block && typeof block.y === "number" ? block.y : 0;
-      return Math.max(currentMax, y);
-    }, -1) + 1;
+const flashButton = (button) => {
+  if (!button) return;
+  button.style.transform = "scale(0.95)";
+  button.style.boxShadow = "0 0 15px rgba(212, 160, 23, 0.6)";
+  setTimeout(() => {
+    button.style.transform = "";
+    button.style.boxShadow = "";
+  }, 150);
+};
+
+const positionKey = (x, y, z) => `${x},${y},${z}`;
+
+const buildOccupied = () => {
+  const occupied = new Set();
+  if (!Array.isArray(gameState.pyramid)) {
+    return occupied;
+  }
+  gameState.pyramid.forEach((block) => {
+    if (!block || typeof block !== "object") {
+      return;
+    }
+    const { x, y, z } = block;
+    if (Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(z)) {
+      occupied.add(positionKey(x, y, z));
+    }
+  });
+  return occupied;
+};
+
+const getMaxHeight = () => {
+  if (!Array.isArray(gameState.pyramid)) {
+    return 0;
+  }
+  return gameState.pyramid.reduce((maxHeight, block) => {
+    if (!block || typeof block !== "object") {
+      return maxHeight;
+    }
+    const z = block.z;
+    return Number.isInteger(z) ? Math.max(maxHeight, z) : maxHeight;
+  }, 0);
+};
+
+const hasSupport = (x, y, z, occupied) => {
+  const supportZ = z - 1;
+  return (
+    occupied.has(positionKey(x - 1, y - 1, supportZ)) &&
+    occupied.has(positionKey(x - 1, y + 1, supportZ)) &&
+    occupied.has(positionKey(x + 1, y - 1, supportZ)) &&
+    occupied.has(positionKey(x + 1, y + 1, supportZ))
+  );
+};
+
+const findSupportedPlacement = (occupied) => {
+  const candidateKeys = new Set();
+  if (Array.isArray(gameState.pyramid)) {
+    gameState.pyramid.forEach((block) => {
+      if (!block || typeof block !== "object") {
+        return;
+      }
+      const { x, y, z } = block;
+      if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) {
+        return;
+      }
+      const nextZ = z + 1;
+      candidateKeys.add(positionKey(x + 1, y + 1, nextZ));
+      candidateKeys.add(positionKey(x + 1, y - 1, nextZ));
+      candidateKeys.add(positionKey(x - 1, y + 1, nextZ));
+      candidateKeys.add(positionKey(x - 1, y - 1, nextZ));
+    });
+  }
+
+  let best = null;
+  let bestDistance = 0;
+
+  candidateKeys.forEach((key) => {
+    if (occupied.has(key)) {
+      return;
+    }
+    const [xStr, yStr, zStr] = key.split(",");
+    const x = Number(xStr);
+    const y = Number(yStr);
+    const z = Number(zStr);
+    if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) {
+      return;
+    }
+    if (z <= 0 || !hasSupport(x, y, z, occupied)) {
+      return;
+    }
+    const distance = Math.abs(x) + Math.abs(y);
+    if (
+      !best ||
+      z > best.z ||
+      (z === best.z && distance < bestDistance) ||
+      (z === best.z && distance === bestDistance && (x < best.x || (x === best.x && y < best.y)))
+    ) {
+      best = { x, y, z };
+      bestDistance = distance;
+    }
+  });
+
+  return best;
+};
+
+const findBasePlacement = (occupied) => {
+  const maxAbs = 100;
+  const isFree = (x, y) => !occupied.has(positionKey(x, y, 0));
+
+  if (isFree(0, 0)) {
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  for (let radius = 1; radius <= maxAbs; radius += 1) {
+    const corners = [
+      [radius, radius],
+      [radius, -radius],
+      [-radius, radius],
+      [-radius, -radius],
+    ];
+    for (const [x, y] of corners) {
+      if (isFree(x, y)) {
+        return { x, y, z: 0 };
+      }
+    }
+
+    for (let x = -radius + 1; x <= radius - 1; x += 1) {
+      if (isFree(x, radius)) {
+        return { x, y: radius, z: 0 };
+      }
+    }
+    for (let y = radius - 1; y >= -radius + 1; y -= 1) {
+      if (isFree(radius, y)) {
+        return { x: radius, y, z: 0 };
+      }
+    }
+    for (let x = radius - 1; x >= -radius + 1; x -= 1) {
+      if (isFree(x, -radius)) {
+        return { x, y: -radius, z: 0 };
+      }
+    }
+    for (let y = -radius + 1; y <= radius - 1; y += 1) {
+      if (isFree(-radius, y)) {
+        return { x: -radius, y, z: 0 };
+      }
+    }
+  }
+
+  return { x: 0, y: 0, z: 0 };
+};
+
+const getCanvasMetrics = () => {
+  if (!canvas) {
+    return null;
+  }
+  const displayWidth = canvas.clientWidth;
+  const displayHeight = canvas.clientHeight;
+  const blockSize = Math.max(20, Math.min(displayWidth, displayHeight) / 15);
+  return {
+    blockSize,
+    centerX: displayWidth / 2,
+    baseY: displayHeight - blockSize,
+  };
+};
+
+const screenToGrid = (screenX, screenY, metrics) => {
+  const { blockSize, centerX, baseY } = metrics;
+  const dx = (screenX - centerX) / (blockSize * 0.6);
+  const dy = (baseY - screenY) / (blockSize * 0.2);
+  const x = Math.round((dx + dy) / 2);
+  const y = Math.round((dy - dx) / 2);
+  return { x, y };
+};
+
+const pickHoverPlacement = (gridX, gridY) => {
+  const validPlacements = getValidPlacements(gameState.pyramid);
+  let bestPlacement = null;
+
+  validPlacements.forEach((placement) => {
+    if (placement.x !== gridX || placement.y !== gridY) {
+      return;
+    }
+    if (!bestPlacement || placement.z < bestPlacement.z) {
+      bestPlacement = placement;
+    }
+  });
+
+  if (bestPlacement) {
+    return { placement: { ...bestPlacement, type: "granite" }, isValid: true };
+  }
+
+  const occupied = buildOccupied();
+  const maxHeight = getMaxHeight();
+  let candidateZ = 0;
+
+  for (let z = 0; z <= maxHeight + 1; z += 1) {
+    if (!occupied.has(positionKey(gridX, gridY, z))) {
+      candidateZ = z;
+      break;
+    }
+  }
 
   return {
-    x: 0,
-    y: Math.max(0, maxHeight),
-    z: 0,
+    placement: { x: gridX, y: gridY, z: candidateZ, type: "granite" },
+    isValid: false,
+  };
+};
+
+const updateHoverFromEvent = (event) => {
+  if (!canvas) {
+    return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  const metrics = getCanvasMetrics();
+  if (!metrics) {
+    return;
+  }
+  const screenX = event.clientX - rect.left;
+  const screenY = event.clientY - rect.top;
+  const { x, y } = screenToGrid(screenX, screenY, metrics);
+
+  if (Math.abs(x) > GRID_SIZE || Math.abs(y) > GRID_SIZE) {
+    hoverPlacement = null;
+    return;
+  }
+
+  const result = pickHoverPlacement(x, y);
+  hoverPlacement = result;
+};
+
+const clearHoverPlacement = () => {
+  hoverPlacement = null;
+};
+
+const handleCanvasClick = () => {
+  if (!hoverPlacement || !hoverPlacement.isValid) {
+    return;
+  }
+  if (placeBtn && placeBtn.disabled) {
+    return;
+  }
+  audioManager.playSound("place");
+  send({
+    type: "place_block",
+    user_id: userId,
+    data: hoverPlacement.placement,
+  });
+};
+
+const calculatePlacement = () => {
+  const occupied = buildOccupied();
+  const supportedPlacement = findSupportedPlacement(occupied);
+  const placement = supportedPlacement ?? findBasePlacement(occupied);
+
+  return {
+    x: placement.x,
+    y: placement.y,
+    z: placement.z,
     type: "granite",
   };
 };
 
 const lockButtons = () => {
   const mineBtn = document.getElementById("btn-mine");
+  const debugClearBtn = document.getElementById("btn-debug-clear");
+  const muteBtn = document.getElementById("btn-mute");
+
+  if (muteBtn) {
+    muteBtn.addEventListener("click", () => {
+      const isMuted = audioManager.toggleMute();
+      muteBtn.textContent = isMuted ? "🔇 Sound Off" : "🔊 Sound On";
+    });
+  }
+
   if (mineBtn) {
     mineBtn.addEventListener("click", () => {
+      flashButton(mineBtn);
+      audioManager.playSound("mine");
       send({ type: "mine_stone", user_id: userId });
     });
   }
@@ -145,23 +420,57 @@ const lockButtons = () => {
       if (placeBtn.disabled) {
         return;
       }
+      flashButton(placeBtn);
+      audioManager.playSound("place");
       send({ type: "place_block", user_id: userId, data: calculatePlacement() });
+    });
+  }
+
+  if (debugClearBtn) {
+    debugClearBtn.addEventListener("click", () => {
+      if (
+        !confirm(
+          "Are you sure you want to clear the entire pyramid? This cannot be undone.",
+        )
+      ) {
+        return;
+      }
+      send({ type: "debug_clear_all", user_id: userId });
     });
   }
 };
 
 connect({
   onStatusChange: setStatus,
-  onMilestone: showMilestoneNotification,
+  onMilestone: (data) => {
+    audioManager.playSound("milestone");
+    showMilestoneNotification(data);
+  },
   onError: (message) => {
+    audioManager.playSound("error");
     flashError();
     showErrorNotice(message);
   },
+  userId: userId,
 });
 lockButtons();
 
+if (canvas) {
+  canvas.addEventListener("mousemove", updateHoverFromEvent);
+  canvas.addEventListener("mouseleave", clearHoverPlacement);
+  canvas.addEventListener("click", handleCanvasClick);
+}
+
 const frame = () => {
   draw();
+  if (hoverPlacement) {
+    renderGhostBlock(
+      hoverPlacement.placement.x,
+      hoverPlacement.placement.y,
+      hoverPlacement.placement.z,
+      hoverPlacement.isValid,
+    );
+  }
   updateHud();
   requestAnimationFrame(frame);
 };

@@ -1,4 +1,5 @@
 import gameState from "./state/gameState.js";
+import audioManager from "./audio/audioManager.js";
 import { connect, send } from "./network/websocket.js";
 import {
   draw,
@@ -17,11 +18,20 @@ const errorNoticeEl = document.getElementById("error-notification");
 const placeWarningEl = document.getElementById("place-warning");
 const placeBtn = document.getElementById("btn-place");
 const canvas = document.getElementById("game-canvas");
+const chatPanel = document.getElementById("chat-panel");
+const chatToggleBtn = document.getElementById("chat-toggle");
+const chatMessagesEl = document.getElementById("chat-messages");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+const leaderboardListEl = document.getElementById("leaderboard-list");
 
 const USER_ID_KEY = "hemiunu-user-id";
+const CHAT_COLLAPSED_KEY = "hemiunu-chat-collapsed";
 const MILESTONE_INTERVAL = 100;
 const ERROR_NOTICE_DURATION = 3000;
 const GRID_SIZE = 10;
+const MAX_CHAT_MESSAGES = 60;
+const LEADERBOARD_LIMIT = 10;
 
 const getUserId = () => {
   const stored = window.localStorage.getItem(USER_ID_KEY);
@@ -36,6 +46,340 @@ const getUserId = () => {
 };
 
 const userId = getUserId();
+
+const getUserLabel = (id) => {
+  if (!id) {
+    return "Player";
+  }
+  if (id === userId) {
+    return "You";
+  }
+  const normalized = String(id);
+  return `Player ${normalized.slice(0, 4)}`;
+};
+
+const currentUserLabel = getUserLabel(userId);
+const chatMessages = [];
+let lastLeaderboardSource = null;
+
+const toTimestamp = (value) => {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+  if (typeof value === "number") {
+    return value < 1000000000000 ? value * 1000 : value;
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return Date.now();
+};
+
+const formatTimestamp = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const normalizeChatMessage = (raw) => {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const payload = raw.data && typeof raw.data === "object" ? raw.data : raw;
+  const text =
+    typeof payload.message === "string"
+      ? payload.message.trim()
+      : typeof payload.text === "string"
+        ? payload.text.trim()
+        : typeof payload.content === "string"
+          ? payload.content.trim()
+          : "";
+  if (!text) {
+    return null;
+  }
+  const senderId =
+    payload.user_id ?? payload.userId ?? payload.sender_id ?? payload.senderId ?? null;
+  const usernameCandidate =
+    typeof payload.username === "string"
+      ? payload.username.trim()
+      : typeof payload.user_name === "string"
+        ? payload.user_name.trim()
+        : typeof payload.user === "string"
+          ? payload.user.trim()
+          : "";
+  const username = usernameCandidate || getUserLabel(senderId);
+  const timestampValue = toTimestamp(
+    payload.timestamp ?? payload.time ?? payload.created_at ?? payload.createdAt,
+  );
+  return { text, username, timestampValue, userId: senderId };
+};
+
+const isDuplicateMessage = (message) => {
+  const last = chatMessages[chatMessages.length - 1];
+  if (!last) {
+    return false;
+  }
+  return (
+    last.userId === message.userId &&
+    last.text === message.text &&
+    Math.abs(last.timestampValue - message.timestampValue) < 2000
+  );
+};
+
+const renderChatMessage = (message) => {
+  const item = document.createElement("li");
+  item.className = "chat-message";
+  if (message.userId && message.userId === userId) {
+    item.classList.add("is-own");
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "chat-meta";
+
+  const userSpan = document.createElement("span");
+  userSpan.className = "chat-user";
+  userSpan.textContent = message.username || "Player";
+
+  const timeEl = document.createElement("time");
+  timeEl.className = "chat-time";
+  const formatted = formatTimestamp(message.timestampValue);
+  timeEl.textContent = formatted;
+  if (message.timestampValue) {
+    timeEl.dateTime = new Date(message.timestampValue).toISOString();
+  }
+
+  meta.append(userSpan, timeEl);
+
+  const textEl = document.createElement("div");
+  textEl.className = "chat-text";
+  textEl.textContent = message.text;
+
+  item.append(meta, textEl);
+  return item;
+};
+
+const scrollChatToLatest = () => {
+  if (!chatMessagesEl) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  });
+};
+
+const appendChatMessage = (message) => {
+  if (!message || !chatMessagesEl) {
+    return;
+  }
+  if (isDuplicateMessage(message)) {
+    return;
+  }
+  chatMessages.push(message);
+  if (chatMessages.length > MAX_CHAT_MESSAGES) {
+    chatMessages.shift();
+    if (chatMessagesEl.firstElementChild) {
+      chatMessagesEl.removeChild(chatMessagesEl.firstElementChild);
+    }
+  }
+  chatMessagesEl.appendChild(renderChatMessage(message));
+  scrollChatToLatest();
+};
+
+const setChatMessages = (messages) => {
+  if (!chatMessagesEl) {
+    return;
+  }
+  chatMessages.length = 0;
+  chatMessagesEl.innerHTML = "";
+  if (!Array.isArray(messages)) {
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  messages.slice(-MAX_CHAT_MESSAGES).forEach((entry) => {
+    const normalized = normalizeChatMessage(entry);
+    if (!normalized) {
+      return;
+    }
+    chatMessages.push(normalized);
+    fragment.appendChild(renderChatMessage(normalized));
+  });
+  chatMessagesEl.appendChild(fragment);
+  scrollChatToLatest();
+};
+
+const extractLeaderboardEntries = (payload) => {
+  if (!payload) {
+    return [];
+  }
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  const candidates = [
+    payload.leaderboard,
+    payload.top_players,
+    payload.topPlayers,
+    payload.players,
+    payload.entries,
+    payload.list,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+  return [];
+};
+
+const normalizeLeaderboardEntry = (entry, index) => {
+  if (!entry || typeof entry !== "object") {
+    return { userId: null, name: `Player ${index + 1}`, score: 0 };
+  }
+  const userId = entry.user_id ?? entry.userId ?? entry.id ?? null;
+  const nameCandidate =
+    typeof entry.username === "string"
+      ? entry.username.trim()
+      : typeof entry.name === "string"
+        ? entry.name.trim()
+        : typeof entry.user === "string"
+          ? entry.user.trim()
+          : "";
+  const name = nameCandidate || getUserLabel(userId) || `Player ${index + 1}`;
+  const scoreValue = Number(
+    entry.score ??
+      entry.blocks ??
+      entry.total_blocks ??
+      entry.placed_blocks ??
+      entry.stone ??
+      entry.value ??
+      0,
+  );
+  const score = Number.isFinite(scoreValue) ? Math.floor(scoreValue) : 0;
+  return { userId, name, score };
+};
+
+const renderLeaderboard = (entries) => {
+  if (!leaderboardListEl) {
+    return;
+  }
+  leaderboardListEl.innerHTML = "";
+  if (!entries.length) {
+    const emptyItem = document.createElement("li");
+    emptyItem.className = "leaderboard-empty";
+    emptyItem.textContent = "No rankings yet.";
+    leaderboardListEl.appendChild(emptyItem);
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  entries.slice(0, LEADERBOARD_LIMIT).forEach((entry, index) => {
+    const normalized = normalizeLeaderboardEntry(entry, index);
+    const item = document.createElement("li");
+    item.className = "leaderboard-entry";
+    if (normalized.userId && normalized.userId === userId) {
+      item.classList.add("is-current");
+    }
+    if (!normalized.userId && normalized.name === currentUserLabel) {
+      item.classList.add("is-current");
+    }
+
+    const rank = document.createElement("span");
+    rank.className = "leaderboard-rank";
+    rank.textContent = String(index + 1);
+
+    const name = document.createElement("span");
+    name.className = "leaderboard-name";
+    name.textContent = normalized.name;
+
+    const score = document.createElement("span");
+    score.className = "leaderboard-score";
+    score.textContent = Number.isFinite(normalized.score)
+      ? normalized.score.toLocaleString()
+      : "0";
+
+    item.append(rank, name, score);
+    fragment.appendChild(item);
+  });
+  leaderboardListEl.appendChild(fragment);
+};
+
+const updateLeaderboard = (payload) => {
+  const entries = extractLeaderboardEntries(payload);
+  renderLeaderboard(entries);
+};
+
+const syncLeaderboardFromStats = () => {
+  if (!leaderboardListEl) {
+    return;
+  }
+  const candidate =
+    gameState.stats?.leaderboard ??
+    gameState.stats?.top_players ??
+    gameState.stats?.topPlayers ??
+    null;
+  if (!Array.isArray(candidate) || candidate === lastLeaderboardSource) {
+    return;
+  }
+  lastLeaderboardSource = candidate;
+  renderLeaderboard(candidate);
+};
+
+const setChatCollapsed = (collapsed) => {
+  if (!chatPanel) {
+    return;
+  }
+  chatPanel.classList.toggle("collapsed", collapsed);
+  if (chatToggleBtn) {
+    chatToggleBtn.setAttribute("aria-expanded", (!collapsed).toString());
+    chatToggleBtn.textContent = collapsed ? ">>" : "<<";
+  }
+  window.localStorage.setItem(CHAT_COLLAPSED_KEY, collapsed ? "1" : "0");
+};
+
+const initChatPanel = () => {
+  if (!chatPanel) {
+    return;
+  }
+  const stored = window.localStorage.getItem(CHAT_COLLAPSED_KEY);
+  const isCollapsed = stored === "1";
+  setChatCollapsed(isCollapsed);
+
+  if (chatToggleBtn) {
+    chatToggleBtn.addEventListener("click", () => {
+      setChatCollapsed(!chatPanel.classList.contains("collapsed"));
+    });
+  }
+
+  if (chatForm && chatInput) {
+    chatForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text) {
+        return;
+      }
+      const timestamp = Date.now();
+      const outgoing = {
+        message: text,
+        user_id: userId,
+        username: currentUserLabel,
+        timestamp,
+      };
+      const normalized = normalizeChatMessage(outgoing);
+      if (normalized) {
+        appendChatMessage(normalized);
+      }
+      send({ type: "chat_message", user_id: userId, data: outgoing });
+      chatInput.value = "";
+      chatInput.focus();
+    });
+  }
+};
 
 const setStatus = (value) => {
   if (statusBar) {
@@ -364,6 +708,7 @@ const handleCanvasClick = () => {
   if (placeBtn && placeBtn.disabled) {
     return;
   }
+  audioManager.playSound("place");
   send({
     type: "place_block",
     user_id: userId,
@@ -387,9 +732,19 @@ const calculatePlacement = () => {
 const lockButtons = () => {
   const mineBtn = document.getElementById("btn-mine");
   const debugClearBtn = document.getElementById("btn-debug-clear");
+  const muteBtn = document.getElementById("btn-mute");
+
+  if (muteBtn) {
+    muteBtn.addEventListener("click", () => {
+      const isMuted = audioManager.toggleMute();
+      muteBtn.textContent = isMuted ? "🔇 Sound Off" : "🔊 Sound On";
+    });
+  }
+
   if (mineBtn) {
     mineBtn.addEventListener("click", () => {
       flashButton(mineBtn);
+      audioManager.playSound("mine");
       send({ type: "mine_stone", user_id: userId });
     });
   }
@@ -400,6 +755,7 @@ const lockButtons = () => {
         return;
       }
       flashButton(placeBtn);
+      audioManager.playSound("place");
       send({ type: "place_block", user_id: userId, data: calculatePlacement() });
     });
   }
@@ -420,8 +776,12 @@ const lockButtons = () => {
 
 connect({
   onStatusChange: setStatus,
-  onMilestone: showMilestoneNotification,
+  onMilestone: (data) => {
+    audioManager.playSound("milestone");
+    showMilestoneNotification(data);
+  },
   onError: (message) => {
+    audioManager.playSound("error");
     flashError();
     showErrorNotice(message);
   },
