@@ -57,6 +57,12 @@ class PersistenceManager:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    async def clear_all_blocks(self) -> None:
+        """Remove all blocks from the database."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM pyramid_blocks")
+            await db.commit()
+
     async def update_user_stones(self, user_id: str, stones: int):
         """Update or insert the stone count for a user."""
         async with aiosqlite.connect(self.db_path) as db:

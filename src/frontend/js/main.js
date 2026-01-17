@@ -386,6 +386,7 @@ const calculatePlacement = () => {
 
 const lockButtons = () => {
   const mineBtn = document.getElementById("btn-mine");
+  const debugClearBtn = document.getElementById("btn-debug-clear");
   if (mineBtn) {
     mineBtn.addEventListener("click", () => {
       flashButton(mineBtn);
@@ -400,6 +401,19 @@ const lockButtons = () => {
       }
       flashButton(placeBtn);
       send({ type: "place_block", user_id: userId, data: calculatePlacement() });
+    });
+  }
+
+  if (debugClearBtn) {
+    debugClearBtn.addEventListener("click", () => {
+      if (
+        !confirm(
+          "Are you sure you want to clear the entire pyramid? This cannot be undone.",
+        )
+      ) {
+        return;
+      }
+      send({ type: "debug_clear_all", user_id: userId });
     });
   }
 };

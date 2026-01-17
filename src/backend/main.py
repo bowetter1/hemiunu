@@ -148,6 +148,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 await handle_mine_stone(message, websocket)
             elif message_type == "place_block":
                 await handle_place_block(message, websocket)
+            elif message_type == "debug_clear_all":
+                await handle_debug_clear(message, websocket)
     except WebSocketDisconnect:
         pass
     finally:
@@ -246,3 +248,24 @@ async def handle_place_block(message: Dict[str, Any], websocket: WebSocket) -> N
             }
         )
     await connection_manager.send_state_sync(websocket, user_id)
+
+
+async def handle_debug_clear(message: Dict[str, Any], websocket: WebSocket) -> None:
+    async with state_lock:
+        pyramid_blocks.clear()
+        try:
+            await persistence_manager.clear_all_blocks()
+        except Exception as e:
+            logger.error(f"Failed to clear blocks: {e}")
+        await connection_manager.broadcast(
+            {
+                "type": "state_sync",
+                "data": {
+                    "pyramid": [],
+                    "stats": {
+                        "total_blocks": 0,
+                        "online_players": len(connection_manager.active_connections),
+                    },
+                },
+            }
+        )
