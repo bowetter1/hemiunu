@@ -16,6 +16,8 @@ const milestoneProgressEl = document.getElementById("milestone-progress");
 const milestoneNoticeEl = document.getElementById("milestone-notification");
 const errorNoticeEl = document.getElementById("error-notification");
 const placeWarningEl = document.getElementById("place-warning");
+const mineBtn = document.getElementById("btn-mine");
+const autoMineBtn = document.getElementById("btn-auto-mine");
 const placeBtn = document.getElementById("btn-place");
 const canvas = document.getElementById("game-canvas");
 const chatPanel = document.getElementById("chat-panel");
@@ -28,15 +30,26 @@ const blockTypeButtons = document.querySelectorAll(".block-type-option");
 const blockTypeInfoEl = document.getElementById("block-type-info");
 const tutorialOverlay = document.getElementById("tutorial-overlay");
 const tutorialCloseBtn = document.getElementById("tutorial-close");
+const activityFeedEl = document.getElementById("activity-feed");
+const achievementsPanel = document.getElementById("achievements-panel");
+const achievementsToggleBtn = document.getElementById("achievements-toggle");
+const achievementsListEl = document.getElementById("achievements-list");
+const achievementsBody = document.getElementById("achievements-body");
+const achievementToast = document.getElementById("achievement-toast");
 
 const USER_ID_KEY = "hemiunu-user-id";
 const CHAT_COLLAPSED_KEY = "hemiunu-chat-collapsed";
+const ACHIEVEMENTS_COLLAPSED_KEY = "hemiunu-achievements-collapsed";
 const TUTORIAL_SEEN_KEY = "hemiunu-tutorial-seen";
 const MILESTONE_INTERVAL = 100;
 const ERROR_NOTICE_DURATION = 3000;
 const GRID_SIZE = 10;
 const MAX_CHAT_MESSAGES = 60;
 const LEADERBOARD_LIMIT = 10;
+const ACTIVITY_FEED_LIMIT = 3;
+const ACTIVITY_FEED_FADE_DELAY = 5000;
+const ACTIVITY_FEED_FADE_DURATION = 500;
+const AUTO_MINE_INTERVAL = 3000;
 const DEFAULT_BLOCK_TYPE = "limestone";
 const BLOCK_TYPE_INFO = {
   granite: {
@@ -87,6 +100,8 @@ const currentUserLabel = getUserLabel(userId);
 const currentUserName = getUserName(userId);
 const chatMessages = [];
 let lastLeaderboardSource = null;
+let autoMineEnabled = false;
+let autoMineInterval = null;
 
 const toTimestamp = (value) => {
   if (value instanceof Date) {
@@ -241,6 +256,62 @@ const setChatMessages = (messages) => {
   scrollChatToLatest();
 };
 
+const formatBlockTypeLabel = (blockType) => {
+  if (typeof blockType !== "string") {
+    return "block";
+  }
+  const normalized = blockType.trim().toLowerCase();
+  const labels = {
+    granite: "granit",
+    limestone: "kalksten",
+    sandstone: "sandsten",
+  };
+  return labels[normalized] ?? normalized || "block";
+};
+
+const removeActivityItem = (item) => {
+  if (!item) {
+    return;
+  }
+  const fadeTimer = Number(item.dataset.fadeTimer);
+  const removeTimer = Number(item.dataset.removeTimer);
+  if (Number.isFinite(fadeTimer)) {
+    window.clearTimeout(fadeTimer);
+  }
+  if (Number.isFinite(removeTimer)) {
+    window.clearTimeout(removeTimer);
+  }
+  item.remove();
+};
+
+const appendActivityItem = ({ username, blockType }) => {
+  if (!activityFeedEl) {
+    return;
+  }
+  const label = typeof username === "string" && username.trim() ? username.trim() : "Player";
+  const typeLabel = formatBlockTypeLabel(blockType);
+  const item = document.createElement("div");
+  item.className = "activity-item";
+  item.textContent = `${label} placerade ett ${typeLabel}-block`;
+  activityFeedEl.appendChild(item);
+  requestAnimationFrame(() => {
+    item.classList.add("is-visible");
+  });
+
+  const fadeTimer = window.setTimeout(() => {
+    item.classList.add("is-fading");
+    const remove = () => removeActivityItem(item);
+    item.addEventListener("transitionend", remove, { once: true });
+    const removeTimer = window.setTimeout(remove, ACTIVITY_FEED_FADE_DURATION + 50);
+    item.dataset.removeTimer = String(removeTimer);
+  }, ACTIVITY_FEED_FADE_DELAY);
+  item.dataset.fadeTimer = String(fadeTimer);
+
+  while (activityFeedEl.children.length > ACTIVITY_FEED_LIMIT) {
+    removeActivityItem(activityFeedEl.firstElementChild);
+  }
+};
+
 const extractLeaderboardEntries = (payload) => {
   if (!payload) {
     return [];
@@ -281,6 +352,7 @@ const normalizeLeaderboardEntry = (entry, index) => {
   const scoreValue = Number(
     entry.score ??
       entry.blocks ??
+      entry.blocks_placed ??
       entry.total_blocks ??
       entry.placed_blocks ??
       entry.stone ??
@@ -523,6 +595,7 @@ const updateHud = () => {
   }
   updatePlacementState();
   syncLeaderboardFromStats();
+  syncAchievements();
 };
 
 const showMilestoneNotification = (data) => {
@@ -622,6 +695,44 @@ const handleSocketMessage = (event) => {
       }
       break;
     }
+    case "block_placed": {
+      const payload = message.data ?? {};
+      const block = payload.block ?? payload; // Fallback for safety/old messages
+      const eventUserId = block.user_id ?? block.userId ?? null;
+      if (!eventUserId || eventUserId === userId) {
+        break;
+      }
+      const username =
+        typeof block.username === "string" && block.username.trim()
+          ? block.username.trim()
+          : getUserLabel(eventUserId);
+      appendActivityItem({
+        username,
+        blockType: block.type ?? block.block_type ?? block.blockType,
+      });
+      break;
+    }
+    case "achievement_unlocked": {
+      const ach = message.data;
+      if (ach) {
+        if (!gameState.achievements) gameState.achievements = [];
+        if (!gameState.achievements.includes(ach.id)) {
+            gameState.achievements.push(ach.id);
+        }
+        showAchievementToast(ach);
+        syncAchievements();
+      }
+      break;
+    }
+    case "rate_limited": {
+      if (mineBtn) {
+        mineBtn.style.transform = "translateX(5px)";
+        setTimeout(() => mineBtn.style.transform = "translateX(-5px)", 50);
+        setTimeout(() => mineBtn.style.transform = "", 100);
+      }
+      showErrorNotice("Mining too fast! (Max 1/sec)");
+      break;
+    }
     default:
       break;
   }
@@ -635,6 +746,124 @@ const flashButton = (button) => {
     button.style.transform = "";
     button.style.boxShadow = "";
   }, 150);
+};
+
+const mineStone = () => {
+  if (mineBtn) {
+    flashButton(mineBtn);
+  }
+  audioManager.playSound("mine");
+  send({ type: "mine_stone", user_id: userId });
+};
+
+const updateAutoMineButton = () => {
+  if (!autoMineBtn) {
+    return;
+  }
+  const label = autoMineEnabled ? "Auto-Mine: ON" : "Auto-Mine: OFF";
+  autoMineBtn.textContent = `⚙️ ${label}`;
+  autoMineBtn.classList.toggle("is-on", autoMineEnabled);
+};
+
+const startAutoMine = () => {
+  if (autoMineInterval) {
+    window.clearInterval(autoMineInterval);
+  }
+  autoMineInterval = window.setInterval(() => {
+    mineStone();
+  }, AUTO_MINE_INTERVAL);
+};
+
+const stopAutoMine = () => {
+  if (!autoMineInterval) {
+    return;
+  }
+  window.clearInterval(autoMineInterval);
+  autoMineInterval = null;
+};
+
+const initAchievementsPanel = () => {
+  if (!achievementsPanel) return;
+
+  const stored = window.localStorage.getItem(ACHIEVEMENTS_COLLAPSED_KEY);
+  const isCollapsed = stored === "1"; // Default to expanded if not set, or change logic
+  // Actually default closed might be better to save space? Let's default open as per request "visa alla badges"
+  
+  if (isCollapsed) {
+    achievementsBody.classList.add("hidden");
+  } else {
+    achievementsBody.classList.remove("hidden");
+  }
+
+  try {
+    const storedAch = JSON.parse(window.localStorage.getItem("hemiunu-achievements"));
+    const storedMeta = JSON.parse(window.localStorage.getItem("hemiunu-achievements-meta"));
+    if (Array.isArray(storedAch)) gameState.achievements = storedAch;
+    if (Array.isArray(storedMeta)) gameState.achievementsMeta = storedMeta;
+    renderAchievements();
+  } catch (e) {}
+
+  achievementsToggleBtn.addEventListener("click", () => {
+    achievementsBody.classList.toggle("hidden");
+    const collapsed = achievementsBody.classList.contains("hidden");
+    window.localStorage.setItem(ACHIEVEMENTS_COLLAPSED_KEY, collapsed ? "1" : "0");
+  });
+};
+
+const renderAchievements = () => {
+  if (!achievementsListEl) return;
+  
+  const meta = gameState.achievementsMeta || [];
+  const unlocked = new Set(gameState.achievements || []);
+
+  achievementsListEl.innerHTML = "";
+  
+  meta.forEach(ach => {
+    const isUnlocked = unlocked.has(ach.id);
+    const li = document.createElement("li");
+    li.className = `achievement-item ${isUnlocked ? "unlocked" : ""}`;
+    li.innerHTML = `
+      <div class="achievement-icon">${ach.icon}</div>
+      <div class="achievement-info">
+        <span class="achievement-name">${ach.name}</span>
+        <span class="achievement-desc">${ach.desc}</span>
+      </div>
+    `;
+    achievementsListEl.appendChild(li);
+  });
+};
+
+let lastAchievementsHash = "";
+const syncAchievements = () => {
+  const meta = gameState.achievementsMeta || [];
+  const unlocked = gameState.achievements || [];
+  const hash = JSON.stringify(meta) + JSON.stringify(unlocked);
+  
+  if (hash !== lastAchievementsHash) {
+    renderAchievements();
+    lastAchievementsHash = hash;
+    window.localStorage.setItem("hemiunu-achievements", JSON.stringify(unlocked));
+    window.localStorage.setItem("hemiunu-achievements-meta", JSON.stringify(meta));
+  }
+};
+
+const showAchievementToast = (achievement) => {
+  if (!achievementToast) return;
+  
+  achievementToast.innerHTML = `
+    <div class="achievement-toast-icon">${achievement.icon}</div>
+    <div class="achievement-toast-content">
+      <span class="achievement-toast-title">Achievement Unlocked!</span>
+      <span class="achievement-toast-name">${achievement.name}</span>
+    </div>
+  `;
+  
+  achievementToast.classList.add("show");
+  audioManager.playSound("milestone"); // Reuse milestone sound or add new one
+  
+  setTimeout(() => {
+    achievementToast.classList.remove("show");
+  }, 4000);
 };
 
 const positionKey = (x, y, z) => `${x},${y},${z}`;
@@ -896,7 +1125,6 @@ const calculatePlacement = () => {
 };
 
 const lockButtons = () => {
-  const mineBtn = document.getElementById("btn-mine");
   const debugClearBtn = document.getElementById("btn-debug-clear");
   const muteBtn = document.getElementById("btn-mute");
 
@@ -909,10 +1137,21 @@ const lockButtons = () => {
 
   if (mineBtn) {
     mineBtn.addEventListener("click", () => {
-      flashButton(mineBtn);
-      audioManager.playSound("mine");
-      send({ type: "mine_stone", user_id: userId });
+      mineStone();
     });
+  }
+
+  if (autoMineBtn) {
+    autoMineBtn.addEventListener("click", () => {
+      autoMineEnabled = !autoMineEnabled;
+      if (autoMineEnabled) {
+        startAutoMine();
+      } else {
+        stopAutoMine();
+      }
+      updateAutoMineButton();
+    });
+    updateAutoMineButton();
   }
 
   if (placeBtn) {
@@ -935,7 +1174,15 @@ const lockButtons = () => {
       ) {
         return;
       }
-      send({ type: "debug_clear_all", user_id: userId });
+      const adminKey = window.prompt("Admin key required to clear the pyramid.");
+      if (!adminKey || !adminKey.trim()) {
+        return;
+      }
+      send({
+        type: "debug_clear_all",
+        user_id: userId,
+        admin_key: adminKey.trim(),
+      });
     });
   }
 };
@@ -954,6 +1201,7 @@ const socket = connect({
 lockButtons();
 initBlockTypeSelector();
 initChatPanel();
+initAchievementsPanel();
 initTutorialOverlay();
 renderLeaderboard([]);
 

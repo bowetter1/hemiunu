@@ -53,6 +53,18 @@
             <ol id="leaderboard-list" aria-live="polite"></ol>
         </aside>
 
+        <aside id="achievements-panel" aria-label="Achievements">
+            <div class="panel-header">
+                <h2 class="panel-title">Faraos Belöningar</h2>
+                <button id="achievements-toggle" type="button" title="Toggle achievements">🏆</button>
+            </div>
+            <div id="achievements-body" class="achievements-body hidden">
+                <ul id="achievements-list"></ul>
+            </div>
+        </aside>
+
+        <div id="achievement-toast" class="achievement-toast" role="alert"></div>
+
         <aside id="control-panel" aria-label="Controls">
             <button id="btn-mine" title="Click to mine 1 stone">⛏️ Mine Stone</button>
             <button id="btn-auto-mine">⚙️ Auto-Mine: OFF</button>

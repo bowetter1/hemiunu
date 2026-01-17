@@ -43,7 +43,7 @@ const overrideState = (data) => {
     return;
   }
 
-  const { pyramid, stats, user_resources } = data;
+  const { pyramid, stats, user_resources, achievements, achievements_meta } = data;
 
   gameState.pyramid.length = 0;
   if (Array.isArray(pyramid)) {
@@ -52,6 +52,12 @@ const overrideState = (data) => {
 
   gameState.stats = stats ? { ...stats } : {};
   gameState.resources = user_resources ? { ...user_resources } : {};
+  if (Array.isArray(achievements)) {
+    gameState.achievements = achievements;
+  }
+  if (Array.isArray(achievements_meta)) {
+    gameState.achievementsMeta = achievements_meta;
+  }
 };
 
 const addBlock = (block) => {
@@ -76,12 +82,27 @@ const handleMessage = (event) => {
       break;
     case "block_placed":
       {
-        const index = addBlock(message.data);
+        const { block, total_blocks } = message.data || {};
+        const index = addBlock(block);
+        
+        if (typeof total_blocks === "number") {
+             if (!gameState.stats) gameState.stats = {};
+             gameState.stats.total_blocks = total_blocks;
+        }
+
         if (typeof index === "number") {
           const isOwn =
             currentUserId &&
-            message?.data?.user_id &&
-            message.data.user_id === currentUserId;
+            block?.user_id &&
+            block.user_id === currentUserId;
+          
+          if (isOwn) {
+            if (!gameState.resources) gameState.resources = {};
+            if (typeof gameState.resources.stone === "number") {
+              gameState.resources.stone -= 1;
+            }
+          }
+
           animateNewBlock(index, isOwn);
           audioManager.playSound("place");
         }

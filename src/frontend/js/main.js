@@ -31,9 +31,15 @@ const blockTypeInfoEl = document.getElementById("block-type-info");
 const tutorialOverlay = document.getElementById("tutorial-overlay");
 const tutorialCloseBtn = document.getElementById("tutorial-close");
 const activityFeedEl = document.getElementById("activity-feed");
+const achievementsPanel = document.getElementById("achievements-panel");
+const achievementsToggleBtn = document.getElementById("achievements-toggle");
+const achievementsListEl = document.getElementById("achievements-list");
+const achievementsBody = document.getElementById("achievements-body");
+const achievementToast = document.getElementById("achievement-toast");
 
 const USER_ID_KEY = "hemiunu-user-id";
 const CHAT_COLLAPSED_KEY = "hemiunu-chat-collapsed";
+const ACHIEVEMENTS_COLLAPSED_KEY = "hemiunu-achievements-collapsed";
 const TUTORIAL_SEEN_KEY = "hemiunu-tutorial-seen";
 const MILESTONE_INTERVAL = 100;
 const ERROR_NOTICE_DURATION = 3000;
@@ -346,6 +352,7 @@ const normalizeLeaderboardEntry = (entry, index) => {
   const scoreValue = Number(
     entry.score ??
       entry.blocks ??
+      entry.blocks_placed ??
       entry.total_blocks ??
       entry.placed_blocks ??
       entry.stone ??
@@ -588,6 +595,7 @@ const updateHud = () => {
   }
   updatePlacementState();
   syncLeaderboardFromStats();
+  syncAchievements();
 };
 
 const showMilestoneNotification = (data) => {
@@ -689,18 +697,40 @@ const handleSocketMessage = (event) => {
     }
     case "block_placed": {
       const payload = message.data ?? {};
-      const eventUserId = payload.user_id ?? payload.userId ?? null;
+      const block = payload.block ?? payload; // Fallback for safety/old messages
+      const eventUserId = block.user_id ?? block.userId ?? null;
       if (!eventUserId || eventUserId === userId) {
         break;
       }
       const username =
-        typeof payload.username === "string" && payload.username.trim()
-          ? payload.username.trim()
+        typeof block.username === "string" && block.username.trim()
+          ? block.username.trim()
           : getUserLabel(eventUserId);
       appendActivityItem({
         username,
-        blockType: payload.type ?? payload.block_type ?? payload.blockType,
+        blockType: block.type ?? block.block_type ?? block.blockType,
       });
+      break;
+    }
+    case "achievement_unlocked": {
+      const ach = message.data;
+      if (ach) {
+        if (!gameState.achievements) gameState.achievements = [];
+        if (!gameState.achievements.includes(ach.id)) {
+            gameState.achievements.push(ach.id);
+        }
+        showAchievementToast(ach);
+        syncAchievements();
+      }
+      break;
+    }
+    case "rate_limited": {
+      if (mineBtn) {
+        mineBtn.style.transform = "translateX(5px)";
+        setTimeout(() => mineBtn.style.transform = "translateX(-5px)", 50);
+        setTimeout(() => mineBtn.style.transform = "", 100);
+      }
+      showErrorNotice("Mining too fast! (Max 1/sec)");
       break;
     }
     default:
@@ -750,6 +780,90 @@ const stopAutoMine = () => {
   }
   window.clearInterval(autoMineInterval);
   autoMineInterval = null;
+};
+
+const initAchievementsPanel = () => {
+  if (!achievementsPanel) return;
+
+  const stored = window.localStorage.getItem(ACHIEVEMENTS_COLLAPSED_KEY);
+  const isCollapsed = stored === "1"; // Default to expanded if not set, or change logic
+  // Actually default closed might be better to save space? Let's default open as per request "visa alla badges"
+  
+  if (isCollapsed) {
+    achievementsBody.classList.add("hidden");
+  } else {
+    achievementsBody.classList.remove("hidden");
+  }
+
+  try {
+    const storedAch = JSON.parse(window.localStorage.getItem("hemiunu-achievements"));
+    const storedMeta = JSON.parse(window.localStorage.getItem("hemiunu-achievements-meta"));
+    if (Array.isArray(storedAch)) gameState.achievements = storedAch;
+    if (Array.isArray(storedMeta)) gameState.achievementsMeta = storedMeta;
+    renderAchievements();
+  } catch (e) {}
+
+  achievementsToggleBtn.addEventListener("click", () => {
+    achievementsBody.classList.toggle("hidden");
+    const collapsed = achievementsBody.classList.contains("hidden");
+    window.localStorage.setItem(ACHIEVEMENTS_COLLAPSED_KEY, collapsed ? "1" : "0");
+  });
+};
+
+const renderAchievements = () => {
+  if (!achievementsListEl) return;
+  
+  const meta = gameState.achievementsMeta || [];
+  const unlocked = new Set(gameState.achievements || []);
+
+  achievementsListEl.innerHTML = "";
+  
+  meta.forEach(ach => {
+    const isUnlocked = unlocked.has(ach.id);
+    const li = document.createElement("li");
+    li.className = `achievement-item ${isUnlocked ? "unlocked" : ""}`;
+    li.innerHTML = `
+      <div class="achievement-icon">${ach.icon}</div>
+      <div class="achievement-info">
+        <span class="achievement-name">${ach.name}</span>
+        <span class="achievement-desc">${ach.desc}</span>
+      </div>
+    `;
+    achievementsListEl.appendChild(li);
+  });
+};
+
+let lastAchievementsHash = "";
+const syncAchievements = () => {
+  const meta = gameState.achievementsMeta || [];
+  const unlocked = gameState.achievements || [];
+  const hash = JSON.stringify(meta) + JSON.stringify(unlocked);
+  
+  if (hash !== lastAchievementsHash) {
+    renderAchievements();
+    lastAchievementsHash = hash;
+    window.localStorage.setItem("hemiunu-achievements", JSON.stringify(unlocked));
+    window.localStorage.setItem("hemiunu-achievements-meta", JSON.stringify(meta));
+  }
+};
+
+const showAchievementToast = (achievement) => {
+  if (!achievementToast) return;
+  
+  achievementToast.innerHTML = `
+    <div class="achievement-toast-icon">${achievement.icon}</div>
+    <div class="achievement-toast-content">
+      <span class="achievement-toast-title">Achievement Unlocked!</span>
+      <span class="achievement-toast-name">${achievement.name}</span>
+    </div>
+  `;
+  
+  achievementToast.classList.add("show");
+  audioManager.playSound("milestone"); // Reuse milestone sound or add new one
+  
+  setTimeout(() => {
+    achievementToast.classList.remove("show");
+  }, 4000);
 };
 
 const positionKey = (x, y, z) => `${x},${y},${z}`;
@@ -1087,6 +1201,7 @@ const socket = connect({
 lockButtons();
 initBlockTypeSelector();
 initChatPanel();
+initAchievementsPanel();
 initTutorialOverlay();
 renderLeaderboard([]);
 

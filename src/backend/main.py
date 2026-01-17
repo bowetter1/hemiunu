@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
@@ -88,15 +89,37 @@ async def _build_state_payload(manager: ConnectionManager, user_id: str) -> Dict
         stone_snapshot = user_stones.get(user_id, DEFAULT_STARTING_STONE)
         chat_snapshot = list(chat_messages)
         usernames_snapshot = dict(usernames)
+        leaderboard_payload = _generate_leaderboard_payload()
+        user_unlocked = user_achievements.get(user_id, [])
     return {
         "pyramid": pyramid_snapshot,
         "stats": {
             "total_blocks": len(pyramid_snapshot),
             "online_players": len(manager.active_connections),
+            "leaderboard": leaderboard_payload["data"]["leaderboard"],
         },
         "user_resources": {"stone": stone_snapshot},
+        "achievements": user_unlocked,
+        "achievements_meta": list(ACHIEVEMENTS.values()),
         "chat": chat_snapshot,
         "usernames": usernames_snapshot,
+    }
+
+
+def _generate_leaderboard_payload() -> Dict[str, Any]:
+    leaderboard = []
+    for user_id, count in user_blocks_placed.items():
+        username = usernames.get(user_id)
+        if not username:
+             username = f"Player {str(user_id)[:4]}"
+        leaderboard.append({"user_id": user_id, "username": username, "blocks_placed": count})
+    
+    # Sort by blocks placed (desc), then username (asc)
+    leaderboard.sort(key=lambda entry: (-entry["blocks_placed"], entry["username"] or ""))
+    
+    return {
+        "type": "leaderboard",
+        "data": {"leaderboard": leaderboard[:10]},
     }
 
 
@@ -118,8 +141,19 @@ MAX_CHAT_MESSAGES = 50
 user_stones: Dict[str, int] = {}
 user_blocks_placed: Dict[str, int] = {}
 usernames: Dict[str, str] = {}
+user_achievements: Dict[str, List[str]] = {}
+user_placed_types: Dict[str, set] = {}
 chat_messages: List[Dict[str, Any]] = []
+last_mine_time: Dict[str, float] = {}
 state_lock = asyncio.Lock()
+
+ACHIEVEMENTS = {
+    "first_block": {"id": "first_block", "name": "Första Stenen", "icon": "🪨", "desc": "Placera 1 block"},
+    "builder_10": {"id": "builder_10", "name": "Byggare", "icon": "🏗️", "desc": "Placera 10 blocks"},
+    "architect_100": {"id": "architect_100", "name": "Arkitekt", "icon": "🏛️", "desc": "Placera 100 blocks"},
+    "night_worker": {"id": "night_worker", "name": "Nattarbetare", "icon": "🌙", "desc": "Placera block under natt (20-06)"},
+    "artist": {"id": "artist", "name": "Konstnär", "icon": "🎨", "desc": "Använd alla 3 blocktyper"},
+}
 
 
 @app.on_event("startup")
@@ -144,12 +178,23 @@ async def startup_event():
     # Load user stones
     global user_stones
     user_stones = await persistence_manager.get_all_user_stones()
+    # Load user stats (blocks placed)
+    global user_blocks_placed
+    user_blocks_placed = await persistence_manager.get_all_user_stats()
     # Load usernames
     global usernames
     usernames = await persistence_manager.get_all_usernames()
+    # Load achievements
+    global user_achievements
+    user_achievements = await persistence_manager.get_all_user_achievements()
+    # Load placed types
+    global user_placed_types
+    user_placed_types = await persistence_manager.get_all_user_placed_types()
+    
     logger.info(
         f"Loaded {len(pyramid_blocks)} blocks, {len(user_stones)} user profiles, "
-        f"and {len(usernames)} usernames."
+        f"{len(user_blocks_placed)} user stats, "
+        f"{len(usernames)} usernames, and achievements for {len(user_achievements)} users."
     )
 
 
@@ -193,6 +238,13 @@ app.mount("/", StaticFiles(directory=str(static_directory), html=True), name="st
 
 async def handle_mine_stone(message: Dict[str, Any], websocket: WebSocket) -> None:
     user_id = message.get("user_id", "unknown")
+    
+    current_time = time.time()
+    if current_time - last_mine_time.get(user_id, 0) < 1.0:
+        await websocket.send_text(_serialize_message({"type": "rate_limited"}))
+        return
+    last_mine_time[user_id] = current_time
+
     async with state_lock:
         if user_id not in user_stones:
             user_stones[user_id] = DEFAULT_STARTING_STONE
@@ -254,8 +306,60 @@ async def handle_place_block(message: Dict[str, Any], websocket: WebSocket) -> N
             try:
                 await persistence_manager.update_user_stones(user_id, user_stones[user_id])
                 await persistence_manager.save_block(new_block)
+                await persistence_manager.update_user_stats(user_id, user_blocks_placed[user_id])
+                
+                # Achievement Checks
+                current_blocks = user_blocks_placed[user_id]
+                if user_id not in user_placed_types:
+                    user_placed_types[user_id] = set()
+                
+                if block_type not in user_placed_types[user_id]:
+                    user_placed_types[user_id].add(block_type)
+                    await persistence_manager.save_user_placed_type(user_id, block_type)
+
+                unlocked_now = []
+                user_unlocked_ids = set(user_achievements.get(user_id, []))
+                
+                # 1. First Block
+                if current_blocks >= 1 and "first_block" not in user_unlocked_ids:
+                    unlocked_now.append("first_block")
+                
+                # 2. Builder 10
+                if current_blocks >= 10 and "builder_10" not in user_unlocked_ids:
+                    unlocked_now.append("builder_10")
+                
+                # 3. Architect 100
+                if current_blocks >= 100 and "architect_100" not in user_unlocked_ids:
+                    unlocked_now.append("architect_100")
+                
+                # 4. Night Worker (20-06)
+                current_hour = datetime.now().hour
+                if (current_hour >= 20 or current_hour < 6) and "night_worker" not in user_unlocked_ids:
+                    unlocked_now.append("night_worker")
+                
+                # 5. Artist (all 3 types)
+                required_types = {"granite", "limestone", "sandstone"}
+                if required_types.issubset(user_placed_types[user_id]) and "artist" not in user_unlocked_ids:
+                    unlocked_now.append("artist")
+
+                # Save and Notify
+                if unlocked_now:
+                    if user_id not in user_achievements:
+                        user_achievements[user_id] = []
+                    
+                    for ach_id in unlocked_now:
+                        user_achievements[user_id].append(ach_id)
+                        await persistence_manager.save_achievement(user_id, ach_id)
+                        # Prepare notification
+                        ach_def = ACHIEVEMENTS.get(ach_id)
+                        if ach_def:
+                             await websocket.send_text(_serialize_message({
+                                 "type": "achievement_unlocked",
+                                 "data": ach_def
+                             }))
+
             except Exception as e:
-                logger.error(f"Failed to save block or update stones: {e}")
+                logger.error(f"Failed to save block or update stones/achievements: {e}")
 
     if error_payload:
         await websocket.send_text(_serialize_message(error_payload))
@@ -266,15 +370,24 @@ async def handle_place_block(message: Dict[str, Any], websocket: WebSocket) -> N
     block_payload = {
         "type": "block_placed",
         "data": {
-            "x": new_block["x"],
-            "y": new_block["y"],
-            "z": new_block["z"],
-            "type": new_block["type"],
-            "user_id": user_id,
-            "username": username,
+            "block": {
+                "x": new_block["x"],
+                "y": new_block["y"],
+                "z": new_block["z"],
+                "type": new_block["type"],
+                "user_id": user_id,
+                "username": username,
+            },
+            "total_blocks": total_blocks,
         },
     }
     await connection_manager.broadcast(block_payload)
+
+    # Broadcast leaderboard update
+    async with state_lock:
+         leaderboard_payload = _generate_leaderboard_payload()
+    await connection_manager.broadcast(leaderboard_payload)
+
     if milestone_reached:
         await connection_manager.broadcast(
             {
@@ -287,7 +400,7 @@ async def handle_place_block(message: Dict[str, Any], websocket: WebSocket) -> N
                 },
             }
         )
-    await connection_manager.send_state_sync(websocket, user_id)
+    # await connection_manager.send_state_sync(websocket, user_id)  <-- Removed to prevent full state sync on place
 
 
 async def handle_set_username(message: Dict[str, Any], websocket: WebSocket) -> None:
@@ -330,6 +443,11 @@ async def handle_set_username(message: Dict[str, Any], websocket: WebSocket) -> 
             "data": {"user_id": user_id, "username": username},
         }
     )
+    # Also broadcast leaderboard as username might change ranking display
+    async with state_lock:
+         leaderboard_payload = _generate_leaderboard_payload()
+    await connection_manager.broadcast(leaderboard_payload)
+
     await connection_manager.send_state_sync(websocket, user_id)
 
 
@@ -352,6 +470,9 @@ async def handle_debug_clear(message: Dict[str, Any], websocket: WebSocket) -> N
             await persistence_manager.clear_all_blocks()
         except Exception as e:
             logger.error(f"Failed to clear blocks: {e}")
+        
+        leaderboard_payload = _generate_leaderboard_payload()
+
         await connection_manager.broadcast(
             {
                 "type": "state_sync",
@@ -360,6 +481,7 @@ async def handle_debug_clear(message: Dict[str, Any], websocket: WebSocket) -> N
                     "stats": {
                         "total_blocks": 0,
                         "online_players": len(connection_manager.active_connections),
+                        "leaderboard": leaderboard_payload["data"]["leaderboard"],
                     },
                     "cleared_by": cleared_by,
                     "usernames": usernames_snapshot,
@@ -408,13 +530,5 @@ async def handle_chat_message(message: Dict[str, Any]) -> None:
 
 async def handle_get_leaderboard(websocket: WebSocket) -> None:
     async with state_lock:
-        leaderboard = [
-            {"user_id": user_id, "blocks_placed": count}
-            for user_id, count in user_blocks_placed.items()
-        ]
-    leaderboard.sort(key=lambda entry: (-entry["blocks_placed"], entry["user_id"]))
-    payload = {
-        "type": "leaderboard",
-        "data": {"top": leaderboard[:10]},
-    }
+        payload = _generate_leaderboard_payload()
     await websocket.send_text(_serialize_message(payload))

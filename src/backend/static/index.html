@@ -18,6 +18,8 @@
             </div>
         </header>
 
+        <div id="activity-feed" aria-live="polite" aria-relevant="additions"></div>
+
         <main>
             <div id="milestone-notification" aria-live="polite"></div>
             <div id="error-notification" role="alert" aria-live="assertive"></div>
@@ -51,8 +53,21 @@
             <ol id="leaderboard-list" aria-live="polite"></ol>
         </aside>
 
+        <aside id="achievements-panel" aria-label="Achievements">
+            <div class="panel-header">
+                <h2 class="panel-title">Faraos Belöningar</h2>
+                <button id="achievements-toggle" type="button" title="Toggle achievements">🏆</button>
+            </div>
+            <div id="achievements-body" class="achievements-body hidden">
+                <ul id="achievements-list"></ul>
+            </div>
+        </aside>
+
+        <div id="achievement-toast" class="achievement-toast" role="alert"></div>
+
         <aside id="control-panel" aria-label="Controls">
             <button id="btn-mine" title="Click to mine 1 stone">⛏️ Mine Stone</button>
+            <button id="btn-auto-mine">⚙️ Auto-Mine: OFF</button>
             <button id="btn-place" title="Click to place a block (Cost: 1 Stone)">🧱 Place Block</button>
             <div class="block-type-panel" aria-label="Blocktyp">
                 <div class="block-type-header">
@@ -70,7 +85,7 @@
             </div>
             <div id="place-warning" aria-live="polite"></div>
             <div id="status-bar">Connecting...</div>
-            <button id="btn-debug-clear" style="margin-top: 20px; background: #444; color: #f66;">💣 Clear All (Debug)</button>
+            <button id="btn-debug-clear" style="margin-top: 20px; background: #444; color: #f66;" hidden>💣 Clear All (Debug)</button>
             <button id="btn-mute" style="margin-top: 10px;">🔊 Sound On</button>
         </aside>
     </div>

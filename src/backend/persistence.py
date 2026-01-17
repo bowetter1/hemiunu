@@ -40,6 +40,27 @@ class PersistenceManager:
                     username TEXT
                 )
             """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS user_stats (
+                    user_id TEXT PRIMARY KEY,
+                    blocks_placed INTEGER
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS user_achievements (
+                    user_id TEXT,
+                    achievement_id TEXT,
+                    unlocked_at TIMESTAMP,
+                    PRIMARY KEY (user_id, achievement_id)
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS user_placed_types (
+                    user_id TEXT,
+                    block_type TEXT,
+                    PRIMARY KEY (user_id, block_type)
+                )
+            """)
             await db.commit()
             logger.info("Database initialized.")
 
@@ -94,6 +115,22 @@ class PersistenceManager:
                 rows = await cursor.fetchall()
                 return {row[0]: row[1] for row in rows}
 
+    async def update_user_stats(self, user_id: str, blocks_placed: int):
+        """Update or insert the blocks placed count for a user."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO user_stats (user_id, blocks_placed) VALUES (?, ?)",
+                (user_id, blocks_placed)
+            )
+            await db.commit()
+
+    async def get_all_user_stats(self) -> Dict[str, int]:
+        """Retrieve all user stats (blocks placed) for initialization."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT user_id, blocks_placed FROM user_stats") as cursor:
+                rows = await cursor.fetchall()
+                return {row[0]: row[1] for row in rows}
+
     async def save_username(self, user_id: str, username: str) -> None:
         """Update or insert the username for a user."""
         async with aiosqlite.connect(self.db_path) as db:
@@ -118,3 +155,60 @@ class PersistenceManager:
             async with db.execute("SELECT user_id, username FROM usernames") as cursor:
                 rows = await cursor.fetchall()
                 return {row[0]: row[1] for row in rows}
+
+    async def save_achievement(self, user_id: str, achievement_id: str):
+        """Record an unlocked achievement."""
+        unlocked_at = datetime.utcnow()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES (?, ?, ?)",
+                (user_id, achievement_id, unlocked_at)
+            )
+            await db.commit()
+
+    async def get_user_achievements(self, user_id: str) -> List[str]:
+        """Get list of achievement IDs unlocked by user."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT achievement_id FROM user_achievements WHERE user_id = ?", (user_id,)) as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
+    
+    async def get_all_user_achievements(self) -> Dict[str, List[str]]:
+        """Retrieve all achievements for all users (for initialization)."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT user_id, achievement_id FROM user_achievements") as cursor:
+                rows = await cursor.fetchall()
+                result = {}
+                for user_id, achievement_id in rows:
+                    if user_id not in result:
+                        result[user_id] = []
+                    result[user_id].append(achievement_id)
+                return result
+
+    async def save_user_placed_type(self, user_id: str, block_type: str):
+        """Record that a user has placed a specific block type."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO user_placed_types (user_id, block_type) VALUES (?, ?)",
+                (user_id, block_type)
+            )
+            await db.commit()
+
+    async def get_user_placed_types(self, user_id: str) -> List[str]:
+        """Get list of block types placed by user."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT block_type FROM user_placed_types WHERE user_id = ?", (user_id,)) as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
+
+    async def get_all_user_placed_types(self) -> Dict[str, set]:
+        """Retrieve all placed types for all users."""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT user_id, block_type FROM user_placed_types") as cursor:
+                rows = await cursor.fetchall()
+                result = {}
+                for user_id, block_type in rows:
+                    if user_id not in result:
+                        result[user_id] = set()
+                    result[user_id].add(block_type)
+                return result
