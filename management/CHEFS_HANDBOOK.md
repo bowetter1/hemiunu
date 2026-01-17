@@ -23,6 +23,89 @@ Du är **Chef** - du kodar aldrig själv. Din roll är att:
 
 ---
 
+## Micro-Sprint Model
+
+> Varken Waterfall eller Agilt. Något nytt för AI-teams.
+
+### Varför?
+
+| Aspekt | Mänskligt team | AI-team |
+|--------|----------------|---------|
+| Sprint-längd | 2 veckor | **20 minuter** |
+| Standup | 15 min dagligen | **30 sek check-in** |
+| Code review | Timmar/dagar | **Sekunder** |
+| Onboarding | Veckor | **5 minuter** |
+| Parallellism | 5-10 devs | **Obegränsat** |
+
+### Modellen
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│   SPEC ──→ SPAWN ──→ MONITOR ──→ VERIFY ──→ SHIP       │
+│     │                                          │        │
+│     └──────────── 15-25 min ──────────────────┘        │
+│                        │                                │
+│                    REPEAT                               │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Sprint Cycle (15-25 min per feature)
+
+| Steg | Tid | Aktivitet |
+|------|-----|-----------|
+| **1. SPEC** | 2 min | Skriv spec i fil, acceptanskriterier |
+| **2. SPAWN** | 1 min | Välj worker, kör spec |
+| **3. MONITOR** | 5-15 min | Check-in var 30-60 sek, unblock |
+| **4. VERIFY** | 1 min | Syntax check, quick test |
+| **5. SHIP** | 2 min | Commit, deploy |
+
+### Principer
+
+**1. Ingen planering utan implementation**
+```
+Waterfall: Plan 3 mån → Build 6 mån
+AI-team:   Plan 5 min → Build 10 min → Learn → Repeat
+```
+
+**2. Specs är kontraktet**
+```
+Agilt: User stories, diskussion
+AI:    Exakt spec = exakt output
+```
+
+**3. Workers är disposable**
+```
+Agilt: Samma team, växer tillsammans
+AI:    Ny worker per task. Ingen tech debt i hjärnan.
+```
+
+**4. Deploy konstant**
+```
+Waterfall: Release var 6:e månad
+Agilt:     Release varannan vecka
+AI-team:   Release varje timme
+```
+
+### Vad vi behåller
+
+| Från Agilt | Från Waterfall |
+|------------|----------------|
+| Iterationer | Tydliga specs |
+| Working software | Acceptanskriterier |
+| Retrospectives | Milestones |
+
+### Vad vi slänger
+
+| Från Agilt | Från Waterfall |
+|------------|----------------|
+| 15 min dailies → 30 sek check-in | Långa planeringsfaser |
+| Sprint planning poker | Big bang releases |
+| 2-veckors sprints | Sekventiellt arbete |
+
+---
+
 ## Quick Start
 
 ```bash
@@ -785,11 +868,12 @@ railway up --detach
 
 Denna handbook är ett levande dokument. Uppdatera den efter varje projekt med nya lärdomar.
 
-**Version:** 2.0
+**Version:** 2.1
 **Uppdaterad:** 2026-01-17
 **Av:** Chef Claude Opus, Hemiunu Project
 
 ### Changelog
+- v2.1: Lade till Micro-Sprint Model (AI-native arbetsmetodik)
 - v2.0: Ny dokumentationsstruktur (ONBOARDING, specs/, workers/), lade till Qwen + Codex modellval
 - v1.3: CD playtest-first, Codex nätverksbegränsning dokumenterad
 - v1.2: Mandatory Pre-Sprint Codebase Analyst, uppdaterad Sprint Structure
