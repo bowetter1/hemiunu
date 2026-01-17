@@ -92,6 +92,150 @@ Skapa denna i varje projekt:
 
 Dessa roller bör alltid finnas i större projekt:
 
+---
+
+## 🎮 Game Studio Roles
+
+För spelstudios behövs specialiserade roller utöver standard-teamet:
+
+### 1. Codebase Analyst (Gemini 2M Context)
+```bash
+gemini -y "
+ROLL: Codebase Analyst
+CONTEXT: Du har 2 miljoner tokens context - använd det!
+
+UPPGIFT: Läs HELA kodbasen och ge en komplett analys.
+
+ANALYS:
+1. Arkitektur-översikt
+2. Styrkor och svagheter
+3. Teknisk skuld
+4. Säkerhetsproblem
+5. Performance-flaskhalsar
+6. Kodkvalitet (1-10)
+7. Konkreta förbättringsförslag
+
+LÄS DESSA FILER:
+- Alla .py filer i src/backend/
+- Alla .js filer i src/frontend/js/
+- Alla .css filer
+- index.html
+
+OUTPUT: Strukturerad rapport som Grok-style review
+"
+```
+
+**Varför Gemini?** 2M context = kan läsa hela kodbasen på en gång, ger holistisk bild.
+
+### 2. Live Game Tester
+```bash
+# Använd Python/Node för att faktiskt SPELA spelet
+codex exec "
+ROLL: Live Game Tester
+UPPGIFT: Testa spelet LIVE via WebSocket.
+
+TESTSCENARIO:
+1. Anslut till wss://[GAME_URL]/ws
+2. Sätt username
+3. Mine 10 stones
+4. Placera 5 blocks (testa olika typer)
+5. Skicka chat-meddelanden
+6. Testa felaktiga placeringar
+7. Verifiera milestone-events
+8. Testa edge cases
+
+OUTPUT:
+- Screenshot/log av varje test
+- PASS/FAIL per scenario
+- Buggar hittade
+- UX-feedback
+"
+```
+
+### 3. Player Experience Reviewer
+```bash
+gemini -y "
+ROLL: Player Experience Reviewer
+UPPGIFT: Granska spelet ur en SPELARES perspektiv.
+
+FRÅGOR ATT BESVARA:
+1. Är det roligt? Varför/varför inte?
+2. Förstår man vad man ska göra?
+3. Känns progressionen meningsfull?
+4. Vill man spela igen?
+5. Vad saknas för att det ska bli beroendeframkallande?
+
+GRANSKA:
+- Onboarding/tutorial
+- Core gameplay loop
+- Social features (chat, leaderboard)
+- Visuell feedback
+- Ljuddesign
+
+OUTPUT:
+- Spelarupplevelse-betyg (1-10)
+- Top 3 styrkor
+- Top 3 svagheter
+- Konkreta förbättringsförslag
+"
+```
+
+### 4. Creative Director
+```bash
+gemini -y "
+ROLL: Creative Director
+UPPGIFT: Granska spelets VISION och KÄNSLA.
+
+ANALYS:
+1. Är temat konsekvent? (Ancient Egypt, pyramid-building)
+2. Stämmer UI/UX med tonen?
+3. Berättar spelet en historia?
+4. Vad är 'the hook'? Varför kommer folk spela?
+5. Vad skiljer detta från andra multiplayer-builders?
+
+VISION-CHECK:
+- Core fantasy: 'Bygg pyramiden tillsammans'
+- Emotional payoff: Vad känner spelaren?
+- Social hook: Varför bjuder man in vänner?
+
+OUTPUT:
+- Vision clarity score (1-10)
+- Brand identity feedback
+- Förslag på starkare narrative
+"
+```
+
+---
+
+## Game Studio Sprint Structure
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    GAME STUDIO SPRINT                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  PRE-SPRINT (Analys)                                        │
+│  ─────────────────────────────────────────────              │
+│  🔍 Codebase Analyst → Rapport                              │
+│  🎮 Live Tester → Bug report                                │
+│  👤 UX Reviewer → Player feedback                           │
+│                                                             │
+│  SPRINT (Implementation)                                    │
+│  ─────────────────────────────────────────────              │
+│  👨‍💻 Codex Workers → Implementerar fixes/features           │
+│  🎨 Creative Director → Validerar vision                    │
+│                                                             │
+│  POST-SPRINT (Verification)                                 │
+│  ─────────────────────────────────────────────              │
+│  🔍 Code Reviewer → APPROVED/REJECTED                       │
+│  🎮 Live Tester → Retest                                    │
+│  👤 UX Reviewer → Final check                               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ### 1. Code Reviewer
 ```bash
 codex exec "
