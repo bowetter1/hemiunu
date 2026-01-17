@@ -3,6 +3,7 @@ import gameState from "../state/gameState.js";
 let socket = null;
 let statusHandler = () => {};
 let milestoneHandler = () => {};
+let errorHandler = () => {};
 
 const updateStatus = (value) => {
   if (typeof statusHandler === "function") {
@@ -13,6 +14,21 @@ const updateStatus = (value) => {
 const updateMilestone = (data) => {
   if (typeof milestoneHandler === "function") {
     milestoneHandler(data);
+  }
+};
+
+const showError = (message) => {
+  const text = message ? `Error: ${message}` : "Error";
+  updateStatus(text);
+  if (typeof errorHandler === "function") {
+    errorHandler(message);
+  }
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    window.setTimeout(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        updateStatus("Connected");
+      }
+    }, 2500);
   }
 };
 
@@ -57,14 +73,18 @@ const handleMessage = (event) => {
     case "milestone-event":
       updateMilestone(message.data);
       break;
+    case "error":
+      showError(message?.data?.message);
+      break;
     default:
       break;
   }
 };
 
-export const connect = ({ onStatusChange, onMilestone } = {}) => {
+export const connect = ({ onStatusChange, onMilestone, onError } = {}) => {
   statusHandler = typeof onStatusChange === "function" ? onStatusChange : () => {};
   milestoneHandler = typeof onMilestone === "function" ? onMilestone : () => {};
+  errorHandler = typeof onError === "function" ? onError : () => {};
   updateStatus("Connecting...");
 
   const scheme = window.location.protocol === "https:" ? "wss://" : "ws://";

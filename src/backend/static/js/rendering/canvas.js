@@ -9,6 +9,10 @@ const colorMap = {
   sandstone: "#c2803c",
 };
 
+const ERROR_FLASH_DURATION = 300;
+
+let errorFlashStart = 0;
+
 const ensureSize = () => {
   if (!canvas) {
     return;
@@ -18,6 +22,10 @@ const ensureSize = () => {
   canvas.width = rect.width * devicePixelRatio;
   canvas.height = rect.height * devicePixelRatio;
   ctx?.scale(devicePixelRatio, devicePixelRatio);
+};
+
+export const flashError = () => {
+  errorFlashStart = Date.now();
 };
 
 export const draw = () => {
@@ -57,4 +65,15 @@ export const draw = () => {
     ctx.lineWidth = 1;
     ctx.stroke();
   });
+
+  const elapsed = errorFlashStart ? Date.now() - errorFlashStart : 0;
+  if (elapsed > 0 && elapsed <= ERROR_FLASH_DURATION) {
+    const alpha = 0.35 * (1 - elapsed / ERROR_FLASH_DURATION);
+    ctx.save();
+    ctx.fillStyle = `rgba(200, 30, 30, ${alpha})`;
+    ctx.fillRect(0, 0, displayWidth, displayHeight);
+    ctx.restore();
+  } else if (elapsed > ERROR_FLASH_DURATION) {
+    errorFlashStart = 0;
+  }
 };

@@ -61,6 +61,14 @@ button:active {
     background: #b38600;
 }
 
+button:disabled {
+    background: #555;
+    color: #cfcfcf;
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 0.8;
+}
+
 #status-bar {
     margin-left: auto;
     font-size: 12px;
@@ -87,4 +95,40 @@ button:active {
 #milestone-notification.show {
     opacity: 1;
     transform: translate(-50%, 0);
+}
+
+#error-notification {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    background: #b00020;
+    color: #fff;
+    border-radius: 6px;
+    font-weight: bold;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 3;
+}
+
+#error-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#place-warning {
+    display: none;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ff7b7b;
+    background: rgba(255, 77, 77, 0.15);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+#place-warning.show {
+    display: inline-flex;
 }

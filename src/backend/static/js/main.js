@@ -1,6 +1,6 @@
 import gameState from "./state/gameState.js";
 import { connect, send } from "./network/websocket.js";
-import { draw } from "./rendering/canvas.js";
+import { draw, flashError } from "./rendering/canvas.js";
 
 const blockCountEl = document.getElementById("block-count");
 const stoneCountEl = document.getElementById("stone-count");
@@ -8,9 +8,13 @@ const playerCountEl = document.getElementById("player-count");
 const statusBar = document.getElementById("status-bar");
 const milestoneProgressEl = document.getElementById("milestone-progress");
 const milestoneNoticeEl = document.getElementById("milestone-notification");
+const errorNoticeEl = document.getElementById("error-notification");
+const placeWarningEl = document.getElementById("place-warning");
+const placeBtn = document.getElementById("btn-place");
 
 const USER_ID_KEY = "hemiunu-user-id";
 const MILESTONE_INTERVAL = 100;
+const ERROR_NOTICE_DURATION = 3000;
 
 const getUserId = () => {
   const stored = window.localStorage.getItem(USER_ID_KEY);
@@ -33,6 +37,7 @@ const setStatus = (value) => {
 };
 
 let milestoneTimer = null;
+let errorNoticeTimer = null;
 
 const getTotalBlocks = () => {
   const statsTotal = gameState.stats?.total_blocks;
@@ -60,6 +65,7 @@ const updateHud = () => {
     const progress = totalBlocks % MILESTONE_INTERVAL;
     milestoneProgressEl.textContent = `${progress}/${MILESTONE_INTERVAL}`;
   }
+  updatePlacementState();
 };
 
 const showMilestoneNotification = (data) => {
@@ -76,6 +82,39 @@ const showMilestoneNotification = (data) => {
   milestoneTimer = window.setTimeout(() => {
     milestoneNoticeEl.classList.remove("show");
   }, 2500);
+};
+
+const showErrorNotice = (message) => {
+  if (!errorNoticeEl) {
+    return;
+  }
+  const text = message || "Ett fel uppstod.";
+  errorNoticeEl.textContent = text;
+  errorNoticeEl.classList.add("show");
+  if (errorNoticeTimer) {
+    window.clearTimeout(errorNoticeTimer);
+  }
+  errorNoticeTimer = window.setTimeout(() => {
+    errorNoticeEl.classList.remove("show");
+  }, ERROR_NOTICE_DURATION);
+};
+
+const updatePlacementState = () => {
+  const stone = Number(gameState.resources?.stone ?? 0);
+  const canPlace = Number.isFinite(stone) && stone > 0;
+
+  if (placeBtn) {
+    placeBtn.disabled = !canPlace;
+  }
+  if (placeWarningEl) {
+    if (canPlace) {
+      placeWarningEl.classList.remove("show");
+      placeWarningEl.textContent = "";
+    } else {
+      placeWarningEl.textContent = "Behöver sten!";
+      placeWarningEl.classList.add("show");
+    }
+  }
 };
 
 const calculatePlacement = () => {
@@ -101,15 +140,24 @@ const lockButtons = () => {
     });
   }
 
-  const placeBtn = document.getElementById("btn-place");
   if (placeBtn) {
     placeBtn.addEventListener("click", () => {
+      if (placeBtn.disabled) {
+        return;
+      }
       send({ type: "place_block", user_id: userId, data: calculatePlacement() });
     });
   }
 };
 
-connect({ onStatusChange: setStatus, onMilestone: showMilestoneNotification });
+connect({
+  onStatusChange: setStatus,
+  onMilestone: showMilestoneNotification,
+  onError: (message) => {
+    flashError();
+    showErrorNotice(message);
+  },
+});
 lockButtons();
 
 const frame = () => {
