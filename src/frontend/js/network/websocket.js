@@ -80,11 +80,20 @@ const handleMessage = (event) => {
     case "state_sync":
       overrideState(message.data);
       break;
+    case "resource_update":
+      // Update only the resources (specifically stone count) without full state sync
+      if (message.data && typeof message.data === "object") {
+        if (!gameState.resources) gameState.resources = {};
+        if (typeof message.data.stone !== "undefined") {
+          gameState.resources.stone = message.data.stone;
+        }
+      }
+      break;
     case "block_placed":
       {
         const { block, total_blocks } = message.data || {};
         const index = addBlock(block);
-        
+
         if (typeof total_blocks === "number") {
              if (!gameState.stats) gameState.stats = {};
              gameState.stats.total_blocks = total_blocks;
@@ -95,7 +104,7 @@ const handleMessage = (event) => {
             currentUserId &&
             block?.user_id &&
             block.user_id === currentUserId;
-          
+
           if (isOwn) {
             if (!gameState.resources) gameState.resources = {};
             if (typeof gameState.resources.stone === "number") {

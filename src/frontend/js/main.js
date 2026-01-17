@@ -733,6 +733,11 @@ const handleSocketMessage = (event) => {
       showErrorNotice("Mining too fast! (Max 1/sec)");
       break;
     }
+    case "resource_update": {
+      // Update HUD immediately when resource changes
+      updateHud();
+      break;
+    }
     default:
       break;
   }

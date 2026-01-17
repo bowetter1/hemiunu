@@ -249,12 +249,17 @@ async def handle_mine_stone(message: Dict[str, Any], websocket: WebSocket) -> No
         if user_id not in user_stones:
             user_stones[user_id] = DEFAULT_STARTING_STONE
         user_stones[user_id] += 1
+        new_stone_count = user_stones[user_id]
         try:
             await persistence_manager.update_user_stones(user_id, user_stones[user_id])
         except Exception as e:
             logger.error(f"Failed to save user stones: {e}")
 
-    await connection_manager.send_state_sync(websocket, user_id)
+    # Send only a small resource update instead of full state sync
+    await websocket.send_text(_serialize_message({
+        "type": "resource_update",
+        "data": {"stone": new_stone_count}
+    }))
 
 
 async def handle_place_block(message: Dict[str, Any], websocket: WebSocket) -> None:
