@@ -419,13 +419,138 @@ Lösning:
 
 ---
 
+## Worker Timing & Rhythm
+
+### Typiska tider per worker-typ
+| Worker | Enkel uppgift | Medium | Komplex |
+|--------|---------------|--------|---------|
+| Codex | 1-2 min | 3-5 min | 5-10 min |
+| Gemini | 1-2 min | 2-4 min | 4-8 min |
+| Claude Task | 30s-1 min | 1-2 min | 2-5 min |
+
+### Check-in Rhythm
+```
+Start workers → Vänta 30s → Första check
+              → Vänta 45s → Andra check
+              → Vänta 60s → Tredje check
+              → Om >5 min: Överväg intervention
+```
+
+### När ska man stoppa en worker?
+- **Ingen progress på 3+ minuter** - Troligen stuck
+- **Samma error i loop** - Behöver ny approach
+- **Redan 80% klart** - Ta resten manuellt
+- **Blockerar andra** - Prioritera flödet
+
+```bash
+# Stoppa specifik worker
+pkill -f "codex exec.*[UPPGIFT]"
+```
+
+---
+
+## Optimal Sprint Size
+
+### Sweet Spots
+| Antal workers | Bäst för | Risk |
+|---------------|----------|------|
+| 1-2 | Quick fixes, buggar | Ingen parallellism |
+| 3-4 | Feature sprint | ✅ Optimal balans |
+| 5-7 | Större features | Behöver aktiv monitoring |
+| 8-10 | Major release | Hög koordineringskostnad |
+
+### Sprint 3 Exempel (4 workers)
+```
+⏱️  Total tid: ~5 minuter
+📝 Output: +1,615 rader
+📁 Filer: 13 modifierade
+✅ Alla specs uppfyllda
+```
+
+**Lärdom:** 4 parallella Codex workers är sweet spot för feature-sprint.
+
+---
+
+## Verification Protocol
+
+### Innan Commit
+```bash
+# 1. Syntax-check alla modifierade filer
+python3 -m py_compile src/backend/*.py
+node --check src/frontend/js/*.js
+
+# 2. Visa diff stats
+git diff --stat HEAD
+
+# 3. Synka frontend till static (om tillämpligt)
+cp -r src/frontend/* src/backend/static/
+```
+
+### Innan Deploy
+```bash
+# Quick sanity check
+git status --short
+git log --oneline -1
+
+# Deploy
+railway up --detach
+```
+
+---
+
+## Chef Mindset
+
+### Vad jag lärde mig
+
+**Sprint 1-2:**
+- Claude Task agents kan INTE skriva filer → Använd Codex
+- Gemini kan ignorera instruktioner → Acceptera eller byt
+- Tydliga specs = tydliga resultat
+
+**Sprint 3:**
+- 4 workers parallellt = optimal hastighet
+- Vänta aktivt, inte passivt → Check var 30-60s
+- Kill stuck workers efter 5 min → Gå vidare
+- Verifiera syntax INNAN commit → Spar tid
+
+### Chef vs Coder Mindset
+
+| Coder tänker | Chef tänker |
+|--------------|-------------|
+| "Jag fixar det snabbt" | "Vem fixar det bäst?" |
+| "Bara en liten ändring" | "Är detta scope creep?" |
+| "Jag vet hur" | "Har jag spec:at det tydligt?" |
+| "Det tar 5 min" | "Workern gör det på 2 min" |
+
+### De Svåra Stunderna
+
+1. **Se en bugg och vilja fixa den själv**
+   → Skriv spec, delegera, gå vidare
+
+2. **Worker som tar för lång tid**
+   → Check progress, kill om stuck, reassign
+
+3. **Känslan av att "bara vänta"**
+   → Använd tiden för review, planning, docs
+
+4. **Lust att micro-manage**
+   → Trust the spec, trust the worker
+
+---
+
 ## Final Words
 
 > "En bra chef vet när hen ska delegera, när hen ska vänta,
 > och när hen ska ta över och köra själv."
+>
+> "Sweet spot: 4 workers, tydliga specs, 30-sekunders check-ins."
 
 Denna handbook är ett levande dokument. Uppdatera den efter varje projekt med nya lärdomar.
 
-**Version:** 1.0
-**Skapad:** 2026-01-17
+**Version:** 1.1
+**Uppdaterad:** 2026-01-17
 **Av:** Chef Claude, Hemiunu Project
+
+### Changelog
+- v1.1: Lade till Worker Timing, Optimal Sprint Size, Verification Protocol, Chef Mindset
+- v1.0: Initial version
