@@ -26,8 +26,18 @@ def read_file(base_path: Path, path: str) -> str:
     return full_path.read_text()
 
 
+def format_size(size: int) -> str:
+    """Format file size in human readable format"""
+    if size < 1024:
+        return f"{size} B"
+    elif size < 1024 * 1024:
+        return f"{size / 1024:.1f} KB"
+    else:
+        return f"{size / (1024 * 1024):.1f} MB"
+
+
 def list_files(base_path: Path, path: str = ".") -> str:
-    """List files in directory"""
+    """List files in directory with sizes"""
     full_path = base_path / path
     if not full_path.exists():
         return f"Error: Directory not found: {path}"
@@ -35,7 +45,9 @@ def list_files(base_path: Path, path: str = ".") -> str:
     files = []
     for f in full_path.rglob("*"):
         if f.is_file() and ".git" not in str(f):
-            files.append(str(f.relative_to(base_path)))
+            rel_path = str(f.relative_to(base_path))
+            size = format_size(f.stat().st_size)
+            files.append(f"  {rel_path} ({size})")
 
     return "\n".join(files[:100]) if files else "(empty)"
 
