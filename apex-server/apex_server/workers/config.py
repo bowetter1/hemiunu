@@ -8,95 +8,92 @@ from typing import Optional
 # Sökväg till prompts-mappen
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-# === TILLGÄNGLIGA AI:er ===
-# Mappar till API providers
-AVAILABLE_PROVIDERS = {
-    "opus": "anthropic",   # Claude Opus 4.5 via Anthropic API
-    "haiku": "anthropic",  # Claude Haiku 4.5 via Anthropic API
-    "sonnet": "anthropic", # Claude Sonnet via Anthropic API
-    "gemini": "google",    # Gemini via Google AI API
+# =============================================================================
+# MODELLER - Alla tillgängliga AI-modeller
+# =============================================================================
+MODELS = {
+    "opus": {
+        "id": "claude-opus-4-5-20251101",
+        "provider": "anthropic",
+        "input_price": 5.0,    # $ per M tokens
+        "output_price": 25.0,  # $ per M tokens
+    },
+    "sonnet": {
+        "id": "claude-sonnet-4-20250514",
+        "provider": "anthropic",
+        "input_price": 3.0,
+        "output_price": 15.0,
+    },
+    "haiku": {
+        "id": "claude-haiku-4-5-20251101",
+        "provider": "anthropic",
+        "input_price": 1.0,
+        "output_price": 5.0,
+    },
+    "gemini": {
+        "id": "gemini-2.0-flash-exp",
+        "provider": "google",
+        "input_price": 0.0,
+        "output_price": 0.0,
+    },
 }
 
-# Model IDs per provider
-MODEL_IDS = {
-    "opus": "claude-opus-4-5-20251101",    # Opus 4.5 - $5/$25 per M
-    "haiku": "claude-haiku-4-5-20251101",  # Haiku 4.5 - $1/$5 per M
-    "sonnet": "claude-sonnet-4-20250514",
-    "gemini": "gemini-2.0-flash-exp",
+# =============================================================================
+# ROLLER - Alla workers med namn, ikon och default-modell
+# =============================================================================
+ROLES = {
+    "chef":      {"name": "Chef",      "icon": "👨‍🍳", "model": "opus"},
+    "ad":        {"name": "AD",        "icon": "🎨",  "model": "haiku"},
+    "architect": {"name": "Architect", "icon": "🏗️",  "model": "haiku"},
+    "backend":   {"name": "Backend",   "icon": "⚙️",  "model": "haiku"},
+    "frontend":  {"name": "Frontend",  "icon": "🖼️",  "model": "haiku"},
+    "tester":    {"name": "Tester",    "icon": "🧪",  "model": "haiku"},
+    "reviewer":  {"name": "Reviewer",  "icon": "🔍",  "model": "haiku"},
+    "devops":    {"name": "DevOps",    "icon": "🚀",  "model": "haiku"},
 }
 
-# === WORKER AI MAPPNING ===
-# Chef uses Opus (smart orchestration), workers use Haiku (cheap & fast)
-WORKER_AI = {
-    "chef": "opus",        # Opus 4.5 - orchestration needs smarts
-    "ad": "haiku",         # Haiku 4.5 - design guidelines
-    "architect": "haiku",  # Haiku 4.5 - planning
-    "backend": "haiku",    # Haiku 4.5 - backend coding
-    "frontend": "haiku",   # Haiku 4.5 - frontend coding
-    "tester": "haiku",     # Haiku 4.5 - test writing
-    "reviewer": "haiku",   # Haiku 4.5 - code review
-    "devops": "haiku",     # Haiku 4.5 - deploy
-}
+# =============================================================================
+# HELPER DICTS (för bakåtkompatibilitet)
+# =============================================================================
+ALL_ROLES = list(ROLES.keys())
+ROLE_NAMES = {k: v["name"] for k, v in ROLES.items()}
+ROLE_ICONS = {k: v["icon"] for k, v in ROLES.items()}
+WORKER_AI = {k: v["model"] for k, v in ROLES.items()}
 
-# === ROLLER ===
-ALL_ROLES = ["chef", "ad", "architect", "backend", "frontend", "tester", "reviewer", "devops"]
-
-ROLE_NAMES = {
-    "chef": "Chef",
-    "ad": "AD",
-    "architect": "Architect",
-    "backend": "Backend",
-    "frontend": "Frontend",
-    "tester": "Tester",
-    "reviewer": "Reviewer",
-    "devops": "DevOps",
-}
-
-# Role icons for logging
-ROLE_ICONS = {
-    "chef": "👨‍🍳",
-    "ad": "🎨",
-    "architect": "🏗️",
-    "backend": "⚙️",
-    "frontend": "🖼️",
-    "tester": "🧪",
-    "reviewer": "🔍",
-    "devops": "🚀",
-}
+# Legacy dicts
+AVAILABLE_PROVIDERS = {k: v["provider"] for k, v in MODELS.items()}
+MODEL_IDS = {k: v["id"] for k, v in MODELS.items()}
+MODEL_PRICING = {k: {"input": v["input_price"], "output": v["output_price"]} for k, v in MODELS.items()}
 
 
 def get_worker_ai(worker: str, override: Optional[str] = None) -> str:
-    """Get AI type for a worker."""
-    if override and override in AVAILABLE_PROVIDERS:
+    """Get AI type for a worker. Checks env var APEX_MODEL_{WORKER} first."""
+    if override and override in MODELS:
         return override
-    return WORKER_AI.get(worker, "haiku")
-
-
-# Pricing per million tokens (USD)
-MODEL_PRICING = {
-    "opus": {"input": 5.0, "output": 25.0},      # Opus 4.5
-    "haiku": {"input": 1.0, "output": 5.0},      # Haiku 4.5
-    "sonnet": {"input": 3.0, "output": 15.0},    # Sonnet 4
-    "gemini": {"input": 0.0, "output": 0.0},     # Free tier
-}
+    # Check environment variable, e.g. APEX_MODEL_CHEF=sonnet
+    env_key = f"APEX_MODEL_{worker.upper()}"
+    env_model = os.environ.get(env_key)
+    if env_model and env_model in MODELS:
+        return env_model
+    return ROLES.get(worker, {}).get("model", "haiku")
 
 
 def calculate_cost(ai_type: str, input_tokens: int, output_tokens: int) -> float:
     """Calculate cost in USD for token usage."""
-    pricing = MODEL_PRICING.get(ai_type, MODEL_PRICING["haiku"])
-    input_cost = input_tokens * pricing["input"] / 1_000_000
-    output_cost = output_tokens * pricing["output"] / 1_000_000
+    model = MODELS.get(ai_type, MODELS["haiku"])
+    input_cost = input_tokens * model["input_price"] / 1_000_000
+    output_cost = output_tokens * model["output_price"] / 1_000_000
     return input_cost + output_cost
 
 
 def get_model_id(ai_type: str) -> str:
     """Get the model ID for an AI type."""
-    return MODEL_IDS.get(ai_type, MODEL_IDS["sonnet"])
+    return MODELS.get(ai_type, MODELS["sonnet"])["id"]
 
 
 def get_provider(ai_type: str) -> str:
     """Get the API provider for an AI type."""
-    return AVAILABLE_PROVIDERS.get(ai_type, "anthropic")
+    return MODELS.get(ai_type, MODELS["haiku"])["provider"]
 
 
 def _load_prompt(filename: str) -> str:
