@@ -84,6 +84,24 @@ If you're blocked and need something from another worker:
    - ✅ Resolved - need is resolved (add where to find answer)
    - ❌ Cannot - cannot fulfill (explain why)
 
+### QUESTIONS Section (clarifications)
+If the task is unclear or you have a question for Chef:
+
+1. **Add to QUESTIONS section** in CONTEXT.md:
+   ```markdown
+   ## QUESTIONS (for Chef)
+   | From | Question | Answer |
+   |------|----------|--------|
+   | Backend | Should /users return email or just name? | (pending) |
+   ```
+
+2. Chef will answer before continuing. Wait for answer if critical.
+
+3. **If you can make a reasonable assumption**, do it and document:
+   ```
+   | Backend | Should /users return email or just name? | Assumed: name only (simpler) |
+   ```
+
 ## PROJECT DIRECTORY
 Working directory: `{project_dir}`
 - Use RELATIVE paths (e.g. `main.py`)
@@ -91,7 +109,20 @@ Working directory: `{project_dir}`
 
 ## REPORT PROGRESS
 Start with: `📍 [Role]: [Current action]`
-End with: `✅ DONE: [Deliverable]` or `❌ PROBLEM: [What failed]`
+
+### End with ONE of these status lines:
+```
+✅ DONE: [What you delivered]
+⚠️ NEED_CLARIFICATION: [Question for Chef - also add to QUESTIONS section]
+🚫 BLOCKED: [What you need - also add to NEEDS section]
+```
+
+**Examples:**
+- `✅ DONE: Created main.py with 4 API endpoints`
+- `⚠️ NEED_CLARIFICATION: Should delete be soft or hard delete?`
+- `🚫 BLOCKED: Need database schema from Architect first`
+
+**Chef will see your status and take action!**
 
 ## DEPLOY TARGET: Railway
 - PORT is set by Railway automatically

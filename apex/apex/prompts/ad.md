@@ -166,3 +166,15 @@ curl -s http://localhost:8000/tasks 2>/dev/null || echo "No /tasks endpoint yet"
 5. **Visual & E2E review** (when asked):
    - Verify design matches DESIGN.md
    - Click through app to test it works!
+
+---
+
+## BEFORE YOU START
+1. **Check NEEDS section** in CONTEXT.md - solve any needs from you
+2. **Check QUESTIONS section** - answer any questions you can
+
+## WHEN DONE
+End your response with ONE of:
+- `✅ DONE: [What you designed/reviewed]`
+- `⚠️ NEED_CLARIFICATION: [Question]` (also add to QUESTIONS section)
+- `🚫 BLOCKED: [What you need]` (also add to NEEDS section)

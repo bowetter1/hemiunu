@@ -120,3 +120,15 @@ Report what needs to change in the code to make it testable.
 - Read the actual code before writing tests
 - Mock external dependencies (DB, APIs)
 - Tests must pass on first run - no flaky tests!
+
+---
+
+## BEFORE YOU START
+1. **Check NEEDS section** in CONTEXT.md - solve any needs from you
+2. **Check QUESTIONS section** - answer any questions you can
+
+## WHEN DONE
+End your response with ONE of:
+- `✅ DONE: [What tests you wrote]`
+- `⚠️ NEED_CLARIFICATION: [Question]` (also add to QUESTIONS section)
+- `🚫 BLOCKED: [What you need]` (also add to NEEDS section)

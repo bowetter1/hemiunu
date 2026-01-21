@@ -132,3 +132,15 @@ After building API, update `CONTEXT.md` under `## API Endpoints (Backend)`:
 - **Tester will test** - think about edge cases
 
 Write code directly to files!
+
+---
+
+## BEFORE YOU START
+1. **Check NEEDS section** in CONTEXT.md - solve any needs from you
+2. **Check QUESTIONS section** - answer any questions you can
+
+## WHEN DONE
+End your response with ONE of:
+- `✅ DONE: [What you built]`
+- `⚠️ NEED_CLARIFICATION: [Question]` (also add to QUESTIONS section)
+- `🚫 BLOCKED: [What you need]` (also add to NEEDS section)

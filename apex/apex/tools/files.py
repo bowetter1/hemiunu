@@ -36,6 +36,15 @@ TOOLS = [
         }
     },
     {
+        "name": "check_questions",
+        "description": "Check CONTEXT.md for any QUESTIONS from workers. Returns unanswered questions if any.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
         "name": "set_project_dir",
         "description": "Set project folder. RUN THIS FIRST to choose where files should be created.",
         "inputSchema": {
@@ -116,6 +125,32 @@ def _parse_needs_table(content: str) -> list[dict]:
     return needs
 
 
+def _parse_questions_table(content: str) -> list[dict]:
+    """Parse QUESTIONS table from CONTEXT.md content."""
+    questions = []
+    # Look for table rows after QUESTIONS header
+    in_questions = False
+    for line in content.split('\n'):
+        if '## QUESTIONS' in line or 'QUESTIONS (for Chef)' in line:
+            in_questions = True
+            continue
+        if in_questions:
+            if line.startswith('## ') or line.startswith('# '):
+                break  # Next section
+            if '|' in line and not line.strip().startswith('|--'):
+                parts = [p.strip() for p in line.split('|')]
+                parts = [p for p in parts if p]  # Remove empty
+                if len(parts) >= 2 and parts[0] not in ['From', 'from']:
+                    answer = parts[2] if len(parts) > 2 else ''
+                    questions.append({
+                        'from': parts[0],
+                        'question': parts[1],
+                        'answer': answer,
+                        'pending': answer.lower() in ['', '(pending)', 'pending', '-']
+                    })
+    return questions
+
+
 def check_needs(arguments: dict, cwd: str) -> dict:
     """Check CONTEXT.md for blockers/needs."""
     context_file = Path(cwd) / "CONTEXT.md"
@@ -130,17 +165,56 @@ def check_needs(arguments: dict, cwd: str) -> dict:
         log_to_sprint(cwd, "📋 NEEDS: None (all clear)")
         return make_response("✅ No blockers in NEEDS section")
 
+    # Filter for pending needs only
+    pending_needs = [n for n in needs if n['status'].lower() in ['pending', '', '⏳', '⏳ waiting']]
+
+    if not pending_needs:
+        log_to_sprint(cwd, "📋 NEEDS: All resolved")
+        return make_response("✅ All blockers resolved")
+
     # Log each blocker
-    log_to_sprint(cwd, f"⚠️ NEEDS: {len(needs)} blocker(s) found!")
-    for n in needs:
-        status_emoji = "🔴" if n['status'].lower() in ['pending', ''] else "🟢"
-        log_to_sprint(cwd, f"   {status_emoji} {n['from']} needs {n['need']} from {n['from_who']}")
+    log_to_sprint(cwd, f"⚠️ NEEDS: {len(pending_needs)} blocker(s) found!")
+    for n in pending_needs:
+        log_to_sprint(cwd, f"   🔴 {n['from']} needs {n['need']} from {n['from_who']}")
 
     needs_text = "\n".join([
-        f"- **{n['from']}** needs: {n['need']} (from {n['from_who']}) [{n['status']}]"
-        for n in needs
+        f"- **{n['from']}** needs: {n['need']} (from {n['from_who']})"
+        for n in pending_needs
     ])
-    return make_response(f"⚠️ **{len(needs)} BLOCKER(S) FOUND:**\n\n{needs_text}")
+    return make_response(f"⚠️ **{len(pending_needs)} BLOCKER(S) FOUND:**\n\n{needs_text}")
+
+
+def check_questions(arguments: dict, cwd: str) -> dict:
+    """Check CONTEXT.md for unanswered questions."""
+    context_file = Path(cwd) / "CONTEXT.md"
+
+    if not context_file.exists():
+        return make_response("📋 No CONTEXT.md found - no questions to report")
+
+    content = context_file.read_text()
+    questions = _parse_questions_table(content)
+
+    if not questions:
+        log_to_sprint(cwd, "❓ QUESTIONS: None")
+        return make_response("✅ No questions in QUESTIONS section")
+
+    # Filter for pending questions only
+    pending = [q for q in questions if q['pending']]
+
+    if not pending:
+        log_to_sprint(cwd, "❓ QUESTIONS: All answered")
+        return make_response("✅ All questions answered")
+
+    # Log each question
+    log_to_sprint(cwd, f"❓ QUESTIONS: {len(pending)} unanswered!")
+    for q in pending:
+        log_to_sprint(cwd, f"   ❓ {q['from']}: {q['question']}")
+
+    questions_text = "\n".join([
+        f"- **{q['from']}** asks: {q['question']}"
+        for q in pending
+    ])
+    return make_response(f"❓ **{len(pending)} QUESTION(S) NEED ANSWERS:**\n\n{questions_text}")
 
 
 def read_file(arguments: dict, cwd: str) -> dict:
@@ -332,6 +406,7 @@ def set_project_dir(arguments: dict, cwd: str) -> dict:
 
 HANDLERS = {
     "check_needs": check_needs,
+    "check_questions": check_questions,
     "set_project_dir": set_project_dir,
     "read_file": read_file,
     "list_files": list_files,

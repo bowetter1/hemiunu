@@ -164,8 +164,37 @@ def _extract_files_from_result(result: str) -> list[str]:
     return list(files)[:5]  # Max 5 files
 
 
+def _extract_feedback_status(result: str) -> tuple[str, str]:
+    """Extract feedback status from worker result.
+
+    Returns: (status, message) where status is one of:
+    - 'done' - Worker completed successfully
+    - 'need_clarification' - Worker needs clarification
+    - 'blocked' - Worker is blocked
+    - 'unknown' - No status found
+    """
+    lines = result.strip().split('\n')
+
+    for line in lines:
+        line_stripped = line.strip()
+        # Check for the three status patterns
+        if line_stripped.startswith('✅ DONE:'):
+            return ('done', line_stripped[8:].strip())
+        elif line_stripped.startswith('⚠️ NEED_CLARIFICATION:'):
+            return ('need_clarification', line_stripped[22:].strip())
+        elif line_stripped.startswith('🚫 BLOCKED:'):
+            return ('blocked', line_stripped[11:].strip())
+
+    return ('unknown', '')
+
+
 def _summarize_result(result: str, max_len: int = 150) -> str:
     """Create a short summary of worker result."""
+    # First check for structured feedback
+    status, message = _extract_feedback_status(result)
+    if status != 'unknown' and message:
+        return message[:max_len]
+
     # Try to find key phrases
     lines = result.strip().split('\n')
 
@@ -191,9 +220,20 @@ def _log_worker_complete(cwd: str, worker: str, task: str, result: str):
     emoji = WORKER_EMOJI.get(worker, "👤")
     summary = _summarize_result(result)
     files = _extract_files_from_result(result)
+    status, status_msg = _extract_feedback_status(result)
+
+    # Determine status emoji
+    if status == 'done':
+        status_emoji = "✅"
+    elif status == 'need_clarification':
+        status_emoji = "⚠️ NEED_CLARIFICATION"
+    elif status == 'blocked':
+        status_emoji = "🚫 BLOCKED"
+    else:
+        status_emoji = "✅"  # Default to done
 
     # Main completion log
-    log_to_sprint(cwd, f"{emoji} {worker.upper()}: {task[:40]}... ✅")
+    log_to_sprint(cwd, f"{emoji} {worker.upper()}: {task[:40]}... {status_emoji}")
 
     # Log summary (what they did)
     log_to_sprint(cwd, f"   ↳ {summary}")
@@ -201,6 +241,12 @@ def _log_worker_complete(cwd: str, worker: str, task: str, result: str):
     # Log files if any
     if files:
         log_to_sprint(cwd, f"   ↳ Files: {', '.join(files)}")
+
+    # Log special status if not done
+    if status == 'need_clarification':
+        log_to_sprint(cwd, f"   ⚠️ QUESTION: {status_msg}")
+    elif status == 'blocked':
+        log_to_sprint(cwd, f"   🚫 BLOCKER: {status_msg}")
 
 
 def assign_ad(arguments: dict, cwd: str) -> dict:

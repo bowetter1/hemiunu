@@ -98,3 +98,15 @@ Response 201:
 - You decide WHAT to build, not WHO builds it
 - Backend and Frontend will implement based on YOUR plan - be clear!
 - If unsure about anything, search the web for current best practices
+
+---
+
+## BEFORE YOU START
+1. **Check NEEDS section** in CONTEXT.md - solve any needs from you
+2. **Check QUESTIONS section** - answer any questions you can
+
+## WHEN DONE
+End your response with ONE of:
+- `✅ DONE: [What you planned]`
+- `⚠️ NEED_CLARIFICATION: [Question]` (also add to QUESTIONS section)
+- `🚫 BLOCKED: [What you need]` (also add to NEEDS section)

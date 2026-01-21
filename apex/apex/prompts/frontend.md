@@ -101,3 +101,15 @@ After building, update `CONTEXT.md` under `## Frontend`:
 - If unsure about anything, search the web or read the actual code
 
 Write code directly to files!
+
+---
+
+## BEFORE YOU START
+1. **Check NEEDS section** in CONTEXT.md - solve any needs from you
+2. **Check QUESTIONS section** - answer any questions you can
+
+## WHEN DONE
+End your response with ONE of:
+- `✅ DONE: [What you built]`
+- `⚠️ NEED_CLARIFICATION: [Question]` (also add to QUESTIONS section)
+- `🚫 BLOCKED: [What you need]` (also add to NEEDS section)
