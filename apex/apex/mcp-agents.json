@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agents": {
+      "command": "python3",
+      "args": ["/Users/bowetter/Desktop/news/apex/apex/core/mcp_server.py"]
+    }
+  }
+}

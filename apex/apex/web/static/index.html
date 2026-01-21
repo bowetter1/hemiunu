@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex - AI Team</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>apex</h1>
+            <p class="subtitle">AI-teamet som bygger din app</p>
+        </div>
+
+        <div class="input-section">
+            <label class="input-label">Beskriv vad du vill bygga</label>
+            <div class="input-group">
+                <input type="text" id="task" placeholder="t.ex. en todo-app med dark mode" />
+                <button id="start" onclick="startSprint()">Starta sprint</button>
+            </div>
+        </div>
+
+        <div class="team-section" id="team">
+            <div class="team-member" id="team-opus">
+                <span class="dot"></span>
+                <span class="team-name">CEO Opus (Claude)</span>
+            </div>
+            <div class="team-member" id="team-qwen">
+                <span class="dot"></span>
+                <span class="team-name">Qwen (kodare)</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="terminal">
+                <div class="terminal-header">
+                    <span class="terminal-title">sprint.log</span>
+                    <span class="terminal-status" id="status">idle</span>
+                </div>
+                <div class="terminal-body" id="log">
+                    <div class="log-entry">
+                        <span class="log-time"></span>
+                        <span class="log-message" style="color: #444;">Redo att starta...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="files-section" id="files-section">
+                <div class="files-header">
+                    <span class="files-title">📁 Skapade filer</span>
+                    <span class="files-count" id="files-count">0 filer</span>
+                </div>
+                <div class="files-body" id="files-list">
+                    <div class="file-item" style="color: #444;">Väntar på filer...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <span>apex v1.0</span>
+            <span>Claude · Qwen</span>
+        </div>
+
+        <!-- Question Modal -->
+        <div class="question-modal" id="question-modal" style="display: none;">
+            <div class="question-box">
+                <div class="question-header">❓ Opus frågar:</div>
+                <div class="question-text" id="question-text"></div>
+                <div class="question-options" id="question-options"></div>
+                <div class="question-input">
+                    <input type="text" id="answer-input" placeholder="Skriv ditt svar..." />
+                    <button onclick="submitAnswer()">Svara</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
