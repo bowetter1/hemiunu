@@ -159,16 +159,28 @@ button:disabled { background: #333; color: #666; cursor: not-allowed; }
     background: rgba(34, 197, 94, 0.1);
 }
 
+.team-member .dots {
+    display: flex;
+    gap: 3px;
+}
+
 .team-member .dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background: #333;
+    transition: all 0.2s ease;
 }
 
-.team-member.active .dot {
+.team-member .dot.active {
     background: #22c55e;
     box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+/* When badge is active, show green border */
+.team-member.active {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
 }
 
 .team-name { color: #999; }

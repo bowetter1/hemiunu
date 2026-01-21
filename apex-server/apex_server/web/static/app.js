@@ -5,6 +5,7 @@ let currentSprintId = null;
 let polling = null;
 let knownFiles = new Set();
 let lastLogId = 0;
+let activeWorkerCounts = {}; // Track count of active workers per type
 
 // Log type icons and colors
 const LOG_ICONS = {
@@ -102,6 +103,13 @@ async function startSprint() {
     document.getElementById('files-list').innerHTML = '<div class="file-item" style="color: #444;">Vantar pa filer...</div>';
     knownFiles = new Set();
     lastLogId = 0;
+    activeWorkerCounts = {}; // Reset worker counts
+
+    // Reset all dots to inactive
+    document.querySelectorAll('.team-member').forEach(el => {
+        el.classList.remove('active');
+        el.querySelectorAll('.dot').forEach(dot => dot.classList.remove('active'));
+    });
 
     document.getElementById('team-chef').classList.add('active');
     addLogLine('Startar sprint...', 'info');
@@ -235,23 +243,45 @@ function updateTeamFromLog(log) {
         'reviewer': 'team-reviewer'
     };
 
-    const teamId = workerMap[log.worker.toLowerCase()];
+    const workerType = log.worker.toLowerCase();
+    const teamId = workerMap[workerType];
     if (!teamId) return;
 
     const element = document.getElementById(teamId);
     if (!element) return;
 
-    // Worker started -> light up
+    // Initialize count if needed
+    if (!activeWorkerCounts[workerType]) {
+        activeWorkerCounts[workerType] = 0;
+    }
+
+    // Worker started -> increment count
     if (log.log_type === 'worker_start') {
-        element.classList.add('active');
+        activeWorkerCounts[workerType]++;
     }
-    // Worker done -> turn off
+    // Worker done -> decrement count
     else if (log.log_type === 'worker_done') {
-        element.classList.remove('active');
+        activeWorkerCounts[workerType] = Math.max(0, activeWorkerCounts[workerType] - 1);
     }
-    // Other log types -> make sure it's lit while working
-    else {
+
+    // Update the dots based on count
+    const count = activeWorkerCounts[workerType];
+    const dots = element.querySelectorAll('.dot');
+
+    // Light up the right number of dots (max 3)
+    dots.forEach((dot, index) => {
+        if (index < count) {
+            dot.classList.add('active');
+        } else {
+            dot.classList.remove('active');
+        }
+    });
+
+    // Badge is active if any workers are running
+    if (count > 0) {
         element.classList.add('active');
+    } else {
+        element.classList.remove('active');
     }
 }
 
