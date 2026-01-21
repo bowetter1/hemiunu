@@ -106,9 +106,9 @@ async function startSprint() {
     lastLogId = 0;
     activeWorkerCounts = {}; // Reset worker counts
 
-    // Reset all dots to inactive
+    // Reset all dots to inactive and remove worker count classes
     document.querySelectorAll('.team-member').forEach(el => {
-        el.classList.remove('active');
+        el.classList.remove('active', 'workers-2', 'workers-3');
         el.querySelectorAll('.dot').forEach(dot => dot.classList.remove('active'));
     });
 
@@ -281,6 +281,16 @@ function updateTeamFromLog(log) {
     // Update the dots based on count
     const count = activeWorkerCounts[workerType];
     const dots = element.querySelectorAll('.dot');
+
+    // Remove old worker count classes
+    element.classList.remove('workers-2', 'workers-3');
+
+    // Add class to show extra dots if needed
+    if (count >= 3) {
+        element.classList.add('workers-3');
+    } else if (count >= 2) {
+        element.classList.add('workers-2');
+    }
 
     // Light up the right number of dots (max 3)
     dots.forEach((dot, index) => {

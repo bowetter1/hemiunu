@@ -172,6 +172,17 @@ button:disabled { background: #333; color: #666; cursor: not-allowed; }
     transition: all 0.2s ease;
 }
 
+/* Hide 2nd and 3rd dots by default */
+.team-member .dot:nth-child(2),
+.team-member .dot:nth-child(3) {
+    display: none;
+}
+
+/* Show extra dots when multiple workers are running */
+.team-member.workers-2 .dot:nth-child(2) { display: block; }
+.team-member.workers-3 .dot:nth-child(2),
+.team-member.workers-3 .dot:nth-child(3) { display: block; }
+
 .team-member .dot.active {
     background: #22c55e;
     box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
