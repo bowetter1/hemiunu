@@ -11,30 +11,31 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 # === TILLGÄNGLIGA AI:er ===
 # Mappar till API providers
 AVAILABLE_PROVIDERS = {
-    "claude": "anthropic",  # Claude Opus via Anthropic API
-    "sonnet": "anthropic",  # Claude Sonnet via Anthropic API
-    "gemini": "google",     # Gemini via Google AI API
+    "opus": "anthropic",   # Claude Opus 4.5 via Anthropic API
+    "haiku": "anthropic",  # Claude Haiku 4.5 via Anthropic API
+    "sonnet": "anthropic", # Claude Sonnet via Anthropic API
+    "gemini": "google",    # Gemini via Google AI API
 }
 
 # Model IDs per provider
 MODEL_IDS = {
-    "claude": "claude-opus-4-5-20251101",  # Opus 4.5
+    "opus": "claude-opus-4-5-20251101",    # Opus 4.5 - $5/$25 per M
+    "haiku": "claude-haiku-4-5-20251101",  # Haiku 4.5 - $1/$5 per M
     "sonnet": "claude-sonnet-4-20250514",
     "gemini": "gemini-2.0-flash-exp",
 }
 
 # === WORKER AI MAPPNING ===
-# Vilken AI varje worker använder
-# TODO: Aktivera Gemini när GOOGLE_API_KEY är konfigurerad
+# Chef uses Opus (smart orchestration), workers use Haiku (cheap & fast)
 WORKER_AI = {
-    "chef": "claude",      # Opus - orchestration
-    "ad": "claude",        # Opus - visual review
-    "architect": "claude", # Opus - planning
-    "backend": "claude",   # Gemini - backend coding (using Claude for now)
-    "frontend": "claude",  # Opus - frontend coding
-    "tester": "claude",    # Gemini - test writing (using Claude for now)
-    "reviewer": "claude",  # Gemini - code review (using Claude for now)
-    "devops": "claude",    # Opus - deploy
+    "chef": "opus",        # Opus 4.5 - orchestration needs smarts
+    "ad": "haiku",         # Haiku 4.5 - design guidelines
+    "architect": "haiku",  # Haiku 4.5 - planning
+    "backend": "haiku",    # Haiku 4.5 - backend coding
+    "frontend": "haiku",   # Haiku 4.5 - frontend coding
+    "tester": "haiku",     # Haiku 4.5 - test writing
+    "reviewer": "haiku",   # Haiku 4.5 - code review
+    "devops": "haiku",     # Haiku 4.5 - deploy
 }
 
 # === ROLLER ===
@@ -68,7 +69,24 @@ def get_worker_ai(worker: str, override: Optional[str] = None) -> str:
     """Get AI type for a worker."""
     if override and override in AVAILABLE_PROVIDERS:
         return override
-    return WORKER_AI.get(worker, "sonnet")
+    return WORKER_AI.get(worker, "haiku")
+
+
+# Pricing per million tokens (USD)
+MODEL_PRICING = {
+    "opus": {"input": 5.0, "output": 25.0},      # Opus 4.5
+    "haiku": {"input": 1.0, "output": 5.0},      # Haiku 4.5
+    "sonnet": {"input": 3.0, "output": 15.0},    # Sonnet 4
+    "gemini": {"input": 0.0, "output": 0.0},     # Free tier
+}
+
+
+def calculate_cost(ai_type: str, input_tokens: int, output_tokens: int) -> float:
+    """Calculate cost in USD for token usage."""
+    pricing = MODEL_PRICING.get(ai_type, MODEL_PRICING["haiku"])
+    input_cost = input_tokens * pricing["input"] / 1_000_000
+    output_cost = output_tokens * pricing["output"] / 1_000_000
+    return input_cost + output_cost
 
 
 def get_model_id(ai_type: str) -> str:

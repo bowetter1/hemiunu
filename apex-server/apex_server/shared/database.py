@@ -72,6 +72,7 @@ def _run_migrations():
         # Add token tracking columns to sprints table
         ("sprints", "input_tokens", "ALTER TABLE sprints ADD COLUMN input_tokens INTEGER DEFAULT 0"),
         ("sprints", "output_tokens", "ALTER TABLE sprints ADD COLUMN output_tokens INTEGER DEFAULT 0"),
+        ("sprints", "cost_usd", "ALTER TABLE sprints ADD COLUMN cost_usd REAL DEFAULT 0.0"),
     ]
 
     with engine.connect() as conn:

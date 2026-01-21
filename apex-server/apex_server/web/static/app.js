@@ -178,14 +178,10 @@ async function pollLogs() {
         if (statusResponse.ok) {
             const sprint = await statusResponse.json();
 
-            // Update token counter with cost estimate
+            // Update token counter with server-calculated cost
             const inputTokens = sprint.input_tokens || 0;
             const outputTokens = sprint.output_tokens || 0;
-
-            // Claude Opus 4.5 pricing: $5/M input, $25/M output
-            const inputCost = inputTokens * 5 / 1000000;
-            const outputCost = outputTokens * 25 / 1000000;
-            const totalCost = inputCost + outputCost;
+            const totalCost = sprint.cost_usd || 0;
 
             // Format token counts (k for thousands)
             const formatTokens = (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : n;

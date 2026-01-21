@@ -53,6 +53,7 @@ class Sprint(Base, TimestampMixin):
     # Token usage tracking
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(default=0.0)  # Accumulated cost in USD
 
     # Error info
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

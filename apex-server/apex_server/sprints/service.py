@@ -199,16 +199,23 @@ class SprintRunner:
         self._db_lock = __import__('threading').Lock()  # Thread-safe logging
         self._total_input_tokens = 0
         self._total_output_tokens = 0
+        self._total_cost_usd = 0.0
 
-    def track_tokens(self, input_tokens: int, output_tokens: int, db: Session = None):
-        """Track token usage (thread-safe)"""
+    def track_tokens(self, ai_type: str, input_tokens: int, output_tokens: int, db: Session = None):
+        """Track token usage and cost (thread-safe)"""
+        from apex_server.workers.config import calculate_cost
+
+        cost = calculate_cost(ai_type, input_tokens, output_tokens)
+
         with self._db_lock:
             self._total_input_tokens += input_tokens
             self._total_output_tokens += output_tokens
+            self._total_cost_usd += cost
             # Update sprint in database
             target_db = db or self.db
             self.sprint.input_tokens = self._total_input_tokens
             self.sprint.output_tokens = self._total_output_tokens
+            self.sprint.cost_usd = self._total_cost_usd
             target_db.commit()
 
     def log(self, log_type: LogType, message: str, worker: str = None, data: dict = None, db: Session = None):
@@ -304,9 +311,10 @@ class SprintRunner:
                 response = self.llm.call_anthropic(model_id, system_prompt, messages, tools)
                 content_blocks = response.content
                 stop_reason = response.stop_reason
-                # Track token usage
+                # Track token usage and cost
                 if hasattr(response, 'usage'):
                     self.track_tokens(
+                        ai_type,
                         response.usage.input_tokens,
                         response.usage.output_tokens,
                         db=db

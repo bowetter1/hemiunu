@@ -36,6 +36,7 @@ class SprintResponse(BaseModel):
     error_message: Optional[str]
     input_tokens: int = 0
     output_tokens: int = 0
+    cost_usd: float = 0.0
 
     class Config:
         from_attributes = True
@@ -84,7 +85,8 @@ def sprint_to_response(sprint) -> SprintResponse:
         completed_at=sprint.completed_at.isoformat() if sprint.completed_at else None,
         error_message=sprint.error_message,
         input_tokens=sprint.input_tokens or 0,
-        output_tokens=sprint.output_tokens or 0
+        output_tokens=sprint.output_tokens or 0,
+        cost_usd=sprint.cost_usd or 0.0
     )
 
 
