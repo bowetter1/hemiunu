@@ -34,6 +34,8 @@ class SprintResponse(BaseModel):
     started_at: Optional[str]
     completed_at: Optional[str]
     error_message: Optional[str]
+    input_tokens: int = 0
+    output_tokens: int = 0
 
     class Config:
         from_attributes = True
@@ -80,7 +82,9 @@ def sprint_to_response(sprint) -> SprintResponse:
         created_at=sprint.created_at.isoformat(),
         started_at=sprint.started_at.isoformat() if sprint.started_at else None,
         completed_at=sprint.completed_at.isoformat() if sprint.completed_at else None,
-        error_message=sprint.error_message
+        error_message=sprint.error_message,
+        input_tokens=sprint.input_tokens or 0,
+        output_tokens=sprint.output_tokens or 0
     )
 
 

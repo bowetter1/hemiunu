@@ -50,6 +50,10 @@ class Sprint(Base, TimestampMixin):
     started_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
+    # Token usage tracking
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+
     # Error info
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

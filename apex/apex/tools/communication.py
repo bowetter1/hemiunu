@@ -1,7 +1,7 @@
 """
 Communication tools - talk_to, checkin_worker, reassign_with_feedback, new_session
 
-Dessa verktyg använder worker-sessions för att behålla minne.
+These tools use worker-sessions to maintain memory.
 """
 from core.config import get_worker_cli, ROLE_NAMES
 from .base import run_cli, make_response, log_to_sprint, clear_sessions
@@ -12,7 +12,7 @@ WORKER_ENUM = ["ad", "architect", "backend", "frontend", "tester", "reviewer", "
 TOOLS = [
     {
         "name": "talk_to",
-        "description": "Prata fritt med en worker. Har MINNE - fortsätter tidigare session!",
+        "description": "Talk freely with a worker. Has MEMORY - continues previous session!",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -24,19 +24,19 @@ TOOLS = [
     },
     {
         "name": "checkin_worker",
-        "description": "Check-in med en specifik worker. Har MINNE!",
+        "description": "Check-in with a specific worker. Has MEMORY!",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "worker": {"type": "string", "enum": WORKER_ENUM},
-                "question": {"type": "string", "description": "Fråga"}
+                "question": {"type": "string", "description": "Question"}
             },
             "required": ["worker", "question"]
         }
     },
     {
         "name": "reassign_with_feedback",
-        "description": "Skicka tillbaka uppgift med feedback. Har MINNE - workern kommer ihåg vad den gjorde!",
+        "description": "Send back task with feedback. Has MEMORY - worker remembers what they did!",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -49,7 +49,7 @@ TOOLS = [
     },
     {
         "name": "new_session",
-        "description": "Starta ny session med en worker (rensar minnet för den workern).",
+        "description": "Start new session with a worker (clears memory for that worker).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -60,7 +60,7 @@ TOOLS = [
     },
     {
         "name": "clear_all_sessions",
-        "description": "Rensa alla worker-sessions (ny sprint).",
+        "description": "Clear all worker-sessions (new sprint).",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -71,10 +71,10 @@ TOOLS = [
 
 
 def talk_to(arguments: dict, cwd: str) -> dict:
-    """Prata fritt med en worker (med minne via session-tracking)."""
+    """Talk freely with a worker (with memory via session-tracking)."""
     worker = arguments.get("worker", "backend")
     message = arguments.get("message", "")
-    cli = get_worker_cli(worker)  # Använd config.py default
+    cli = get_worker_cli(worker)  # Use config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
     log_to_sprint(cwd, f"💬 {role_name}: {message[:50]}...")
@@ -83,10 +83,10 @@ def talk_to(arguments: dict, cwd: str) -> dict:
 
 
 def checkin_worker(arguments: dict, cwd: str) -> dict:
-    """Check-in med en worker (med minne)."""
+    """Check-in with a worker (with memory)."""
     worker = arguments.get("worker", "")
-    question = arguments.get("question", "Hur går det?")
-    cli = get_worker_cli(worker)  # Använd config.py default
+    question = arguments.get("question", "How's it going?")
+    cli = get_worker_cli(worker)  # Use config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
     result = run_cli(cli, question, cwd, worker=worker)
@@ -94,39 +94,39 @@ def checkin_worker(arguments: dict, cwd: str) -> dict:
 
 
 def reassign_with_feedback(arguments: dict, cwd: str) -> dict:
-    """Skicka tillbaka uppgift med feedback (med minne)."""
+    """Send back task with feedback (with memory)."""
     worker = arguments.get("worker", "backend")
     task = arguments.get("task", "")
     feedback = arguments.get("feedback", "")
-    cli = get_worker_cli(worker)  # Använd config.py default
+    cli = get_worker_cli(worker)  # Use config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
-    prompt = f"Uppgift: {task}\n\nFeedback: {feedback}\n\nGör justeringarna!"
+    prompt = f"Task: {task}\n\nFeedback: {feedback}\n\nMake the adjustments!"
     log_to_sprint(cwd, f"🔄 REASSIGN {role_name}")
     result = run_cli(cli, prompt, cwd, worker=worker)
     return make_response(f"🔄 {role_name}: {result}")
 
 
 def new_session(arguments: dict, cwd: str) -> dict:
-    """Starta ny session för en worker (rensa minne)."""
+    """Start new session for a worker (clear memory)."""
     from .base import set_session
     worker = arguments.get("worker", "backend")
-    cli = get_worker_cli(worker)  # Använd config.py default
+    cli = get_worker_cli(worker)  # Use config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
-    # Rensa session för denna worker
+    # Clear session for this worker
     set_session(worker, None)
 
-    log_to_sprint(cwd, f"🆕 NY SESSION: {role_name}")
-    result = run_cli(cli, f"Du är {role_name}. Ny session - redo för uppdrag!", cwd, worker=worker)
-    return make_response(f"🆕 Ny session med {role_name}: {result[:200]}")
+    log_to_sprint(cwd, f"🆕 NEW SESSION: {role_name}")
+    result = run_cli(cli, f"You are {role_name}. New session - ready for assignments!", cwd, worker=worker)
+    return make_response(f"🆕 New session with {role_name}: {result[:200]}")
 
 
 def clear_all_sessions(arguments: dict, cwd: str) -> dict:
-    """Rensa alla worker-sessions."""
+    """Clear all worker-sessions."""
     clear_sessions()
-    log_to_sprint(cwd, "🧹 Alla worker-sessions rensade")
-    return make_response("🧹 Alla worker-sessions rensade - redo för ny sprint!")
+    log_to_sprint(cwd, "🧹 All worker-sessions cleared")
+    return make_response("🧹 All worker-sessions cleared - ready for new sprint!")
 
 
 HANDLERS = {

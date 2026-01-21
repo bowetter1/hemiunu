@@ -1,9 +1,9 @@
 """
-Apex Tools - Modulära verktyg för MCP-servern.
+Apex Tools - Modular tools for the MCP server.
 
-Varje modul exporterar:
-- TOOLS: Lista med tool-schemas
-- HANDLERS: Dict med {tool_name: handler_func}
+Each module exports:
+- TOOLS: List of tool schemas
+- HANDLERS: Dict of {tool_name: handler_func}
 """
 
 from .base import run_cli, log_to_sprint
@@ -15,7 +15,7 @@ from .deploy import TOOLS as DEPLOY_TOOLS, HANDLERS as DEPLOY_HANDLERS
 from .testing import TOOLS as TESTING_TOOLS, HANDLERS as TESTING_HANDLERS
 from .boss import TOOLS as BOSS_TOOLS, HANDLERS as BOSS_HANDLERS
 
-# Kombinera alla tools
+# Combine all tools
 ALL_TOOLS = (
     MEETING_TOOLS +
     DELEGATION_TOOLS +
@@ -26,7 +26,7 @@ ALL_TOOLS = (
     BOSS_TOOLS
 )
 
-# Kombinera alla handlers
+# Combine all handlers
 ALL_HANDLERS = {
     **MEETING_HANDLERS,
     **DELEGATION_HANDLERS,

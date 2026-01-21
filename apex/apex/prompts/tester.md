@@ -59,6 +59,20 @@ tests/
   conftest.py       ← fixtures (mock DB, test client)
 ```
 
+### CRITICAL: Fix Import Paths!
+Always add this to `conftest.py` to prevent ModuleNotFoundError:
+
+```python
+# conftest.py - MUST HAVE THIS AT TOP!
+import sys
+from pathlib import Path
+
+# Add project root to path so imports work
+sys.path.insert(0, str(Path(__file__).parent.parent))
+```
+
+Without this, `from main import app` will fail!
+
 ### JavaScript (jest/vitest):
 ```
 __tests__/

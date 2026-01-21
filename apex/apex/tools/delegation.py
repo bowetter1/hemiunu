@@ -1,5 +1,5 @@
 """
-Delegation tools - assign_* för alla roller
+Delegation tools - assign_* for all roles
 assign_ad, assign_architect, assign_backend, assign_frontend, assign_parallel, assign_reviewer, assign_tester, assign_security, assign_devops
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,55 +12,55 @@ from .base import run_cli, make_response, log_to_sprint
 TOOLS = [
     {
         "name": "assign_ad",
-        "description": "Ge AD (Art Director) ett uppdrag. Bra för design-riktlinjer, UX, färger, typografi.",
+        "description": "Assign AD (Art Director) a task. Good for design guidelines, UX, colors, typography.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "task": {"type": "string", "description": "Design-uppdraget"},
-                "context": {"type": "string", "description": "Extra kontext om projektet"}
+                "task": {"type": "string", "description": "The design task"},
+                "context": {"type": "string", "description": "Extra context about the project"}
             },
             "required": ["task"]
         }
     },
     {
         "name": "assign_architect",
-        "description": "Ge Architect ett uppdrag. Bra för planering, struktur, design.",
+        "description": "Assign Architect a task. Good for planning, structure, technical design.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "task": {"type": "string", "description": "Uppdraget"},
-                "context": {"type": "string", "description": "Extra kontext"}
+                "task": {"type": "string", "description": "The task"},
+                "context": {"type": "string", "description": "Extra context"}
             },
             "required": ["task"]
         }
     },
     {
         "name": "assign_backend",
-        "description": "Ge Backend-utvecklare ett uppdrag. Bygger API:et som frontend sedan använder. KÖR FÖRST!",
+        "description": "Assign Backend developer a task. Builds API that frontend uses. RUN FIRST!",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "task": {"type": "string", "description": "Vad ska byggas?"},
-                "file": {"type": "string", "description": "Vilken fil? (t.ex. main.py)"}
+                "task": {"type": "string", "description": "What to build?"},
+                "file": {"type": "string", "description": "Which file? (e.g. main.py)"}
             },
             "required": ["task"]
         }
     },
     {
         "name": "assign_frontend",
-        "description": "Ge Frontend-utvecklare ett uppdrag. Bygger mot EXISTERANDE API. Kör EFTER backend!",
+        "description": "Assign Frontend developer a task. Builds against EXISTING API. Run AFTER backend!",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "task": {"type": "string", "description": "Vad ska byggas?"},
-                "file": {"type": "string", "description": "Vilken fil? (t.ex. index.html, app.js)"}
+                "task": {"type": "string", "description": "What to build?"},
+                "file": {"type": "string", "description": "Which file? (e.g. index.html, app.js)"}
             },
             "required": ["task"]
         }
     },
     {
         "name": "assign_parallel",
-        "description": "Kör FLERA workers SAMTIDIGT. Perfekt för oberoende uppgifter som AD + Architect.",
+        "description": "Run MULTIPLE workers AT ONCE. Perfect for independent tasks like AD + Architect.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -69,14 +69,14 @@ TOOLS = [
                     "items": {
                         "type": "object",
                         "properties": {
-                            "worker": {"type": "string", "enum": ["ad", "architect", "backend", "frontend", "tester", "reviewer", "security", "devops"], "description": "Vilken worker"},
-                            "task": {"type": "string", "description": "Uppgiften"},
-                            "context": {"type": "string", "description": "Extra kontext (valfritt)"},
-                            "file": {"type": "string", "description": "Fil att jobba med (valfritt)"}
+                            "worker": {"type": "string", "enum": ["ad", "architect", "backend", "frontend", "tester", "reviewer", "security", "devops"], "description": "Which worker"},
+                            "task": {"type": "string", "description": "The task"},
+                            "context": {"type": "string", "description": "Extra context (optional)"},
+                            "file": {"type": "string", "description": "File to work with (optional)"}
                         },
                         "required": ["worker", "task"]
                     },
-                    "description": "Lista med uppdrag [{worker, task, context?, file?}]"
+                    "description": "List of assignments [{worker, task, context?, file?}]"
                 }
             },
             "required": ["assignments"]
@@ -84,24 +84,24 @@ TOOLS = [
     },
     {
         "name": "assign_reviewer",
-        "description": "Be Reviewer granska kod.",
+        "description": "Ask Reviewer to review code.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "files_to_review": {"type": "array", "items": {"type": "string"}, "description": "Filer att granska"},
-                "focus": {"type": "string", "description": "Vad ska fokuseras på?"}
+                "files_to_review": {"type": "array", "items": {"type": "string"}, "description": "Files to review"},
+                "focus": {"type": "string", "description": "What to focus on?"}
             },
             "required": ["files_to_review"]
         }
     },
     {
         "name": "assign_tester",
-        "description": "Tester SKRIVER testfiler (test_*.py). Kör INNAN run_tests()! Tester skapar filer, run_tests() kör dem.",
+        "description": "Tester WRITES test files (test_*.py). Run BEFORE run_tests()! Tester creates files, run_tests() runs them.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "task": {"type": "string", "description": "Vad ska testas? T.ex. 'Skriv tester för API endpoints'"},
-                "context": {"type": "string", "description": "Extra kontext"}
+                "task": {"type": "string", "description": "What to test? E.g. 'Write tests for API endpoints'"},
+                "context": {"type": "string", "description": "Extra context"}
             },
             "required": ["task"]
         }
@@ -120,12 +120,12 @@ TOOLS = [
     },
     {
         "name": "assign_devops",
-        "description": "Ge DevOps ett uppdrag. Bra för infra, CI/CD, config, monitoring.",
+        "description": "Assign DevOps a task. Good for infra, CI/CD, config, monitoring, deploy.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "task": {"type": "string", "description": "DevOps-uppdraget"},
-                "context": {"type": "string", "description": "Extra kontext"}
+                "task": {"type": "string", "description": "The DevOps task"},
+                "context": {"type": "string", "description": "Extra context"}
             },
             "required": ["task"]
         }
@@ -134,10 +134,10 @@ TOOLS = [
 
 
 def assign_ad(arguments: dict, cwd: str) -> dict:
-    """Ge AD (Art Director) ett uppdrag."""
+    """Assign AD (Art Director) a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("ad")  # Använd config.py default
+    cli = get_worker_cli("ad")  # Use config.py default
 
     prompt = load_prompt("ad", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="ad")
@@ -147,10 +147,10 @@ def assign_ad(arguments: dict, cwd: str) -> dict:
 
 
 def assign_architect(arguments: dict, cwd: str) -> dict:
-    """Ge Architect ett uppdrag."""
+    """Assign Architect a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("architect")  # Använd config.py default
+    cli = get_worker_cli("architect")  # Use config.py default
 
     prompt = load_prompt("architect", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="architect")
@@ -160,10 +160,10 @@ def assign_architect(arguments: dict, cwd: str) -> dict:
 
 
 def assign_backend(arguments: dict, cwd: str) -> dict:
-    """Ge Backend-utvecklare ett uppdrag."""
+    """Assign Backend developer a task."""
     task = arguments.get("task", "")
     file = arguments.get("file", "")
-    cli = get_worker_cli("backend")  # Använd config.py default (gemini)
+    cli = get_worker_cli("backend")  # Use config.py default (gemini)
 
     prompt = load_prompt("backend", task=task, file=file, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="backend")
@@ -173,10 +173,10 @@ def assign_backend(arguments: dict, cwd: str) -> dict:
 
 
 def assign_frontend(arguments: dict, cwd: str) -> dict:
-    """Ge Frontend-utvecklare ett uppdrag."""
+    """Assign Frontend developer a task."""
     task = arguments.get("task", "")
     file = arguments.get("file", "")
-    cli = get_worker_cli("frontend")  # Använd config.py default
+    cli = get_worker_cli("frontend")  # Use config.py default
 
     prompt = load_prompt("frontend", task=task, file=file, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="frontend")
@@ -186,10 +186,10 @@ def assign_frontend(arguments: dict, cwd: str) -> dict:
 
 
 def assign_parallel(arguments: dict, cwd: str) -> dict:
-    """Kör flera workers parallellt."""
+    """Run multiple workers in parallel."""
     assignments = arguments.get("assignments", [])
     if not assignments:
-        return make_response("Inga uppdrag givna")
+        return make_response("No assignments given")
 
     # Worker emoji mapping
     WORKER_EMOJI = {
@@ -204,7 +204,7 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
     }
 
     results = []
-    log_to_sprint(cwd, f"⚡ STARTAR {len(assignments)} PARALLELLA UPPGIFTER...")
+    log_to_sprint(cwd, f"⚡ STARTING {len(assignments)} PARALLEL TASKS...")
 
     with ThreadPoolExecutor(max_workers=len(assignments)) as executor:
         futures = {}
@@ -213,9 +213,9 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
             task = a.get("task", "")
             context = a.get("context", "")
             file = a.get("file", "")
-            cli = get_worker_cli(worker)  # Använd config.py default
+            cli = get_worker_cli(worker)  # Use config.py default
 
-            # Ladda rätt prompt för worker-typen
+            # Load correct prompt for worker type
             try:
                 if worker in ["backend", "frontend"]:
                     prompt = load_prompt(worker, task=task, file=file, project_dir=cwd)
@@ -224,8 +224,8 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
                 else:
                     prompt = load_prompt(worker, task=task, context=context, project_dir=cwd)
             except ValueError:
-                # Fallback om prompt saknas
-                prompt = f"Du är {worker.upper()}. Uppgift: {task}"
+                # Fallback if prompt is missing
+                prompt = f"You are {worker.upper()}. Task: {task}"
 
             future = executor.submit(run_cli, cli, prompt, cwd, worker)
             futures[future] = (worker, cli, task)
@@ -241,15 +241,15 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
                 results.append(f"**{worker.upper()}**: ERROR - {e}")
                 log_to_sprint(cwd, f"{emoji} {worker.upper()}: ERROR - {e}")
 
-    log_to_sprint(cwd, f"⚡ PARALLELLT ARBETE KLART ({len(assignments)} workers)")
-    return make_response(f"⚡ PARALLELLT ARBETE KLART\n\n" + "\n\n---\n\n".join(results))
+    log_to_sprint(cwd, f"⚡ PARALLEL WORK COMPLETE ({len(assignments)} workers)")
+    return make_response(f"⚡ PARALLEL WORK COMPLETE\n\n" + "\n\n---\n\n".join(results))
 
 
 def assign_reviewer(arguments: dict, cwd: str) -> dict:
-    """Be Reviewer granska kod."""
+    """Ask Reviewer to review code."""
     files = arguments.get("files_to_review", [])
     focus = arguments.get("focus", "allmän kvalitet")
-    cli = get_worker_cli("reviewer")  # Använd config.py default (gemini)
+    cli = get_worker_cli("reviewer")  # Use config.py default (gemini)
 
     files_str = ", ".join(files)
     prompt = load_prompt("reviewer", files=files_str, focus=focus, project_dir=cwd)
@@ -260,10 +260,10 @@ def assign_reviewer(arguments: dict, cwd: str) -> dict:
 
 
 def assign_tester(arguments: dict, cwd: str) -> dict:
-    """Ge Tester ett uppdrag."""
+    """Assign Tester a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("tester")  # Använd config.py default
+    cli = get_worker_cli("tester")  # Use config.py default
 
     prompt = load_prompt("tester", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="tester")
@@ -276,7 +276,7 @@ def assign_security(arguments: dict, cwd: str) -> dict:
     """Security audit."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("security")  # Använd config.py default (gemini)
+    cli = get_worker_cli("security")  # Use config.py default (gemini)
 
     prompt = load_prompt("security", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="security")
@@ -286,10 +286,10 @@ def assign_security(arguments: dict, cwd: str) -> dict:
 
 
 def assign_devops(arguments: dict, cwd: str) -> dict:
-    """Ge DevOps ett uppdrag."""
+    """Assign DevOps a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("devops")  # Använd config.py default
+    cli = get_worker_cli("devops")  # Use config.py default
 
     prompt = load_prompt("devops", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="devops")

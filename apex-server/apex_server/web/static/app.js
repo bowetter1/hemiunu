@@ -99,6 +99,7 @@ async function startSprint() {
     document.getElementById('start').disabled = true;
     document.getElementById('status').className = 'terminal-status running';
     document.getElementById('status').textContent = 'running';
+    document.getElementById('tokens').textContent = '0 tokens';
     document.getElementById('log').innerHTML = '';
     document.getElementById('files-list').innerHTML = '<div class="file-item" style="color: #444;">Vantar pa filer...</div>';
     knownFiles = new Set();
@@ -176,6 +177,11 @@ async function pollLogs() {
 
         if (statusResponse.ok) {
             const sprint = await statusResponse.json();
+
+            // Update token counter
+            const totalTokens = (sprint.input_tokens || 0) + (sprint.output_tokens || 0);
+            const tokenText = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens;
+            document.getElementById('tokens').textContent = `${tokenText} tokens`;
 
             if (sprint.status === 'completed' || sprint.status === 'failed') {
                 // Sprint is done - stop polling

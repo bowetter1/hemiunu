@@ -21,7 +21,10 @@ AD + Architect → Backend → Frontend → Tester → Reviewer → DevOps
 
 ## SHARED MEMORY
 You are part of a team. All files are shared:
-- `CONTEXT.md` - **READ FIRST!** Quick reference - tech stack, API, design
+- `CONTEXT.md` - **READ FIRST!** Contains:
+  - **Vision** - what we're building and why (from kickoff)
+  - **Sprint Goals** - current objectives
+  - Tech stack, API endpoints, design tokens
 - `PLAN.md` - Architect's technical plan
 - `DESIGN.md` - AD's design system
 
@@ -32,8 +35,8 @@ Each role writes to their own section. **Values below are FORMAT EXAMPLES - use 
 # PROJECT CONTEXT
 
 ## NEEDS (blockers)
-| Från | Behöver | Från vem | Status |
-|------|---------|----------|--------|
+| From | Need | From who | Status |
+|------|------|----------|--------|
 
 ## Environment (DevOps)
 - python: [version]
@@ -68,18 +71,18 @@ If you're blocked and need something from another worker:
 
 1. **Add a row** to NEEDS table:
    ```
-   | Frontend | API endpoint för /calculate | Backend | ⏳ Väntar |
+   | Frontend | API endpoint for /calculate | Backend | ⏳ Waiting |
    ```
 
 2. **Solve needs directed at you** - update status to ✅:
    ```
-   | Frontend | API endpoint för /calculate | Backend | ✅ Se API Endpoints |
+   | Frontend | API endpoint for /calculate | Backend | ✅ See API Endpoints |
    ```
 
 3. **Status values:**
-   - ⏳ Väntar - need is open
-   - ✅ Löst - need is resolved (add where to find answer)
-   - ❌ Kan inte - cannot fulfill (explain why)
+   - ⏳ Waiting - need is open
+   - ✅ Resolved - need is resolved (add where to find answer)
+   - ❌ Cannot - cannot fulfill (explain why)
 
 ## PROJECT DIRECTORY
 Working directory: `{project_dir}`

@@ -10,42 +10,42 @@ from core.config import CLI_FLAGS
 
 
 # === SESSION TRACKING ===
-# Spårar session-ID per worker för att behålla minne
+# Tracks session-ID per worker to maintain memory
 WORKER_SESSIONS = {}
 
 
 def get_session(worker: str) -> str | None:
-    """Hämta session-ID för en worker."""
+    """Get session-ID for a worker."""
     return WORKER_SESSIONS.get(worker)
 
 
 def set_session(worker: str, session_id: str):
-    """Spara session-ID för en worker."""
+    """Save session-ID for a worker."""
     WORKER_SESSIONS[worker] = session_id
 
 
 def clear_sessions():
-    """Rensa alla sessions (ny sprint)."""
+    """Clear all sessions (new sprint)."""
     WORKER_SESSIONS.clear()
 
 
 def _extract_session_id(output: str, cli: str) -> str | None:
-    """Extrahera session-ID från CLI-output."""
-    # Claude: letar efter UUID-format i output
-    # Typiskt format: Session: abc12345-1234-5678-abcd-ef1234567890
+    """Extract session-ID from CLI output."""
+    # Claude: looks for UUID format in output
+    # Typical format: Session: abc12345-1234-5678-abcd-ef1234567890
     uuid_pattern = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
     matches = re.findall(uuid_pattern, output, re.IGNORECASE)
     if matches:
-        return matches[-1]  # Ta sista (mest sannolikt session-ID)
+        return matches[-1]  # Take last (most likely session-ID)
     return None
 
 
 # === FEEDBACK ===
-WORKER_FEEDBACK_PROMPT = "\n\nVIKTIGT: Säg ifrån om uppdraget är oklart eller om du har en bättre idé."
+WORKER_FEEDBACK_PROMPT = "\n\nIMPORTANT: Speak up if the task is unclear or if you have a better idea."
 
 
 def log_to_sprint(cwd: str, message: str):
-    """Logga till sprint.log i projektmappen."""
+    """Log to sprint.log in project folder."""
     try:
         log_file = os.path.join(cwd, "sprint.log")
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -57,28 +57,28 @@ def log_to_sprint(cwd: str, message: str):
 
 
 def run_cli(cli: str, prompt: str, cwd: str, worker: str = None, continue_session: bool = False) -> str:
-    """Kör en CLI och returnera output.
+    """Run a CLI and return output.
 
     Args:
-        cli: Vilken CLI (qwen, claude, gemini)
-        prompt: Prompten att skicka
+        cli: Which CLI (claude, sonnet, gemini)
+        prompt: The prompt to send
         cwd: Working directory
-        worker: Worker-namn för session-tracking (t.ex. "backend", "frontend")
-        continue_session: Om True, fortsätt tidigare session (minne!)
+        worker: Worker name for session-tracking (e.g. "backend", "frontend")
+        continue_session: If True, continue previous session (memory!)
     """
-    # Kolla om vi har en sparad session för denna worker
+    # Check if we have a saved session for this worker
     session_id = get_session(worker) if worker else None
 
     if session_id:
-        session_info = f" (fortsätter {worker} session)"
+        session_info = f" (continuing {worker} session)"
     elif continue_session:
         session_info = " (--continue)"
     else:
         session_info = ""
 
-    log_to_sprint(cwd, f"▶️ STARTAR {cli.upper()}{session_info}...")
+    log_to_sprint(cwd, f"▶️ STARTING {cli.upper()}{session_info}...")
 
-    # Bygg kommando baserat på CLI
+    # Build command based on CLI
     if cli == "claude":
         cmd = ["claude", "-p", prompt, "--dangerously-skip-permissions"]
         if session_id:
@@ -99,7 +99,7 @@ def run_cli(cli: str, prompt: str, cwd: str, worker: str = None, continue_sessio
             cmd.extend(["-r", "latest"])
         cmd.append(prompt)
     else:
-        # Fallback för okänd CLI
+        # Fallback for unknown CLI
         cmd = [cli, prompt]
 
     try:
@@ -111,33 +111,33 @@ def run_cli(cli: str, prompt: str, cwd: str, worker: str = None, continue_sessio
             timeout=240,
             cwd=cwd
         )
-        output = r.stdout.strip() or "(ingen output)"
+        output = r.stdout.strip() or "(no output)"
 
-        # Försök extrahera och spara session-ID för workern
+        # Try to extract and save session-ID for the worker
         if worker:
             new_session_id = _extract_session_id(output, cli)
             if new_session_id:
                 set_session(worker, new_session_id)
-                log_to_sprint(cwd, f"💾 Sparade session för {worker}: {new_session_id[:8]}...")
+                log_to_sprint(cwd, f"💾 Saved session for {worker}: {new_session_id[:8]}...")
 
-        log_to_sprint(cwd, f"✅ {cli.upper()} klar ({len(output)} tecken)")
+        log_to_sprint(cwd, f"✅ {cli.upper()} done ({len(output)} chars)")
         return output
     except subprocess.TimeoutExpired:
         log_to_sprint(cwd, f"⏰ {cli.upper()} timeout (4 min)")
         return "ERROR: Timeout efter 5 minuter"
     except FileNotFoundError:
-        log_to_sprint(cwd, f"❌ {cli.upper()} hittades inte")
-        return f"ERROR: CLI '{cli}' är inte installerad"
+        log_to_sprint(cwd, f"❌ {cli.upper()} not found")
+        return f"ERROR: CLI '{cli}' is not installed"
     except Exception as e:
-        log_to_sprint(cwd, f"❌ {cli.upper()} fel: {e}")
+        log_to_sprint(cwd, f"❌ {cli.upper()} error: {e}")
         return f"ERROR: {e}"
 
 
 def timestamp() -> str:
-    """Returnera nuvarande tid som sträng."""
+    """Return current time as string."""
     return datetime.now().strftime("%H:%M:%S")
 
 
 def make_response(text: str) -> dict:
-    """Skapa MCP-response."""
+    """Create MCP response."""
     return {"content": [{"type": "text", "text": text}]}

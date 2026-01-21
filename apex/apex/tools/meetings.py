@@ -9,25 +9,25 @@ from .base import make_response, log_to_sprint
 TOOLS = [
     {
         "name": "team_kickoff",
-        "description": "Kickoff-möte: PRESENTERA planen för teamet. Kör EFTER assign_architect har skapat planen.",
+        "description": "Kickoff meeting: PRESENT the plan to the team. Run AFTER assign_architect has created the plan.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "vision": {"type": "string", "description": "Vad bygger vi? Varför?"},
-                "goals": {"type": "array", "items": {"type": "string"}, "description": "Sprint-mål"},
-                "plan_summary": {"type": "string", "description": "Sammanfattning av arkitektens plan"}
+                "vision": {"type": "string", "description": "What are we building? Why?"},
+                "goals": {"type": "array", "items": {"type": "string"}, "description": "Sprint goals"},
+                "plan_summary": {"type": "string", "description": "Summary of architect's plan"}
             },
             "required": ["vision", "goals"]
         }
     },
     {
         "name": "team_demo",
-        "description": "Demo-möte: Visa vad som byggts. Kör EFTER utveckling är klar, FÖRE retrospective.",
+        "description": "Demo meeting: Show what was built. Run AFTER development is done, BEFORE retrospective.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "what_was_built": {"type": "string", "description": "Kort beskrivning av vad som byggts"},
-                "files_created": {"type": "array", "items": {"type": "string"}, "description": "Lista över skapade filer"}
+                "what_was_built": {"type": "string", "description": "Short description of what was built"},
+                "files_created": {"type": "array", "items": {"type": "string"}, "description": "List of created files"}
             },
             "required": ["what_was_built"]
         }
@@ -52,13 +52,13 @@ TOOLS = [
 
 
 def team_kickoff(arguments: dict, cwd: str) -> dict:
-    """Kickoff-möte - skriver till CONTEXT.md så workers ser det."""
+    """Kickoff meeting - writes to CONTEXT.md so workers can see it."""
     vision = arguments.get("vision", "")
     goals = arguments.get("goals", [])
 
     goals_str = "\n".join(f"- {g}" for g in goals)
 
-    # Skriv till CONTEXT.md så workers faktiskt ser vision/goals
+    # Write to CONTEXT.md so workers actually see vision/goals
     context_file = Path(cwd) / "CONTEXT.md"
     kickoff_section = f"""# PROJECT CONTEXT
 
@@ -73,10 +73,10 @@ def team_kickoff(arguments: dict, cwd: str) -> dict:
 |------|------|----------|--------|
 
 """
-    # Skriv eller prepend till CONTEXT.md
+    # Write or prepend to CONTEXT.md
     if context_file.exists():
         existing = context_file.read_text()
-        # Om det redan finns Vision-sektion, uppdatera inte
+        # If Vision section already exists, don't update
         if "## Vision" not in existing:
             context_file.write_text(kickoff_section + existing)
     else:
@@ -95,10 +95,10 @@ Goals:
 
 
 def team_demo(arguments: dict, cwd: str) -> dict:
-    """Demo-möte."""
+    """Demo meeting."""
     what_was_built = arguments.get("what_was_built", "")
 
-    # Lista filer
+    # List files
     files = [str(f.relative_to(cwd)) for f in Path(cwd).rglob("*")
              if f.is_file() and not f.name.startswith(".")
              and "__pycache__" not in str(f) and "node_modules" not in str(f)
@@ -108,9 +108,9 @@ def team_demo(arguments: dict, cwd: str) -> dict:
 
     return make_response(f"""🎯 DEMO
 
-Byggt: {what_was_built}
+Built: {what_was_built}
 
-Filer ({len(files)} st):
+Files ({len(files)}):
 {chr(10).join(f'  • {f}' for f in files)}""")
 
 

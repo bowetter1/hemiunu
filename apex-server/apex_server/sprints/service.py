@@ -197,6 +197,19 @@ class SprintRunner:
         self.llm = LLMClient()
         self.worker_sessions: dict[str, list] = {}  # Worker memory
         self._db_lock = __import__('threading').Lock()  # Thread-safe logging
+        self._total_input_tokens = 0
+        self._total_output_tokens = 0
+
+    def track_tokens(self, input_tokens: int, output_tokens: int, db: Session = None):
+        """Track token usage (thread-safe)"""
+        with self._db_lock:
+            self._total_input_tokens += input_tokens
+            self._total_output_tokens += output_tokens
+            # Update sprint in database
+            target_db = db or self.db
+            self.sprint.input_tokens = self._total_input_tokens
+            self.sprint.output_tokens = self._total_output_tokens
+            target_db.commit()
 
     def log(self, log_type: LogType, message: str, worker: str = None, data: dict = None, db: Session = None):
         """Add structured log entry (thread-safe)"""
@@ -291,11 +304,19 @@ class SprintRunner:
                 response = self.llm.call_anthropic(model_id, system_prompt, messages, tools)
                 content_blocks = response.content
                 stop_reason = response.stop_reason
+                # Track token usage
+                if hasattr(response, 'usage'):
+                    self.track_tokens(
+                        response.usage.input_tokens,
+                        response.usage.output_tokens,
+                        db=db
+                    )
             else:  # google
                 response = self.llm.call_gemini(system_prompt, messages, tools)
                 # Convert Gemini response to Anthropic-like structure
                 content_blocks = self._parse_gemini_response(response)
                 stop_reason = "end_turn" if not any(b.get("type") == "tool_use" for b in content_blocks) else "tool_use"
+                # TODO: Track Gemini tokens when enabled
 
             assistant_content = []
             has_tool_use = False

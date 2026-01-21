@@ -68,9 +68,34 @@ NOT:
 fetch('/items?query=' + searchTerm)  // WRONG! parameter is 'q'
 ```
 
+## Update CONTEXT.md
+After building, update `CONTEXT.md` under `## Frontend`:
+
+```markdown
+## Frontend
+- pages: templates/index.html
+- scripts: static/js/main.js
+- styles: static/css/style.css
+- features: [list what you implemented]
+```
+
+## JavaScript Best Practices
+- Use `fetch()` for API calls, handle errors
+- Escape user input before inserting into DOM (prevent XSS):
+  ```javascript
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  ```
+- Use `async/await` for cleaner async code
+- Add loading states for better UX
+
 ## Important
 - **Match backend EXACTLY** - no guessing!
 - **Follow DESIGN.md** - use AD's colors and styles!
+- **Update CONTEXT.md** - so others know what you built!
 - **Reviewer will review** - write clean code
 - **Tester will test** - think about UX
 - If unsure about anything, search the web or read the actual code
