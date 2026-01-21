@@ -183,8 +183,8 @@ async function pollLogs() {
             const outputTokens = sprint.output_tokens || 0;
             const totalTokens = inputTokens + outputTokens;
 
-            // Claude Opus 4 pricing: $15/M input, $75/M output
-            const costUsd = (inputTokens * 15 / 1000000) + (outputTokens * 75 / 1000000);
+            // Claude Opus 4.5 pricing: $5/M input, $25/M output
+            const costUsd = (inputTokens * 5 / 1000000) + (outputTokens * 25 / 1000000);
 
             const tokenText = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens;
             const costText = costUsd >= 0.01 ? `$${costUsd.toFixed(2)}` : `$${costUsd.toFixed(3)}`;
