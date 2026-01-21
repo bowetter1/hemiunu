@@ -11,7 +11,7 @@ from apex_server.config import get_settings
 from .models import User
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
 
 class AuthService:
