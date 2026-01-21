@@ -76,10 +76,12 @@ If task mentions "Deploy" - follow steps below.
 builder = "nixpacks"
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+startCommand = "sh -c 'uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 healthcheckPath = "/"
 restartPolicyType = "on_failure"
 ```
+
+**NOTE:** Use `sh -c '...'` wrapper so `${PORT}` expands correctly!
 
 ### 2. Procfile (backup)
 ```
