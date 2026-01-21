@@ -50,6 +50,11 @@
   - Delete animation: fadeOutDelete 0.3s with slide-left effect
 - See DESIGN.md for full details
 
+## Tester (Tester)
+- tests: tests/test_api.py (comprehensive API tests)
+- status: 11 tests passing (GET, POST, PUT, DELETE, validation, 404)
+- fixtures: tests/conftest.py (in-memory sqlite, async client)
+
 ## API Endpoints (Backend)
 - GET / → Serves index.html
 - GET /contacts?q=search → List all contacts, optional search filter

@@ -223,15 +223,22 @@ function addLogFromServer(log) {
 function updateTeamFromLog(log) {
     if (!log.worker) return;
 
+    // Remove active from all workers
     document.querySelectorAll('.team-member').forEach(el => el.classList.remove('active'));
 
+    // Map all workers to their badge IDs
     const workerMap = {
         'chef': 'team-chef',
+        'devops': 'team-devops',
+        'ad': 'team-ad',
+        'architect': 'team-architect',
         'backend': 'team-backend',
-        'frontend': 'team-frontend'
+        'frontend': 'team-frontend',
+        'tester': 'team-tester',
+        'reviewer': 'team-reviewer'
     };
 
-    const teamId = workerMap[log.worker];
+    const teamId = workerMap[log.worker.toLowerCase()];
     if (teamId) {
         document.getElementById(teamId)?.classList.add('active');
     }
