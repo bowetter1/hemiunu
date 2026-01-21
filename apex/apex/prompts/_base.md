@@ -31,6 +31,10 @@ Each role writes to their own section. **Values below are FORMAT EXAMPLES - use 
 ```markdown
 # PROJECT CONTEXT
 
+## NEEDS (blockers)
+| Från | Behöver | Från vem | Status |
+|------|---------|----------|--------|
+
 ## Environment (DevOps)
 - python: [version]
 - pytest: [version]
@@ -54,9 +58,28 @@ Each role writes to their own section. **Values below are FORMAT EXAMPLES - use 
 
 ### How to Update CONTEXT.md
 1. Read the file first
-2. Find YOUR section (or create it)
-3. Write UNDER your heading only
-4. Keep it short: `key: value` format
+2. **Check NEEDS section** - solve any needs directed at YOU
+3. Find YOUR section (or create it)
+4. Write UNDER your heading only
+5. Keep it short: `key: value` format
+
+### NEEDS Section (blockers)
+If you're blocked and need something from another worker:
+
+1. **Add a row** to NEEDS table:
+   ```
+   | Frontend | API endpoint för /calculate | Backend | ⏳ Väntar |
+   ```
+
+2. **Solve needs directed at you** - update status to ✅:
+   ```
+   | Frontend | API endpoint för /calculate | Backend | ✅ Se API Endpoints |
+   ```
+
+3. **Status values:**
+   - ⏳ Väntar - need is open
+   - ✅ Löst - need is resolved (add where to find answer)
+   - ❌ Kan inte - cannot fulfill (explain why)
 
 ## PROJECT DIRECTORY
 Working directory: `{project_dir}`

@@ -7,7 +7,7 @@ from core.config import get_worker_cli, ROLE_NAMES
 from .base import run_cli, make_response, log_to_sprint, clear_sessions
 
 
-WORKER_ENUM = ["ad", "architect", "backend", "frontend", "tester", "reviewer", "devops"]
+WORKER_ENUM = ["ad", "architect", "backend", "frontend", "tester", "reviewer", "security", "devops"]
 
 TOOLS = [
     {
@@ -17,8 +17,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "worker": {"type": "string", "enum": WORKER_ENUM},
-                "message": {"type": "string"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"]}
+                "message": {"type": "string"}
             },
             "required": ["worker", "message"]
         }
@@ -30,8 +29,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "worker": {"type": "string", "enum": WORKER_ENUM},
-                "question": {"type": "string", "description": "Fråga"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"]}
+                "question": {"type": "string", "description": "Fråga"}
             },
             "required": ["worker", "question"]
         }
@@ -44,8 +42,7 @@ TOOLS = [
             "properties": {
                 "worker": {"type": "string", "enum": WORKER_ENUM},
                 "task": {"type": "string"},
-                "feedback": {"type": "string"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"]}
+                "feedback": {"type": "string"}
             },
             "required": ["worker", "task", "feedback"]
         }
@@ -56,8 +53,7 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "worker": {"type": "string", "enum": WORKER_ENUM},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"]}
+                "worker": {"type": "string", "enum": WORKER_ENUM}
             },
             "required": ["worker"]
         }
@@ -78,8 +74,7 @@ def talk_to(arguments: dict, cwd: str) -> dict:
     """Prata fritt med en worker (med minne via session-tracking)."""
     worker = arguments.get("worker", "backend")
     message = arguments.get("message", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli(worker, ai)
+    cli = get_worker_cli(worker)  # Använd config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
     log_to_sprint(cwd, f"💬 {role_name}: {message[:50]}...")
@@ -91,8 +86,7 @@ def checkin_worker(arguments: dict, cwd: str) -> dict:
     """Check-in med en worker (med minne)."""
     worker = arguments.get("worker", "")
     question = arguments.get("question", "Hur går det?")
-    ai = arguments.get("ai")
-    cli = get_worker_cli(worker, ai)
+    cli = get_worker_cli(worker)  # Använd config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
     result = run_cli(cli, question, cwd, worker=worker)
@@ -104,8 +98,7 @@ def reassign_with_feedback(arguments: dict, cwd: str) -> dict:
     worker = arguments.get("worker", "backend")
     task = arguments.get("task", "")
     feedback = arguments.get("feedback", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli(worker, ai)
+    cli = get_worker_cli(worker)  # Använd config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
     prompt = f"Uppgift: {task}\n\nFeedback: {feedback}\n\nGör justeringarna!"
@@ -118,8 +111,7 @@ def new_session(arguments: dict, cwd: str) -> dict:
     """Starta ny session för en worker (rensa minne)."""
     from .base import set_session
     worker = arguments.get("worker", "backend")
-    ai = arguments.get("ai")
-    cli = get_worker_cli(worker, ai)
+    cli = get_worker_cli(worker)  # Använd config.py default
     role_name = ROLE_NAMES.get(worker, worker)
 
     # Rensa session för denna worker

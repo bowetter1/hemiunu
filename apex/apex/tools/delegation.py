@@ -1,6 +1,6 @@
 """
 Delegation tools - assign_* för alla roller
-assign_ad, assign_architect, assign_backend, assign_frontend, assign_parallel, assign_reviewer, assign_tester, assign_devops
+assign_ad, assign_architect, assign_backend, assign_frontend, assign_parallel, assign_reviewer, assign_tester, assign_security, assign_devops
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -17,8 +17,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "task": {"type": "string", "description": "Design-uppdraget"},
-                "context": {"type": "string", "description": "Extra kontext om projektet"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI"}
+                "context": {"type": "string", "description": "Extra kontext om projektet"}
             },
             "required": ["task"]
         }
@@ -30,8 +29,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "task": {"type": "string", "description": "Uppdraget"},
-                "context": {"type": "string", "description": "Extra kontext"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI"}
+                "context": {"type": "string", "description": "Extra kontext"}
             },
             "required": ["task"]
         }
@@ -43,8 +41,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "task": {"type": "string", "description": "Vad ska byggas?"},
-                "file": {"type": "string", "description": "Vilken fil? (t.ex. main.py)"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI"}
+                "file": {"type": "string", "description": "Vilken fil? (t.ex. main.py)"}
             },
             "required": ["task"]
         }
@@ -56,8 +53,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "task": {"type": "string", "description": "Vad ska byggas?"},
-                "file": {"type": "string", "description": "Vilken fil? (t.ex. index.html, app.js)"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI"}
+                "file": {"type": "string", "description": "Vilken fil? (t.ex. index.html, app.js)"}
             },
             "required": ["task"]
         }
@@ -73,15 +69,14 @@ TOOLS = [
                     "items": {
                         "type": "object",
                         "properties": {
-                            "worker": {"type": "string", "enum": ["ad", "architect", "backend", "frontend", "tester", "reviewer", "devops"], "description": "Vilken worker"},
+                            "worker": {"type": "string", "enum": ["ad", "architect", "backend", "frontend", "tester", "reviewer", "security", "devops"], "description": "Vilken worker"},
                             "task": {"type": "string", "description": "Uppgiften"},
                             "context": {"type": "string", "description": "Extra kontext (valfritt)"},
-                            "file": {"type": "string", "description": "Fil att jobba med (valfritt)"},
-                            "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI (valfritt)"}
+                            "file": {"type": "string", "description": "Fil att jobba med (valfritt)"}
                         },
                         "required": ["worker", "task"]
                     },
-                    "description": "Lista med uppdrag [{worker, task, context?, file?, ai?}]"
+                    "description": "Lista med uppdrag [{worker, task, context?, file?}]"
                 }
             },
             "required": ["assignments"]
@@ -94,8 +89,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "files_to_review": {"type": "array", "items": {"type": "string"}, "description": "Filer att granska"},
-                "focus": {"type": "string", "description": "Vad ska fokuseras på?"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI"}
+                "focus": {"type": "string", "description": "Vad ska fokuseras på?"}
             },
             "required": ["files_to_review"]
         }
@@ -107,8 +101,19 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "task": {"type": "string", "description": "Vad ska testas? T.ex. 'Skriv tester för API endpoints'"},
-                "context": {"type": "string", "description": "Extra kontext"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI"}
+                "context": {"type": "string", "description": "Extra kontext"}
+            },
+            "required": ["task"]
+        }
+    },
+    {
+        "name": "assign_security",
+        "description": "Security audit - OWASP vulnerabilities, auth, input validation, secrets exposure.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "Security audit task"},
+                "context": {"type": "string", "description": "Extra context"}
             },
             "required": ["task"]
         }
@@ -120,8 +125,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "task": {"type": "string", "description": "DevOps-uppdraget"},
-                "context": {"type": "string", "description": "Extra kontext"},
-                "ai": {"type": "string", "enum": ["claude", "sonnet", "gemini"], "description": "Vilken AI"}
+                "context": {"type": "string", "description": "Extra kontext"}
             },
             "required": ["task"]
         }
@@ -133,8 +137,7 @@ def assign_ad(arguments: dict, cwd: str) -> dict:
     """Ge AD (Art Director) ett uppdrag."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli("ad", ai)
+    cli = get_worker_cli("ad")  # Använd config.py default
 
     prompt = load_prompt("ad", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="ad")
@@ -147,8 +150,7 @@ def assign_architect(arguments: dict, cwd: str) -> dict:
     """Ge Architect ett uppdrag."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli("architect", ai)
+    cli = get_worker_cli("architect")  # Använd config.py default
 
     prompt = load_prompt("architect", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="architect")
@@ -161,8 +163,7 @@ def assign_backend(arguments: dict, cwd: str) -> dict:
     """Ge Backend-utvecklare ett uppdrag."""
     task = arguments.get("task", "")
     file = arguments.get("file", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli("backend", ai)
+    cli = get_worker_cli("backend")  # Använd config.py default (gemini)
 
     prompt = load_prompt("backend", task=task, file=file, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="backend")
@@ -175,8 +176,7 @@ def assign_frontend(arguments: dict, cwd: str) -> dict:
     """Ge Frontend-utvecklare ett uppdrag."""
     task = arguments.get("task", "")
     file = arguments.get("file", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli("frontend", ai)
+    cli = get_worker_cli("frontend")  # Använd config.py default
 
     prompt = load_prompt("frontend", task=task, file=file, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="frontend")
@@ -199,6 +199,7 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
         "frontend": "🖼️",
         "tester": "🧪",
         "reviewer": "🔍",
+        "security": "🔐",
         "devops": "🚀",
     }
 
@@ -212,8 +213,7 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
             task = a.get("task", "")
             context = a.get("context", "")
             file = a.get("file", "")
-            ai = a.get("ai")
-            cli = get_worker_cli(worker, ai)
+            cli = get_worker_cli(worker)  # Använd config.py default
 
             # Ladda rätt prompt för worker-typen
             try:
@@ -249,8 +249,7 @@ def assign_reviewer(arguments: dict, cwd: str) -> dict:
     """Be Reviewer granska kod."""
     files = arguments.get("files_to_review", [])
     focus = arguments.get("focus", "allmän kvalitet")
-    ai = arguments.get("ai")
-    cli = get_worker_cli("reviewer", ai)
+    cli = get_worker_cli("reviewer")  # Använd config.py default (gemini)
 
     files_str = ", ".join(files)
     prompt = load_prompt("reviewer", files=files_str, focus=focus, project_dir=cwd)
@@ -264,8 +263,7 @@ def assign_tester(arguments: dict, cwd: str) -> dict:
     """Ge Tester ett uppdrag."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli("tester", ai)
+    cli = get_worker_cli("tester")  # Använd config.py default
 
     prompt = load_prompt("tester", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="tester")
@@ -274,12 +272,24 @@ def assign_tester(arguments: dict, cwd: str) -> dict:
     return make_response(f"🧪 Tester svarar:\n\n{result}")
 
 
+def assign_security(arguments: dict, cwd: str) -> dict:
+    """Security audit."""
+    task = arguments.get("task", "")
+    context = arguments.get("context", "")
+    cli = get_worker_cli("security")  # Använd config.py default (gemini)
+
+    prompt = load_prompt("security", task=task, context=context, project_dir=cwd)
+    result = run_cli(cli, prompt, cwd, worker="security")
+
+    log_to_sprint(cwd, f"🔐 Security: {task[:50]}...")
+    return make_response(f"🔐 Security svarar:\n\n{result}")
+
+
 def assign_devops(arguments: dict, cwd: str) -> dict:
     """Ge DevOps ett uppdrag."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    ai = arguments.get("ai")
-    cli = get_worker_cli("devops", ai)
+    cli = get_worker_cli("devops")  # Använd config.py default
 
     prompt = load_prompt("devops", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="devops")
@@ -296,5 +306,6 @@ HANDLERS = {
     "assign_parallel": assign_parallel,
     "assign_reviewer": assign_reviewer,
     "assign_tester": assign_tester,
+    "assign_security": assign_security,
     "assign_devops": assign_devops,
 }

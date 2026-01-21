@@ -17,13 +17,14 @@ WORKER_CLI = {
     "architect": "claude", # Opus - planning
     "backend": "gemini",   # Gemini - backend coding
     "frontend": "claude",  # Opus - frontend coding
-    "tester": "claude",    # Opus - test writing
+    "tester": "gemini",    # Gemini - test writing
     "reviewer": "gemini",  # Gemini - code review
+    "security": "gemini",  # Gemini - security audit
     "devops": "claude",    # Opus - deploy
 }
 
 # === ROLLER ===
-ALL_ROLES = ["chef", "ad", "architect", "backend", "frontend", "tester", "reviewer", "devops"]
+ALL_ROLES = ["chef", "ad", "architect", "backend", "frontend", "tester", "reviewer", "security", "devops"]
 
 ROLE_NAMES = {
     "chef": "Chef",
@@ -33,6 +34,7 @@ ROLE_NAMES = {
     "frontend": "Frontend",
     "tester": "Tester",
     "reviewer": "Reviewer",
+    "security": "Security",
     "devops": "DevOps",
 }
 

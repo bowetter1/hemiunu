@@ -96,7 +96,8 @@ def get_base_prompt() -> str:
 def get_chef_prompt(task: str, project_dir: str = "") -> str:
     """Get Chef prompt with task substitution."""
     template = _load_prompt("chef.md")
-    prompt = template.format(task=task)
+    # Use replace instead of format() to avoid issues with curly braces in examples
+    prompt = template.replace("{task}", task)
     if project_dir:
         prompt += f"\n\nPROJEKTMAPP: {project_dir}"
     return prompt
@@ -116,7 +117,7 @@ def get_worker_prompt(role: str, **kwargs) -> str:
     base = get_base_prompt()
     role_template = _load_prompt(f"{role}.md")
 
-    # Substitute variables
+    # Substitute variables using replace() to avoid issues with curly braces in examples
     # Default empty strings for optional variables
     defaults = {
         "task": "",
@@ -128,10 +129,9 @@ def get_worker_prompt(role: str, **kwargs) -> str:
     }
     defaults.update(kwargs)
 
-    try:
-        role_prompt = role_template.format(**defaults)
-    except KeyError as e:
-        # If template has unknown variables, just use as-is
-        role_prompt = role_template
+    # Use replace instead of format() to avoid KeyError on curly braces in examples
+    role_prompt = role_template
+    for key, value in defaults.items():
+        role_prompt = role_prompt.replace(f"{{{key}}}", str(value))
 
     return f"{base}\n\n---\n\n{role_prompt}"
