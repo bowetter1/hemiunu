@@ -36,4 +36,25 @@ Build a modern portfolio website with 4 pages (Home, About, Projects, Contact) f
 - See DESIGN.md for full details
 
 ## API Endpoints (Backend)
+- GET / → Home page (index.html)
+- GET /about → About page (about.html)
+- GET /projects → Projects page (projects.html)
+- GET /contact → Contact page (contact.html)
+- See main.py for full API
 
+## Frontend
+- pages: templates/base.html, templates/index.html, templates/about.html, templates/projects.html, templates/contact.html
+- scripts: static/js/main.js
+- styles: static/css/style.css
+- features:
+    - Modern dark theme with Neon Mint accents
+    - Responsive mobile-first design with Lucide icons
+    - Glassmorphism sticky navbar
+    - Animated project cards
+    - Functional contact form (visual/alert only)
+    - Google Fonts integration (Inter & Fira Code)
+
+## Security
+- audit: VULNERABILITIES_FOUND (Medium)
+- findings: Missing security headers, outdated Jinja2 (3.1.2)
+- status: See SECURITY_AUDIT.md for details

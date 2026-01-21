@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Contact | Apex Portfolio{% endblock %}
+
+{% block content %}
+<section class="section container" style="max-width: 600px; text-align: center;">
+    <p class="mono text-primary">04. What’s Next?</p>
+    <h2 style="font-size: clamp(40px, 5vw, 60px);">Get In Touch</h2>
+    <p style="margin-bottom: 50px;">
+        Although I’m not currently looking for any new opportunities, my inbox is always open. Whether you have a question or just want to say hi, I’ll try my best to get back to you!
+    </p>
+    
+    <form class="contact-form" style="text-align: left;">
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" placeholder="Your Name" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="email@example.com" required>
+        </div>
+        <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" rows="5" placeholder="Your Message" required></textarea>
+        </div>
+        <div style="text-align: center; margin-top: 40px;">
+            <button type="submit" class="btn btn-outline" style="padding: 1.25rem 1.75rem;">Say Hello</button>
+        </div>
+    </form>
+</section>
+
+<script>
+document.querySelector('.contact-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    alert('Thank you for your message! (Note: This is a demo, no email was sent)');
+    e.target.reset();
+});
+</script>
+{% endblock %}

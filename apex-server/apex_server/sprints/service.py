@@ -421,6 +421,7 @@ class SprintRunner:
             "assign_frontend": ("frontend", "🖼️"),
             "assign_tester": ("tester", "🧪"),
             "assign_reviewer": ("reviewer", "🔍"),
+            "assign_security": ("security", "🔐"),
             "assign_devops": ("devops", "🚀"),
         }
 

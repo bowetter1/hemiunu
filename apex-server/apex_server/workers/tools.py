@@ -19,7 +19,7 @@ from .config import ROLE_NAMES, ROLE_ICONS
 # =============================================================================
 
 # Worker enum for delegation tools
-WORKER_ENUM = ["ad", "architect", "backend", "frontend", "tester", "reviewer", "devops"]
+WORKER_ENUM = ["ad", "architect", "backend", "frontend", "tester", "reviewer", "devops", "security"]
 
 TOOL_DEFINITIONS = [
     # === FILE OPERATIONS ===
@@ -148,6 +148,18 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {
                 "task": {"type": "string", "description": "DevOps task"},
+                "context": {"type": "string", "description": "Extra context"}
+            },
+            "required": ["task"]
+        }
+    },
+    {
+        "name": "assign_security",
+        "description": "Security audit - OWASP vulnerabilities, auth, input validation, secrets exposure.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "Security audit task"},
                 "context": {"type": "string", "description": "Extra context"}
             },
             "required": ["task"]
@@ -287,6 +299,49 @@ TOOL_DEFINITIONS = [
         }
     },
 
+    # === TESTING & QA TOOLS ===
+    {
+        "name": "run_lint",
+        "description": "Run linting for code quality (ruff, flake8, eslint).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "framework": {
+                    "type": "string",
+                    "enum": ["auto", "ruff", "flake8", "eslint", "prettier"],
+                    "description": "Lint tool (auto = detect automatically)"
+                },
+                "path": {"type": "string", "description": "Specific file/folder to lint"},
+                "fix": {"type": "boolean", "description": "Try to fix automatically"}
+            }
+        }
+    },
+    {
+        "name": "run_typecheck",
+        "description": "Run type checking (mypy, pyright, tsc).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "framework": {
+                    "type": "string",
+                    "enum": ["auto", "mypy", "pyright", "tsc"],
+                    "description": "Type checker (auto = detect automatically)"
+                },
+                "path": {"type": "string", "description": "Specific file/folder to check"}
+            }
+        }
+    },
+    {
+        "name": "run_qa",
+        "description": "Run full QA: tests + lint + typecheck.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "focus": {"type": "string", "description": "What to focus on"}
+            }
+        }
+    },
+
     # === DEPLOY TOOLS ===
     {
         "name": "check_railway_status",
@@ -297,16 +352,93 @@ TOOL_DEFINITIONS = [
         }
     },
     {
+        "name": "deploy_railway",
+        "description": "Deploy the project to Railway.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "with_database": {
+                    "type": "string",
+                    "enum": ["none", "postgres", "mongo"],
+                    "description": "Add database service"
+                }
+            }
+        }
+    },
+    {
+        "name": "create_deploy_files",
+        "description": "Create Dockerfile, railway.toml, Procfile, requirements.txt from templates.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "db": {
+                    "type": "string",
+                    "enum": ["none", "postgres", "mongo", "sqlite"],
+                    "description": "Database type"
+                },
+                "extra_deps": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Extra pip dependencies"
+                }
+            }
+        }
+    },
+    {
         "name": "start_dev_server",
         "description": "Start development server (uvicorn on localhost:8000).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "port": {"type": "integer", "description": "Port (default 8000)"}
+            }
+        }
+    },
+    {
+        "name": "stop_dev_server",
+        "description": "Stop the development server.",
         "input_schema": {
             "type": "object",
             "properties": {}
         }
     },
     {
-        "name": "stop_dev_server",
-        "description": "Stop the development server.",
+        "name": "open_browser",
+        "description": "Open an HTML file in the browser.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string", "description": "File to open (default: index.html)"}
+            }
+        }
+    },
+
+    # === BOSS/DECISION TOOLS ===
+    {
+        "name": "log_decision",
+        "description": "Document an important decision for future reference.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "decision": {"type": "string", "description": "What was decided?"},
+                "reason": {"type": "string", "description": "Why?"}
+            },
+            "required": ["decision", "reason"]
+        }
+    },
+    {
+        "name": "get_decisions",
+        "description": "Get logged decisions for the project.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max number to show (default 10)"}
+            }
+        }
+    },
+    {
+        "name": "summarize_progress",
+        "description": "Summarize the project's progress - files, decisions, status.",
         "input_schema": {
             "type": "object",
             "properties": {}
@@ -620,6 +752,302 @@ def stop_dev_server(base_path: Path, args: dict) -> str:
         return "⚠️ No dev server running"
 
 
+def run_lint(base_path: Path, args: dict) -> str:
+    """Run linting."""
+    framework = args.get("framework", "auto")
+    path = args.get("path", ".")
+    fix = args.get("fix", False)
+
+    # Auto-detect
+    if framework == "auto":
+        if list(base_path.glob("*.py")) or list(base_path.glob("**/*.py")):
+            framework = "ruff"
+        elif (base_path / "package.json").exists():
+            framework = "eslint"
+        else:
+            return "❌ Could not detect lint tool. Specify framework manually."
+
+    # Run lint
+    if framework == "ruff":
+        cmd = ["ruff", "check", path]
+        if fix:
+            cmd.append("--fix")
+    elif framework == "flake8":
+        cmd = ["flake8", path]
+    elif framework == "eslint":
+        cmd = ["npx", "eslint", path]
+        if fix:
+            cmd.append("--fix")
+    elif framework == "prettier":
+        cmd = ["npx", "prettier", "--check" if not fix else "--write", path]
+    else:
+        return f"❌ Unknown lint tool: {framework}"
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=base_path)
+        output = result.stdout + result.stderr
+        success = result.returncode == 0
+        status = "✅ CLEAN" if success else "⚠️ ISSUES"
+        return f"🔍 LINT ({framework}): {status}\n\n```\n{output[-2000:]}\n```"
+    except FileNotFoundError:
+        return f"❌ {framework} not found. Install it first."
+    except Exception as e:
+        return f"❌ Error running lint: {e}"
+
+
+def run_typecheck(base_path: Path, args: dict) -> str:
+    """Run type checking."""
+    framework = args.get("framework", "auto")
+    path = args.get("path", ".")
+
+    # Auto-detect
+    if framework == "auto":
+        if list(base_path.glob("*.py")) or list(base_path.glob("**/*.py")):
+            framework = "mypy"
+        elif (base_path / "package.json").exists():
+            framework = "tsc"
+        else:
+            return "❌ Could not detect type checker. Specify framework manually."
+
+    # Run typecheck
+    if framework == "mypy":
+        cmd = ["mypy", path]
+    elif framework == "pyright":
+        cmd = ["pyright", path]
+    elif framework == "tsc":
+        cmd = ["npx", "tsc", "--noEmit"]
+    else:
+        return f"❌ Unknown type checker: {framework}"
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=base_path)
+        output = result.stdout + result.stderr
+        success = result.returncode == 0
+        status = "✅ CLEAN" if success else "❌ TYPE ERRORS"
+        return f"📝 TYPECHECK ({framework}): {status}\n\n```\n{output[-2000:]}\n```"
+    except FileNotFoundError:
+        return f"❌ {framework} not found. Install it first."
+    except Exception as e:
+        return f"❌ Error running typecheck: {e}"
+
+
+def run_qa(base_path: Path, args: dict) -> str:
+    """Run full QA suite."""
+    results = []
+
+    # Run tests
+    test_result = run_tests(base_path, {"framework": "auto"})
+    results.append(test_result)
+
+    # Run lint
+    lint_result = run_lint(base_path, {"framework": "auto"})
+    results.append(lint_result)
+
+    # Run typecheck
+    type_result = run_typecheck(base_path, {"framework": "auto"})
+    results.append(type_result)
+
+    return "🧪 QA RESULTS:\n\n" + "\n\n---\n\n".join(results)
+
+
+def deploy_railway(base_path: Path, args: dict) -> str:
+    """Deploy to Railway."""
+    with_db = args.get("with_database", "none")
+    project_name = base_path.name
+
+    results = []
+
+    # Railway init + up
+    for cmd_name, cmd in [
+        ("init", ["railway", "init", "--name", project_name]),
+        ("up", ["railway", "up", "--detach"])
+    ]:
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=180, cwd=base_path, input="y\n")
+            results.append(f"{cmd_name}: {r.stdout or r.stderr or 'OK'}")
+        except Exception as e:
+            results.append(f"{cmd_name}: {e}")
+
+    # Database if requested
+    if with_db != "none":
+        try:
+            r = subprocess.run(["railway", "add", "--database", with_db],
+                             capture_output=True, text=True, timeout=30, cwd=base_path)
+            results.append(f"db: {r.stdout or r.stderr}")
+        except Exception as e:
+            results.append(f"db: {e}")
+
+    return "🚀 Deploy:\n" + "\n".join(results)
+
+
+# Deploy file templates
+DOCKERFILE_TEMPLATE = """FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+"""
+
+RAILWAY_TOML_TEMPLATE = """[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/"
+restartPolicyType = "on_failure"
+"""
+
+PROCFILE_TEMPLATE = """web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+"""
+
+REQUIREMENTS_BASE = ["fastapi", "uvicorn[standard]", "python-multipart", "jinja2"]
+REQUIREMENTS_DB = {
+    "none": [],
+    "sqlite": ["aiosqlite"],
+    "postgres": ["sqlalchemy", "psycopg2-binary", "asyncpg"],
+    "mongo": ["motor", "pymongo"],
+}
+
+
+def create_deploy_files(base_path: Path, args: dict) -> str:
+    """Create standard deploy files from templates."""
+    db = args.get("db", "none")
+    extra_deps = args.get("extra_deps", [])
+
+    created = []
+
+    # Dockerfile
+    dockerfile = base_path / "Dockerfile"
+    if not dockerfile.exists():
+        dockerfile.write_text(DOCKERFILE_TEMPLATE)
+        created.append("Dockerfile")
+
+    # railway.toml
+    railway_toml = base_path / "railway.toml"
+    if not railway_toml.exists():
+        railway_toml.write_text(RAILWAY_TOML_TEMPLATE)
+        created.append("railway.toml")
+
+    # Procfile
+    procfile = base_path / "Procfile"
+    if not procfile.exists():
+        procfile.write_text(PROCFILE_TEMPLATE)
+        created.append("Procfile")
+
+    # requirements.txt
+    requirements = base_path / "requirements.txt"
+    if not requirements.exists():
+        deps = REQUIREMENTS_BASE + REQUIREMENTS_DB.get(db, []) + extra_deps
+        deps.extend(["pytest", "httpx"])  # For testing
+        requirements.write_text("\n".join(sorted(set(deps))) + "\n")
+        created.append("requirements.txt")
+
+    if created:
+        return f"✅ Created deploy files:\n- " + "\n- ".join(created)
+    else:
+        return "ℹ️ All deploy files already exist"
+
+
+def open_browser(base_path: Path, args: dict) -> str:
+    """Open file in browser."""
+    file = args.get("file", "index.html")
+    file_path = base_path / file
+
+    if not file_path.exists():
+        file_path = base_path / "static" / file
+
+    if file_path.exists():
+        subprocess.run(["open", str(file_path)])
+        return f"🌐 Opened {file}"
+    return f"❌ Could not find {file}"
+
+
+import json
+from datetime import datetime
+
+def _get_decisions_file(base_path: Path) -> Path:
+    """Get path to decisions file."""
+    return base_path / ".apex_decisions.json"
+
+
+def _load_decisions(base_path: Path) -> list:
+    """Load decisions from file."""
+    decisions_file = _get_decisions_file(base_path)
+    if decisions_file.exists():
+        try:
+            return json.load(open(decisions_file))
+        except:
+            return []
+    return []
+
+
+def _save_decisions(base_path: Path, decisions: list):
+    """Save decisions to file."""
+    with open(_get_decisions_file(base_path), "w") as f:
+        json.dump(decisions, f, indent=2, ensure_ascii=False)
+
+
+def log_decision(base_path: Path, args: dict) -> str:
+    """Log a decision."""
+    decision = args.get("decision", "")
+    reason = args.get("reason", "")
+    timestamp = datetime.now().isoformat()
+
+    decisions = _load_decisions(base_path)
+    decisions.append({"timestamp": timestamp, "decision": decision, "reason": reason})
+    _save_decisions(base_path, decisions)
+
+    return f"📝 Decision logged: {decision}\nReason: {reason}"
+
+
+def get_decisions(base_path: Path, args: dict) -> str:
+    """Get logged decisions."""
+    limit = args.get("limit", 10)
+    decisions = _load_decisions(base_path)
+
+    if not decisions:
+        return "No decisions logged yet."
+
+    recent = decisions[-limit:][::-1]
+    lines = [f"📝 Decisions ({len(recent)} of {len(decisions)}):\n"]
+    for d in recent:
+        lines.append(f"• [{d['timestamp'][:10]}] {d['decision']}")
+
+    return "\n".join(lines)
+
+
+def summarize_progress(base_path: Path, args: dict) -> str:
+    """Summarize progress."""
+    # Count files
+    files = [f for f in base_path.rglob("*") if f.is_file()
+             and not any(x in f.parts for x in IGNORE_DIRS)
+             and not f.name.startswith(".")]
+
+    decisions = _load_decisions(base_path)
+
+    summary = [
+        f"📊 Progress Summary:",
+        f"• Files: {len(files)}",
+        f"• Decisions: {len(decisions)}"
+    ]
+
+    # Recent decisions
+    if decisions:
+        summary.append("• Recent decisions:")
+        for d in decisions[-3:]:
+            summary.append(f"  - {d['decision'][:50]}")
+
+    # Key files
+    key_files = ["main.py", "index.html", "app.js", "style.css", "requirements.txt"]
+    existing = [f for f in key_files if (base_path / f).exists()]
+    if existing:
+        summary.append(f"• Key files: {', '.join(existing)}")
+
+    return "\n".join(summary)
+
+
 # =============================================================================
 # TOOL REGISTRY
 # =============================================================================
@@ -643,20 +1071,31 @@ TOOL_HANDLERS: dict[str, Callable[[Path, dict], str]] = {
     "team_demo": team_demo,
     "team_retrospective": team_retrospective,
 
-    # Testing
+    # Testing & QA
     "run_tests": run_tests,
+    "run_lint": run_lint,
+    "run_typecheck": run_typecheck,
+    "run_qa": run_qa,
 
     # Deploy
     "check_railway_status": check_railway_status,
+    "deploy_railway": deploy_railway,
+    "create_deploy_files": create_deploy_files,
     "start_dev_server": start_dev_server,
     "stop_dev_server": stop_dev_server,
+    "open_browser": open_browser,
+
+    # Boss/Decision tools
+    "log_decision": log_decision,
+    "get_decisions": get_decisions,
+    "summarize_progress": summarize_progress,
 }
 
 # Delegation tools - these need special handling in SprintRunner
 DELEGATION_TOOLS = {
     "assign_ad", "assign_architect", "assign_backend", "assign_frontend",
-    "assign_tester", "assign_reviewer", "assign_devops", "assign_parallel",
-    "talk_to", "reassign_with_feedback"
+    "assign_tester", "assign_reviewer", "assign_devops", "assign_security",
+    "assign_parallel", "talk_to", "reassign_with_feedback"
 }
 
 

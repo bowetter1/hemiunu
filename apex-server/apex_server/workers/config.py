@@ -49,6 +49,7 @@ ROLES = {
     "frontend":  {"name": "Frontend",  "icon": "🖼️",  "model": "haiku"},
     "tester":    {"name": "Tester",    "icon": "🧪",  "model": "haiku"},
     "reviewer":  {"name": "Reviewer",  "icon": "🔍",  "model": "haiku"},
+    "security":  {"name": "Security",  "icon": "🔐",  "model": "haiku"},
     "devops":    {"name": "DevOps",    "icon": "🚀",  "model": "haiku"},
 }
 

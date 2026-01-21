@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Projects | Apex Portfolio{% endblock %}
+
+{% block content %}
+<section class="section container">
+    <h2 class="numbered-heading">Some Things I’ve Built</h2>
+    
+    <div class="grid">
+        <!-- Project 1 -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <i data-lucide="folder" class="text-primary" size="40"></i>
+                <div style="display: flex; gap: 15px;">
+                    <a href="#"><i data-lucide="github" size="20"></i></a>
+                    <a href="#"><i data-lucide="external-link" size="20"></i></a>
+                </div>
+            </div>
+            <h3>OctoProfile</h3>
+            <p>A nicer look at your GitHub profile and repository stats with data visualizations of your top languages and starred repositories.</p>
+            <ul style="display: flex; gap: 15px; margin-top: 20px;" class="mono">
+                <li>Next.js</li>
+                <li>Chart.js</li>
+                <li>GitHub API</li>
+            </ul>
+        </div>
+
+        <!-- Project 2 -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <i data-lucide="folder" class="text-primary" size="40"></i>
+                <div style="display: flex; gap: 15px;">
+                    <a href="#"><i data-lucide="github" size="20"></i></a>
+                    <a href="#"><i data-lucide="external-link" size="20"></i></a>
+                </div>
+            </div>
+            <h3>Spotify Profile</h3>
+            <p>Web app for visualizing personalized Spotify data. View your top artists, top tracks, recently played tracks, and detailed audio information.</p>
+            <ul style="display: flex; gap: 15px; margin-top: 20px;" class="mono">
+                <li>React</li>
+                <li>Styled Components</li>
+                <li>Spotify API</li>
+            </ul>
+        </div>
+
+        <!-- Project 3 -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <i data-lucide="folder" class="text-primary" size="40"></i>
+                <div style="display: flex; gap: 15px;">
+                    <a href="#"><i data-lucide="github" size="20"></i></a>
+                    <a href="#"><i data-lucide="external-link" size="20"></i></a>
+                </div>
+            </div>
+            <h3>Halcyon Theme</h3>
+            <p>A minimal, dark blue theme for VS Code, Sublime Text, Atom, iTerm, and more. Available on Visual Studio Marketplace.</p>
+            <ul style="display: flex; gap: 15px; margin-top: 20px;" class="mono">
+                <li>VS Code</li>
+                <li>Sublime Text</li>
+                <li>Atom</li>
+            </ul>
+        </div>
+
+        <!-- Project 4 -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <i data-lucide="folder" class="text-primary" size="40"></i>
+                <div style="display: flex; gap: 15px;">
+                    <a href="#"><i data-lucide="github" size="20"></i></a>
+                    <a href="#"><i data-lucide="external-link" size="20"></i></a>
+                </div>
+            </div>
+            <h3>Integration App</h3>
+            <p>A multi-platform integration application that connects various SaaS tools together to automate workflows and data synchronization.</p>
+            <ul style="display: flex; gap: 15px; margin-top: 20px;" class="mono">
+                <li>Python</li>
+                <li>FastAPI</li>
+                <li>Redis</li>
+            </ul>
+        </div>
+    </div>
+</section>
+{% endblock %}
