@@ -2,6 +2,7 @@
 Delegation tools - assign_* for all roles
 assign_ad, assign_architect, assign_backend, assign_frontend, assign_parallel, assign_reviewer, assign_tester, assign_security, assign_devops
 """
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.config import get_worker_cli
@@ -133,56 +134,125 @@ TOOLS = [
 ]
 
 
+# Worker emoji mapping
+WORKER_EMOJI = {
+    "ad": "🎨",
+    "architect": "🏗️",
+    "backend": "⚙️",
+    "frontend": "🖼️",
+    "tester": "🧪",
+    "reviewer": "🔍",
+    "security": "🔐",
+    "devops": "🚀",
+}
+
+
+def _extract_files_from_result(result: str) -> list[str]:
+    """Extract file names mentioned in worker result."""
+    # Common patterns for file creation/modification
+    patterns = [
+        r"(?:created?|wrote|updated?|modified?|saved?)\s+[`'\"]?(\S+\.\w{2,4})[`'\"]?",
+        r"[`'\"](\S+\.\w{2,4})[`'\"]",  # Files in quotes/backticks
+    ]
+    files = set()
+    for pattern in patterns:
+        matches = re.findall(pattern, result, re.IGNORECASE)
+        for m in matches:
+            # Filter out common false positives
+            if not any(x in m.lower() for x in ['http', 'localhost', 'example', '.com', '.org']):
+                files.add(m)
+    return list(files)[:5]  # Max 5 files
+
+
+def _summarize_result(result: str, max_len: int = 150) -> str:
+    """Create a short summary of worker result."""
+    # Try to find key phrases
+    lines = result.strip().split('\n')
+
+    # Look for conclusion/summary lines
+    for line in lines:
+        lower = line.lower()
+        if any(word in lower for word in ['created', 'done', 'complete', 'approved', 'finished', 'implemented']):
+            clean = line.strip()[:max_len]
+            if len(clean) > 20:
+                return clean
+
+    # Fallback: first non-empty meaningful line
+    for line in lines:
+        clean = line.strip()
+        if len(clean) > 20 and not clean.startswith('#'):
+            return clean[:max_len]
+
+    return result[:max_len]
+
+
+def _log_worker_complete(cwd: str, worker: str, task: str, result: str):
+    """Log worker completion with summary and files."""
+    emoji = WORKER_EMOJI.get(worker, "👤")
+    summary = _summarize_result(result)
+    files = _extract_files_from_result(result)
+
+    # Main completion log
+    log_to_sprint(cwd, f"{emoji} {worker.upper()}: {task[:40]}... ✅")
+
+    # Log summary (what they did)
+    log_to_sprint(cwd, f"   ↳ {summary}")
+
+    # Log files if any
+    if files:
+        log_to_sprint(cwd, f"   ↳ Files: {', '.join(files)}")
+
+
 def assign_ad(arguments: dict, cwd: str) -> dict:
     """Assign AD (Art Director) a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("ad")  # Use config.py default
+    cli = get_worker_cli("ad")
 
     prompt = load_prompt("ad", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="ad")
 
-    log_to_sprint(cwd, f"🎨 AD: {task[:50]}...")
-    return make_response(f"🎨 AD svarar:\n\n{result}")
+    _log_worker_complete(cwd, "ad", task, result)
+    return make_response(f"🎨 AD responds:\n\n{result}")
 
 
 def assign_architect(arguments: dict, cwd: str) -> dict:
     """Assign Architect a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("architect")  # Use config.py default
+    cli = get_worker_cli("architect")
 
     prompt = load_prompt("architect", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="architect")
 
-    log_to_sprint(cwd, f"🏗️ Architect: {task[:50]}...")
-    return make_response(f"🏗️ Architect svarar:\n\n{result}")
+    _log_worker_complete(cwd, "architect", task, result)
+    return make_response(f"🏗️ Architect responds:\n\n{result}")
 
 
 def assign_backend(arguments: dict, cwd: str) -> dict:
     """Assign Backend developer a task."""
     task = arguments.get("task", "")
     file = arguments.get("file", "")
-    cli = get_worker_cli("backend")  # Use config.py default (gemini)
+    cli = get_worker_cli("backend")
 
     prompt = load_prompt("backend", task=task, file=file, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="backend")
 
-    log_to_sprint(cwd, f"⚙️ Backend: {task[:50]}...")
-    return make_response(f"⚙️ Backend svarar:\n\n{result}")
+    _log_worker_complete(cwd, "backend", task, result)
+    return make_response(f"⚙️ Backend responds:\n\n{result}")
 
 
 def assign_frontend(arguments: dict, cwd: str) -> dict:
     """Assign Frontend developer a task."""
     task = arguments.get("task", "")
     file = arguments.get("file", "")
-    cli = get_worker_cli("frontend")  # Use config.py default
+    cli = get_worker_cli("frontend")
 
     prompt = load_prompt("frontend", task=task, file=file, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="frontend")
 
-    log_to_sprint(cwd, f"🖼️ Frontend: {task[:50]}...")
-    return make_response(f"🖼️ Frontend svarar:\n\n{result}")
+    _log_worker_complete(cwd, "frontend", task, result)
+    return make_response(f"🖼️ Frontend responds:\n\n{result}")
 
 
 def assign_parallel(arguments: dict, cwd: str) -> dict:
@@ -191,19 +261,9 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
     if not assignments:
         return make_response("No assignments given")
 
-    # Worker emoji mapping
-    WORKER_EMOJI = {
-        "ad": "🎨",
-        "architect": "🏗️",
-        "backend": "⚙️",
-        "frontend": "🖼️",
-        "tester": "🧪",
-        "reviewer": "🔍",
-        "security": "🔐",
-        "devops": "🚀",
-    }
-
     results = []
+    worker_summaries = []  # For final summary
+
     log_to_sprint(cwd, f"⚡ STARTING {len(assignments)} PARALLEL TASKS...")
 
     with ThreadPoolExecutor(max_workers=len(assignments)) as executor:
@@ -213,7 +273,7 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
             task = a.get("task", "")
             context = a.get("context", "")
             file = a.get("file", "")
-            cli = get_worker_cli(worker)  # Use config.py default
+            cli = get_worker_cli(worker)
 
             # Load correct prompt for worker type
             try:
@@ -236,66 +296,87 @@ def assign_parallel(arguments: dict, cwd: str) -> dict:
             try:
                 result = future.result()
                 results.append(f"**{worker.upper()}** ({cli}):\n{result[:500]}...")
-                log_to_sprint(cwd, f"{emoji} {worker.upper()}: {task[:30]}... ✅")
+
+                # Log with summary
+                _log_worker_complete(cwd, worker, task, result)
+
+                # Collect for final summary
+                summary = _summarize_result(result, 80)
+                files = _extract_files_from_result(result)
+                worker_summaries.append({
+                    "worker": worker,
+                    "summary": summary,
+                    "files": files
+                })
+
             except Exception as e:
                 results.append(f"**{worker.upper()}**: ERROR - {e}")
                 log_to_sprint(cwd, f"{emoji} {worker.upper()}: ERROR - {e}")
 
+    # Log final summary
     log_to_sprint(cwd, f"⚡ PARALLEL WORK COMPLETE ({len(assignments)} workers)")
+    log_to_sprint(cwd, "─" * 40)
+    log_to_sprint(cwd, "📋 SUMMARY:")
+    for ws in worker_summaries:
+        emoji = WORKER_EMOJI.get(ws["worker"], "👤")
+        files_str = f" → {', '.join(ws['files'])}" if ws['files'] else ""
+        log_to_sprint(cwd, f"   {emoji} {ws['worker'].upper()}: {ws['summary'][:60]}{files_str}")
+    log_to_sprint(cwd, "─" * 40)
+
     return make_response(f"⚡ PARALLEL WORK COMPLETE\n\n" + "\n\n---\n\n".join(results))
 
 
 def assign_reviewer(arguments: dict, cwd: str) -> dict:
     """Ask Reviewer to review code."""
     files = arguments.get("files_to_review", [])
-    focus = arguments.get("focus", "allmän kvalitet")
-    cli = get_worker_cli("reviewer")  # Use config.py default (gemini)
+    focus = arguments.get("focus", "general quality")
+    cli = get_worker_cli("reviewer")
 
     files_str = ", ".join(files)
     prompt = load_prompt("reviewer", files=files_str, focus=focus, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="reviewer")
 
-    log_to_sprint(cwd, f"🔍 Reviewer: {files_str[:50]}...")
-    return make_response(f"🔍 Reviewer svarar:\n\n{result}")
+    _log_worker_complete(cwd, "reviewer", f"Review {files_str}", result)
+    return make_response(f"🔍 Reviewer responds:\n\n{result}")
 
 
 def assign_tester(arguments: dict, cwd: str) -> dict:
     """Assign Tester a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("tester")  # Use config.py default
+    cli = get_worker_cli("tester")
 
     prompt = load_prompt("tester", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="tester")
 
-    log_to_sprint(cwd, f"🧪 Tester: {task[:50]}...")
-    return make_response(f"🧪 Tester svarar:\n\n{result}")
+    _log_worker_complete(cwd, "tester", task, result)
+    return make_response(f"🧪 Tester responds:\n\n{result}")
 
 
 def assign_security(arguments: dict, cwd: str) -> dict:
     """Security audit."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("security")  # Use config.py default (gemini)
+    cli = get_worker_cli("security")
 
     prompt = load_prompt("security", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="security")
 
-    log_to_sprint(cwd, f"🔐 Security: {task[:50]}...")
-    return make_response(f"🔐 Security svarar:\n\n{result}")
+    _log_worker_complete(cwd, "security", task, result)
+    return make_response(f"🔐 Security responds:\n\n{result}")
 
 
 def assign_devops(arguments: dict, cwd: str) -> dict:
     """Assign DevOps a task."""
     task = arguments.get("task", "")
     context = arguments.get("context", "")
-    cli = get_worker_cli("devops")  # Use config.py default
+    cli = get_worker_cli("devops")
 
     prompt = load_prompt("devops", task=task, context=context, project_dir=cwd)
     result = run_cli(cli, prompt, cwd, worker="devops")
 
-    log_to_sprint(cwd, f"🚀 DevOps: {task[:50]}...")
-    return make_response(f"🚀 DevOps svarar:\n\n{result}")
+    _log_worker_complete(cwd, "devops", task, result)
+    return make_response(f"🚀 DevOps responds:\n\n{result}")
 
 
 HANDLERS = {

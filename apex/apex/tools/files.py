@@ -27,6 +27,15 @@ def set_project_dir_internal(path: str) -> str:
 
 TOOLS = [
     {
+        "name": "check_needs",
+        "description": "Check CONTEXT.md for any NEEDS/blockers from workers. Returns list of blockers if any.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
         "name": "set_project_dir",
         "description": "Set project folder. RUN THIS FIRST to choose where files should be created.",
         "inputSchema": {
@@ -82,6 +91,58 @@ TOOLS = [
 ]
 
 
+def _parse_needs_table(content: str) -> list[dict]:
+    """Parse NEEDS table from CONTEXT.md content."""
+    needs = []
+    # Look for table rows after NEEDS header
+    in_needs = False
+    for line in content.split('\n'):
+        if '## NEEDS' in line or 'NEEDS (blockers)' in line:
+            in_needs = True
+            continue
+        if in_needs:
+            if line.startswith('## ') or line.startswith('# '):
+                break  # Next section
+            if '|' in line and not line.strip().startswith('|--'):
+                parts = [p.strip() for p in line.split('|')]
+                parts = [p for p in parts if p]  # Remove empty
+                if len(parts) >= 3 and parts[0] not in ['From', 'from']:
+                    needs.append({
+                        'from': parts[0],
+                        'need': parts[1],
+                        'from_who': parts[2] if len(parts) > 2 else '',
+                        'status': parts[3] if len(parts) > 3 else 'pending'
+                    })
+    return needs
+
+
+def check_needs(arguments: dict, cwd: str) -> dict:
+    """Check CONTEXT.md for blockers/needs."""
+    context_file = Path(cwd) / "CONTEXT.md"
+
+    if not context_file.exists():
+        return make_response("📋 No CONTEXT.md found - no blockers to report")
+
+    content = context_file.read_text()
+    needs = _parse_needs_table(content)
+
+    if not needs:
+        log_to_sprint(cwd, "📋 NEEDS: None (all clear)")
+        return make_response("✅ No blockers in NEEDS section")
+
+    # Log each blocker
+    log_to_sprint(cwd, f"⚠️ NEEDS: {len(needs)} blocker(s) found!")
+    for n in needs:
+        status_emoji = "🔴" if n['status'].lower() in ['pending', ''] else "🟢"
+        log_to_sprint(cwd, f"   {status_emoji} {n['from']} needs {n['need']} from {n['from_who']}")
+
+    needs_text = "\n".join([
+        f"- **{n['from']}** needs: {n['need']} (from {n['from_who']}) [{n['status']}]"
+        for n in needs
+    ])
+    return make_response(f"⚠️ **{len(needs)} BLOCKER(S) FOUND:**\n\n{needs_text}")
+
+
 def read_file(arguments: dict, cwd: str) -> dict:
     """Read a file."""
     file = arguments.get("file", "")
@@ -90,6 +151,15 @@ def read_file(arguments: dict, cwd: str) -> dict:
     if file_path.exists() and file_path.is_file():
         try:
             content = file_path.read_text()
+
+            # Auto-detect NEEDS when reading CONTEXT.md
+            if file.upper() == "CONTEXT.MD":
+                needs = _parse_needs_table(content)
+                if needs:
+                    log_to_sprint(cwd, f"⚠️ CONTEXT.md has {len(needs)} NEEDS entry/entries!")
+                    for n in needs:
+                        log_to_sprint(cwd, f"   → {n['from']} needs: {n['need']}")
+
             if len(content) > 5000:
                 content = content[:5000] + f"\n\n... (truncated, {len(content)} chars total)"
             log_to_sprint(cwd, f"📄 Read: {file}")
@@ -261,6 +331,7 @@ def set_project_dir(arguments: dict, cwd: str) -> dict:
 
 
 HANDLERS = {
+    "check_needs": check_needs,
     "set_project_dir": set_project_dir,
     "read_file": read_file,
     "list_files": list_files,

@@ -99,7 +99,7 @@ async function startSprint() {
     document.getElementById('start').disabled = true;
     document.getElementById('status').className = 'terminal-status running';
     document.getElementById('status').textContent = 'running';
-    document.getElementById('tokens').textContent = '0 tokens ($0.00)';
+    document.getElementById('tokens').textContent = '0 in / 0 out ($0.00)';
     document.getElementById('log').innerHTML = '';
     document.getElementById('files-list').innerHTML = '<div class="file-item" style="color: #444;">Vantar pa filer...</div>';
     knownFiles = new Set();
@@ -181,14 +181,17 @@ async function pollLogs() {
             // Update token counter with cost estimate
             const inputTokens = sprint.input_tokens || 0;
             const outputTokens = sprint.output_tokens || 0;
-            const totalTokens = inputTokens + outputTokens;
 
             // Claude Opus 4.5 pricing: $5/M input, $25/M output
-            const costUsd = (inputTokens * 5 / 1000000) + (outputTokens * 25 / 1000000);
+            const inputCost = inputTokens * 5 / 1000000;
+            const outputCost = outputTokens * 25 / 1000000;
+            const totalCost = inputCost + outputCost;
 
-            const tokenText = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens;
-            const costText = costUsd >= 0.01 ? `$${costUsd.toFixed(2)}` : `$${costUsd.toFixed(3)}`;
-            document.getElementById('tokens').textContent = `${tokenText} tokens (${costText})`;
+            // Format token counts (k for thousands)
+            const formatTokens = (n) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : n;
+            const costText = totalCost >= 0.01 ? `$${totalCost.toFixed(2)}` : `$${totalCost.toFixed(3)}`;
+
+            document.getElementById('tokens').textContent = `${formatTokens(inputTokens)} in / ${formatTokens(outputTokens)} out (${costText})`;
 
             if (sprint.status === 'completed' || sprint.status === 'failed') {
                 // Sprint is done - stop polling

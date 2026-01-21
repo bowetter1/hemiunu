@@ -59,3 +59,32 @@ def get_db() -> Generator[Session, None, None]:
 def init_db():
     """Create all tables"""
     Base.metadata.create_all(bind=engine)
+
+    # Run migrations for new columns
+    _run_migrations()
+
+
+def _run_migrations():
+    """Add new columns to existing tables (SQLAlchemy create_all doesn't do this)"""
+    from sqlalchemy import text
+
+    migrations = [
+        # Add token tracking columns to sprints table
+        ("sprints", "input_tokens", "ALTER TABLE sprints ADD COLUMN input_tokens INTEGER DEFAULT 0"),
+        ("sprints", "output_tokens", "ALTER TABLE sprints ADD COLUMN output_tokens INTEGER DEFAULT 0"),
+    ]
+
+    with engine.connect() as conn:
+        for table, column, sql in migrations:
+            try:
+                # Check if column exists
+                result = conn.execute(text(f"SELECT {column} FROM {table} LIMIT 1"))
+                result.close()
+            except Exception:
+                # Column doesn't exist, add it
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                    print(f"Migration: Added {column} to {table}")
+                except Exception as e:
+                    print(f"Migration failed for {column}: {e}")
