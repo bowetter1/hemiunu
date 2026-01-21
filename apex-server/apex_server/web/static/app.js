@@ -129,17 +129,8 @@ async function startSprint() {
 
         currentSprintId = data.id;
 
-        // Sprint completed (it runs synchronously for now)
-        await pollLogs(); // Final log fetch
-        await updateFiles();
-
-        clearInterval(polling);
-        polling = null;
-
-        document.getElementById('status').className = data.status === 'completed' ? 'terminal-status done' : 'terminal-status';
-        document.getElementById('status').textContent = data.status === 'completed' ? 'done' : 'failed';
-        document.getElementById('start').disabled = false;
-        document.querySelectorAll('.team-member').forEach(el => el.classList.remove('active'));
+        // Sprint runs in background - keep polling until done
+        // The polling interval is already running, just let it continue
 
     } catch (e) {
         clearInterval(polling);
@@ -153,21 +144,42 @@ async function pollLogs() {
     if (!currentSprintId) return;
 
     try {
-        const response = await fetch(`${API_BASE}/sprints/${currentSprintId}/logs?since_id=${lastLogId}`, {
+        // Fetch new logs
+        const logsResponse = await fetch(`${API_BASE}/sprints/${currentSprintId}/logs?since_id=${lastLogId}`, {
             headers: getHeaders()
         });
 
-        if (!response.ok) return;
+        if (logsResponse.ok) {
+            const logsData = await logsResponse.json();
 
-        const data = await response.json();
-
-        for (const log of data.logs) {
-            addLogFromServer(log);
-            lastLogId = log.id;
+            for (const log of logsData.logs) {
+                addLogFromServer(log);
+                lastLogId = log.id;
+            }
         }
 
         // Also update files
         await updateFiles();
+
+        // Check sprint status
+        const statusResponse = await fetch(`${API_BASE}/sprints/${currentSprintId}`, {
+            headers: getHeaders()
+        });
+
+        if (statusResponse.ok) {
+            const sprint = await statusResponse.json();
+
+            if (sprint.status === 'completed' || sprint.status === 'failed') {
+                // Sprint is done - stop polling
+                clearInterval(polling);
+                polling = null;
+
+                document.getElementById('status').className = sprint.status === 'completed' ? 'terminal-status done' : 'terminal-status';
+                document.getElementById('status').textContent = sprint.status === 'completed' ? 'done' : 'failed';
+                document.getElementById('start').disabled = false;
+                document.querySelectorAll('.team-member').forEach(el => el.classList.remove('active'));
+            }
+        }
 
     } catch (e) {
         console.error(e);

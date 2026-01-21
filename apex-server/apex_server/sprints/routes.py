@@ -3,7 +3,7 @@ import uuid
 from typing import List, Optional
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -86,29 +86,40 @@ def sprint_to_response(sprint) -> SprintResponse:
 
 # Background task runner
 def run_sprint_background(sprint_id: uuid.UUID, db_url: str):
-    """Run sprint in background"""
+    """Run sprint in background thread"""
+    import threading
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+    from .models import Sprint
 
-    engine = create_engine(db_url)
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
+    def run():
+        engine = create_engine(db_url)
+        SessionLocal = sessionmaker(bind=engine)
+        db = SessionLocal()
 
-    try:
-        service = SprintService(db)
-        # Need to get tenant_id somehow - for now just query without tenant filter
-        sprint = db.query(SprintService).filter_by(id=sprint_id).first()
-        if sprint:
-            runner = SprintRunner(sprint, db)
-            runner.run()
-    finally:
-        db.close()
+        try:
+            sprint = db.query(Sprint).filter_by(id=sprint_id).first()
+            if sprint:
+                runner = SprintRunner(sprint, db)
+                runner.run()
+        except Exception as e:
+            print(f"Sprint error: {e}")
+            # Update sprint status to failed
+            sprint = db.query(Sprint).filter_by(id=sprint_id).first()
+            if sprint:
+                sprint.status = SprintStatus.FAILED
+                sprint.error_message = str(e)
+                db.commit()
+        finally:
+            db.close()
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
 
 
 @router.post("", response_model=SprintResponse)
 def create_sprint(
     request: CreateSprintRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -121,14 +132,11 @@ def create_sprint(
         created_by_id=current_user.id
     )
 
-    # Run sprint in background
-    # For now, run synchronously for simplicity
-    runner = SprintRunner(sprint, db)
-    result = runner.run()
+    # Run sprint in background thread
+    db_url = str(settings.database_url)
+    run_sprint_background(sprint.id, db_url)
 
-    # Refresh to get updated status
-    db.refresh(sprint)
-
+    # Return immediately with running status
     return sprint_to_response(sprint)
 
 
