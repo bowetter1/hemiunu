@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Product Details{% endblock %}
+
+{% block content %}
+    <div style="margin-top: var(--space-lg);">
+        <a href="/" class="nav-link">← Back to Products</a>
+    </div>
+    
+    <div id="product-detail" class="product-detail">
+        <!-- Product details will be loaded here by app.js -->
+        <div class="loading">Loading details...</div>
+    </div>
+{% endblock %}

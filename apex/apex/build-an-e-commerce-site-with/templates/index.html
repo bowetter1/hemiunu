@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Apex Store - Home{% endblock %}
+
+{% block content %}
+    <h1 style="margin-top: var(--space-xl); margin-bottom: var(--space-lg);">Latest Products</h1>
+    
+    <!-- Sprint 2: Search & Filter -->
+    <div class="controls-bar">
+        <div class="search-container">
+            <input type="text" id="search-input" class="input" placeholder="Search products...">
+        </div>
+        <div class="filter-group">
+            <select id="category-select" class="input" style="cursor: pointer;">
+                <option value="">All Categories</option>
+            </select>
+            <select id="sort-select" class="input" style="cursor: pointer;">
+                <option value="">Default Sort</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="name_asc">Name: A-Z</option>
+                <option value="name_desc">Name: Z-A</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="product-grid" class="grid">
+        <!-- Products will be loaded here by app.js -->
+        <div class="loading">Loading...</div>
+    </div>
+{% endblock %}
