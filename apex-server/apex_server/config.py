@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # LLM
     anthropic_api_key: str = ""
+    google_api_key: str = ""  # For Gemini
     openai_api_key: str = ""  # For Mem0 embeddings
 
     # Storage

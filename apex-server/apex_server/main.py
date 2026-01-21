@@ -1,9 +1,14 @@
 """
 Apex Server - Multi-tenant AI Team SaaS
 """
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from apex_server.config import get_settings
 from apex_server.shared.database import init_db
@@ -60,9 +65,18 @@ def health():
     }
 
 
+# Static files
+static_dir = Path(__file__).parent / "web" / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
 @app.get("/")
 def root():
-    """Root endpoint"""
+    """Serve the dashboard"""
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
     return {
         "name": "Apex Server",
         "docs": "/docs",

@@ -12,7 +12,7 @@ from apex_server.shared.database import get_db
 from apex_server.shared.dependencies import get_current_user
 from apex_server.shared.tools import list_files, read_file
 from apex_server.auth.models import User
-from .models import SprintStatus
+from .models import SprintStatus, LogEntry
 from .service import SprintService, SprintRunner
 
 router = APIRouter(prefix="/sprints", tags=["sprints"])
@@ -50,6 +50,23 @@ class SprintFilesResponse(BaseModel):
 class SprintFileResponse(BaseModel):
     path: str
     content: str
+
+
+class LogEntryResponse(BaseModel):
+    id: int
+    timestamp: str
+    log_type: str
+    worker: Optional[str]
+    message: str
+    data: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class SprintLogsResponse(BaseModel):
+    logs: List[LogEntryResponse]
+    total: int
 
 
 # Helper to convert Sprint to response
@@ -198,3 +215,39 @@ def get_sprint_file(
         raise HTTPException(status_code=404, detail=content)
 
     return SprintFileResponse(path=path, content=content)
+
+
+@router.get("/{sprint_id}/logs", response_model=SprintLogsResponse)
+def get_sprint_logs(
+    sprint_id: uuid.UUID,
+    since_id: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get logs for a sprint, optionally since a specific log ID"""
+    service = SprintService(db)
+    sprint = service.get_by_id(sprint_id, current_user.tenant_id)
+
+    if not sprint:
+        raise HTTPException(status_code=404, detail="Sprint not found")
+
+    # Get logs since the given ID
+    logs = db.query(LogEntry).filter(
+        LogEntry.sprint_id == sprint_id,
+        LogEntry.id > since_id
+    ).order_by(LogEntry.id).all()
+
+    return SprintLogsResponse(
+        logs=[
+            LogEntryResponse(
+                id=log.id,
+                timestamp=log.timestamp.isoformat(),
+                log_type=log.log_type.value,
+                worker=log.worker,
+                message=log.message,
+                data=log.data
+            )
+            for log in logs
+        ],
+        total=len(sprint.logs)
+    )

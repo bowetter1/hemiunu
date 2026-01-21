@@ -1075,10 +1075,234 @@ subprocess.run(command, env=env, ...)
 
 ---
 
-## Fas 2 (senare)
+## Fas 2: Full MCP-lösning
 
-- WebSocket för realtime logs
-- Dashboard UI
-- Worker prompts (backend, frontend, devops)
-- GitHub integration (auto-create repo)
-- Railway integration (auto-deploy)
+Kopiera och adaptera från apex CLI (`/apex/apex/`):
+
+### Prompts (kopiera rakt av)
+```
+apex_server/mcp/prompts/
+├── _base.md        # Delad kontext för alla workers
+├── chef.md         # CEO/Orchestrator (388 rader, Flight Checklist)
+├── ad.md           # Art Director
+├── architect.md    # Arkitekt
+├── backend.md      # Backend-utvecklare
+├── frontend.md     # Frontend-utvecklare
+├── tester.md       # Test-skrivare
+├── reviewer.md     # Kodgranskare
+└── devops.md       # DevOps
+```
+
+### Tools (adaptera för API)
+```
+apex_server/mcp/tools/
+├── __init__.py     # ALL_TOOLS, ALL_HANDLERS
+├── delegation.py   # assign_ad, assign_backend, assign_parallel, etc.
+├── communication.py # talk_to, checkin_worker, reassign_with_feedback
+├── boss.py         # thinking, log_decision, summarize_progress
+├── files.py        # read_file, write_file, list_files
+├── meetings.py     # team_kickoff, sprint_planning, team_demo
+├── testing.py      # run_tests, run_lint, run_typecheck
+└── deploy.py       # deploy_railway, check_railway_status
+```
+
+### Orchestrator
+- Ersätt `subprocess.run(["claude", ...])` med `anthropic.messages.create()`
+- Ersätt `subprocess.run(["gemini", ...])` med `google.generativeai`
+- Behåll samma tool-loop och session-hantering
+
+---
+
+## Fas 3: Web-förbättringar (Roadmap)
+
+Baserat på analys av apex CLI vs web-behov.
+
+### Prioritet 1: Grundläggande UX
+
+#### 1.1 Real-time WebSocket
+```
+CLI:  Loggar skrivs till fil → användaren läser filen
+Web:  WebSocket push → loggar visas direkt i browser
+
+Endpoint: WS /api/v1/ws/sprints/{id}
+Events:
+  - log: {type, worker, message, timestamp}
+  - status: {phase, progress, active_workers}
+  - file: {action: created|modified, path, size}
+```
+
+#### 1.2 Visuell progress
+```
+┌──────────────────────────────────────────────────────┐
+│  PRE-FLIGHT                                          │
+│  [✓] DevOps  [✓] CRITERIA.md  [✓] Kickoff           │
+├──────────────────────────────────────────────────────┤
+│  SPRINT 1: Core Setup                                │
+│  [✓] AD+Architect  [▶] Backend+Frontend  [ ] Test   │
+│                                                      │
+│  ████████████████░░░░░░░░  65%                      │
+├──────────────────────────────────────────────────────┤
+│  WORKERS                                             │
+│  🎨 AD          ✅ klar                              │
+│  🏗️ Architect   ✅ klar                              │
+│  ⚙️ Backend     🔄 arbetar... (iteration 3)         │
+│  🖼️ Frontend    ⏳ väntar                            │
+└──────────────────────────────────────────────────────┘
+```
+
+#### 1.3 Interaktiv Chef-dialog
+```
+┌──────────────────────────────────────────────────────┐
+│  💬 Chef frågar:                                     │
+│                                                      │
+│  "Vilken databas vill du använda för detta projekt?" │
+│                                                      │
+│  [PostgreSQL]  [SQLite]  [MongoDB]  [Ingen]         │
+│                                                      │
+│  Eller skriv eget svar: [________________] [Skicka] │
+└──────────────────────────────────────────────────────┘
+```
+
+### Prioritet 2: Insikter & Kontroll
+
+#### 2.1 Kostnadsvisning
+```
+┌─────────────────────────────────────┐
+│  💰 Token-användning                │
+│                                     │
+│  Chef (Opus)      12,450 tokens     │
+│  Backend (Gemini)  8,230 tokens     │
+│  Frontend (Opus)   6,120 tokens     │
+│  ─────────────────────────────      │
+│  Totalt:          26,800 tokens     │
+│  Kostnad:         ~$0.42            │
+└─────────────────────────────────────┘
+```
+
+#### 2.2 Förhandsvisning av app
+```
+┌──────────────────────────────────────────────────────┐
+│  🖥️ Live Preview                    [↗ Öppna]        │
+├──────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────┐ │
+│  │                                                │ │
+│  │     iframe med localhost:8000                  │ │
+│  │     (dev-server startas automatiskt)          │ │
+│  │                                                │ │
+│  └────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────┘
+```
+
+#### 2.3 Cancel/Pause
+- Avbryt sprint mitt i körningen
+- Pausa och återuppta senare
+- Hoppa över steg (t.ex. skippa tester)
+
+### Prioritet 3: Integrationer
+
+#### 3.1 GitHub-integration
+```
+Automatiskt per sprint:
+1. Skapa nytt repo (eller använd befintligt)
+2. Commit efter varje fas
+3. Skapa PR när klart
+4. Visa commit-historik i UI
+
+Settings per tenant:
+- github_token (encrypted)
+- default_org
+- repo_template
+```
+
+#### 3.2 Railway auto-deploy
+```
+Efter godkänd sprint:
+1. Länka repo till Railway
+2. Sätt environment variables
+3. Deploya automatiskt
+4. Visa deploy-URL i UI
+```
+
+#### 3.3 Historik & Templates
+```
+┌──────────────────────────────────────────────────────┐
+│  📁 Tidigare sprints                                 │
+├──────────────────────────────────────────────────────┤
+│  ✅ Todo-app med React       2024-01-20   [Återskapa]│
+│  ✅ API för väderdata        2024-01-19   [Återskapa]│
+│  ❌ E-handel (misslyckades)  2024-01-18   [Se loggar]│
+└──────────────────────────────────────────────────────┘
+
+[+ Skapa från template]
+  - Blank FastAPI
+  - React + FastAPI
+  - Next.js fullstack
+```
+
+### Prioritet 4: Avancerat
+
+#### 4.1 Multi-LLM per worker
+```python
+# Tenant config
+worker_config = {
+    "chef": "claude-opus",      # Bäst på orchestration
+    "ad": "claude-opus",        # Bäst på design
+    "architect": "claude-opus", # Bäst på planering
+    "backend": "gemini-pro",    # Snabb på kod
+    "frontend": "claude-opus",  # Bra på UI
+    "tester": "gemini-pro",     # Snabb på tester
+    "reviewer": "gemini-pro",   # Snabb på review
+    "devops": "claude-opus",    # Bäst på config
+}
+```
+
+#### 4.2 Mem0 integration
+```
+Per tenant:
+- Kodstandarder, preferenser
+- Vanliga mönster
+
+Per sprint:
+- Projektbeslut
+- API-kontrakt
+
+Per worker:
+- Vad de gjort i denna sprint
+```
+
+#### 4.3 Parallell execution
+```python
+# Äkta parallell körning med asyncio
+async def run_parallel(assignments):
+    tasks = [
+        run_worker(a["worker"], a["task"])
+        for a in assignments
+    ]
+    results = await asyncio.gather(*tasks)
+    return results
+```
+
+---
+
+## Implementation Checklist
+
+### Fas 2: MCP-lösning ✅
+- [x] Kopiera prompts från apex CLI
+- [x] Adaptera tools för API (inte subprocess)
+- [x] Implementera SprintRunner med full orchestration
+- [x] Lägg till Gemini-stöd
+- [ ] Testa hela flödet (deploy till Railway)
+
+### Fas 3: Web-förbättringar
+- [ ] WebSocket för real-time logs
+- [ ] Visuell progress-indikator
+- [ ] Interaktiv Chef-dialog (question modal)
+- [ ] Token/kostnadsvisning
+- [ ] Dev-server preview (iframe)
+- [ ] Cancel/pause-funktionalitet
+- [ ] GitHub-integration
+- [ ] Railway auto-deploy
+- [ ] Sprint-historik
+- [ ] Templates
+
+---

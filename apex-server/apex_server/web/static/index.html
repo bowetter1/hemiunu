@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex - AI Team</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="container" id="login-screen">
+        <div class="header">
+            <h1>apex</h1>
+            <p class="subtitle">AI-teamet som bygger din app</p>
+        </div>
+
+        <div class="auth-section">
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label>E-post</label>
+                    <input type="email" id="login-email" placeholder="namn@foretag.se" />
+                </div>
+                <div class="form-group">
+                    <label>Losenord</label>
+                    <input type="password" id="login-password" placeholder="********" />
+                </div>
+                <button onclick="login()">Logga in</button>
+                <div class="auth-error" id="login-error"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="container" id="dashboard" style="display: none;">
+        <div class="header">
+            <h1>apex</h1>
+            <p class="subtitle">AI-teamet som bygger din app</p>
+            <button class="logout-btn" onclick="logout()">Logga ut</button>
+        </div>
+
+        <div class="input-section">
+            <label class="input-label">Beskriv vad du vill bygga</label>
+            <div class="input-group">
+                <input type="text" id="task" placeholder="t.ex. en todo-app med dark mode" />
+                <button id="start" onclick="startSprint()">Starta sprint</button>
+            </div>
+        </div>
+
+        <div class="team-section" id="team">
+            <div class="team-member" id="team-chef">
+                <span class="dot"></span>
+                <span class="team-name">Chef (Opus)</span>
+            </div>
+            <div class="team-member" id="team-backend">
+                <span class="dot"></span>
+                <span class="team-name">Backend</span>
+            </div>
+            <div class="team-member" id="team-frontend">
+                <span class="dot"></span>
+                <span class="team-name">Frontend</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="terminal">
+                <div class="terminal-header">
+                    <span class="terminal-title">sprint.log</span>
+                    <span class="terminal-status" id="status">idle</span>
+                </div>
+                <div class="terminal-body" id="log">
+                    <div class="log-entry">
+                        <span class="log-time"></span>
+                        <span class="log-message" style="color: #444;">Redo att starta...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="files-section" id="files-section">
+                <div class="files-header">
+                    <span class="files-title">Skapade filer</span>
+                    <span class="files-count" id="files-count">0 filer</span>
+                </div>
+                <div class="files-body" id="files-list">
+                    <div class="file-item" style="color: #444;">Vantar pa filer...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <span>apex-server v1.0</span>
+            <span id="user-info"></span>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

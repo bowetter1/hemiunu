@@ -102,3 +102,27 @@ def get_me(current_user = Depends(get_current_user)):
         role=current_user.role,
         tenant_id=str(current_user.tenant_id)
     )
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str
+    admin_key: str
+
+
+@router.post("/admin/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Admin endpoint to reset a user's password"""
+    import os
+    admin_key = os.environ.get("ADMIN_KEY", "")
+    if not admin_key or request.admin_key != admin_key:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    auth_service = AuthService(db)
+    user = auth_service.get_by_email(request.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = auth_service.hash_password(request.new_password)
+    db.commit()
+    return {"status": "ok", "message": "Password updated"}
