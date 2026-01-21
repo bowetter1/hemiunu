@@ -18,7 +18,7 @@ AVAILABLE_PROVIDERS = {
 
 # Model IDs per provider
 MODEL_IDS = {
-    "claude": "claude-opus-4-20250514",
+    "claude": "claude-opus-4-5-20251101",  # Opus 4.5
     "sonnet": "claude-sonnet-4-20250514",
     "gemini": "gemini-2.0-flash-exp",
 }
