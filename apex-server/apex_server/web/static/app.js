@@ -243,7 +243,9 @@ function updateTeamFromLog(log) {
         'reviewer': 'team-reviewer'
     };
 
-    const workerType = log.worker.toLowerCase();
+    // Extract base worker type from instance ID (e.g., "frontend-2" -> "frontend")
+    const workerRaw = log.worker.toLowerCase();
+    const workerType = workerRaw.replace(/-\d+$/, ''); // Remove -N suffix if present
     const teamId = workerMap[workerType];
     if (!teamId) return;
 

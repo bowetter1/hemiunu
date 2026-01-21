@@ -192,12 +192,14 @@ class SprintRunner:
     def __init__(self, sprint: Sprint, db: Session):
         self.sprint = sprint
         self.db = db
+        self.db_url = str(get_settings().database_url)
         self.project_dir = Path(sprint.project_dir)
         self.llm = LLMClient()
         self.worker_sessions: dict[str, list] = {}  # Worker memory
+        self._db_lock = __import__('threading').Lock()  # Thread-safe logging
 
-    def log(self, log_type: LogType, message: str, worker: str = None, data: dict = None):
-        """Add structured log entry"""
+    def log(self, log_type: LogType, message: str, worker: str = None, data: dict = None, db: Session = None):
+        """Add structured log entry (thread-safe)"""
         entry = LogEntry(
             sprint_id=self.sprint.id,
             log_type=log_type,
@@ -205,8 +207,14 @@ class SprintRunner:
             message=message,
             data=json.dumps(data) if data else None
         )
-        self.db.add(entry)
-        self.db.commit()
+        # Use provided db session or fall back to self.db with lock
+        if db:
+            db.add(entry)
+            db.commit()
+        else:
+            with self._db_lock:
+                self.db.add(entry)
+                self.db.commit()
         print(f"[{self.sprint.id}] [{log_type.value}] {worker or ''}: {message}")
 
     def _get_worker_icon(self, worker: str) -> str:
@@ -230,13 +238,16 @@ class SprintRunner:
             ]
         return tools
 
-    def run_worker(self, worker_name: str, task: str, max_iterations: int = 20) -> dict:
+    def run_worker(self, worker_name: str, task: str, max_iterations: int = 20,
+                   instance_id: str = None, db: Session = None) -> dict:
         """Run a single worker with tool calling loop
 
         Args:
             worker_name: Worker role (chef, backend, frontend, etc.)
             task: Task description
             max_iterations: Max API round-trips
+            instance_id: Optional instance ID for parallel workers (e.g., "frontend-1")
+            db: Optional dedicated database session for this worker
 
         Returns:
             Dict with worker result
@@ -247,7 +258,10 @@ class SprintRunner:
         provider = get_provider(ai_type)
         model_id = get_model_id(ai_type)
 
-        self.log(LogType.WORKER_START, f"STARTAR {role_name.upper()} ({ai_type})...", worker_name)
+        # Use instance_id for logging if provided (for parallel workers)
+        log_worker = instance_id if instance_id else worker_name
+
+        self.log(LogType.WORKER_START, f"STARTAR {role_name.upper()} ({ai_type})...", log_worker, db=db)
 
         # Get appropriate prompt
         if worker_name == "chef":
@@ -297,7 +311,7 @@ class SprintRunner:
                     text = block.get("text", "") if isinstance(block, dict) else block.text
                     final_text = text
                     if len(text) < 300:
-                        self.log(LogType.THINKING, text, worker_name)
+                        self.log(LogType.THINKING, text, log_worker, db=db)
                     assistant_content.append(block)
 
                 elif block_type == "tool_use":
@@ -316,8 +330,9 @@ class SprintRunner:
                     self.log(
                         LogType.TOOL_CALL,
                         f"{tool_name} anropat",
-                        worker_name,
-                        {"tool": tool_name, "args": tool_args}
+                        log_worker,
+                        {"tool": tool_name, "args": tool_args},
+                        db=db
                     )
 
                     # Handle delegation tools specially
@@ -328,7 +343,7 @@ class SprintRunner:
 
                     # Log result (abbreviated)
                     result_preview = result[:200] + "..." if len(result) > 200 else result
-                    self.log(LogType.TOOL_RESULT, result_preview, worker_name)
+                    self.log(LogType.TOOL_RESULT, result_preview, log_worker, db=db)
 
                     assistant_content.append(block)
                     messages.append({"role": "assistant", "content": assistant_content})
@@ -346,8 +361,8 @@ class SprintRunner:
         # Save session for memory
         self.worker_sessions[worker_name] = messages
 
-        self.log(LogType.WORKER_DONE, f"{role_name.upper()} klar ({len(final_text)} tecken)", worker_name)
-        return {"worker": worker_name, "iterations": i + 1, "final_response": final_text}
+        self.log(LogType.WORKER_DONE, f"{role_name.upper()} klar ({len(final_text)} tecken)", log_worker, db=db)
+        return {"worker": worker_name, "instance_id": instance_id, "iterations": i + 1, "final_response": final_text}
 
     def _parse_gemini_response(self, response) -> list:
         """Parse Gemini response into Anthropic-like content blocks"""
@@ -420,7 +435,10 @@ class SprintRunner:
         return f"Unknown delegation tool: {tool_name}"
 
     def _handle_parallel(self, args: dict) -> str:
-        """Handle parallel worker execution"""
+        """Handle parallel worker execution with separate DB sessions per thread"""
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
         assignments = args.get("assignments", [])
         if not assignments:
             return "No assignments given"
@@ -429,35 +447,68 @@ class SprintRunner:
 
         results = []
 
+        # Count instances per worker type for unique IDs
+        worker_counts: dict[str, int] = {}
+        assignment_info = []
+
+        for a in assignments:
+            worker = a.get("worker", "backend")
+            task = a.get("task", "")
+            context = a.get("context", "")
+            file = a.get("file", "")
+
+            full_task = task
+            if context:
+                full_task += f"\n\nContext: {context}"
+            if file:
+                full_task += f"\n\nFile: {file}"
+
+            # Generate instance ID for multiple workers of same type
+            worker_counts[worker] = worker_counts.get(worker, 0) + 1
+            count = worker_counts[worker]
+            instance_id = worker if count == 1 else f"{worker}-{count}"
+
+            assignment_info.append({
+                "worker": worker,
+                "instance_id": instance_id,
+                "task": full_task
+            })
+
+        def run_worker_with_own_session(worker: str, instance_id: str, task: str) -> dict:
+            """Run worker with its own database session"""
+            engine = create_engine(self.db_url)
+            SessionLocal = sessionmaker(bind=engine)
+            thread_db = SessionLocal()
+            try:
+                return self.run_worker(worker, task, instance_id=instance_id, db=thread_db)
+            finally:
+                thread_db.close()
+
         # Run workers in parallel using thread pool
         with ThreadPoolExecutor(max_workers=len(assignments)) as executor:
             futures = {}
-            for a in assignments:
-                worker = a.get("worker", "backend")
-                task = a.get("task", "")
-                context = a.get("context", "")
-                file = a.get("file", "")
-
-                full_task = task
-                if context:
-                    full_task += f"\n\nContext: {context}"
-                if file:
-                    full_task += f"\n\nFile: {file}"
-
-                future = executor.submit(self.run_worker, worker, full_task)
-                futures[future] = worker
+            for info in assignment_info:
+                future = executor.submit(
+                    run_worker_with_own_session,
+                    info["worker"],
+                    info["instance_id"],
+                    info["task"]
+                )
+                futures[future] = info
 
             for future in futures:
-                worker = futures[future]
+                info = futures[future]
+                worker = info["worker"]
+                instance_id = info["instance_id"]
                 icon = self._get_worker_icon(worker)
                 try:
                     result = future.result()
                     response = result.get('final_response', '')[:500]
-                    results.append(f"**{worker.upper()}**:\n{response}...")
-                    self.log(LogType.WORKER_DONE, f"{icon} {worker.upper()} ✅", worker)
+                    results.append(f"**{instance_id.upper()}**:\n{response}...")
+                    # Note: WORKER_DONE is already logged by run_worker
                 except Exception as e:
-                    results.append(f"**{worker.upper()}**: ERROR - {e}")
-                    self.log(LogType.ERROR, f"{icon} {worker.upper()} ERROR: {e}", worker)
+                    results.append(f"**{instance_id.upper()}**: ERROR - {e}")
+                    self.log(LogType.ERROR, f"{icon} {instance_id.upper()} ERROR: {e}", instance_id)
 
         self.log(LogType.PARALLEL_DONE, f"PARALLELLT ARBETE KLART ({len(assignments)} workers)", None)
         return f"⚡ PARALLEL WORK COMPLETE\n\n" + "\n\n---\n\n".join(results)
