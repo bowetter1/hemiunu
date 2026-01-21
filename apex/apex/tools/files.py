@@ -13,13 +13,13 @@ _current_project_dir = None
 
 
 def get_project_dir(fallback: str) -> str:
-    """Hämta aktuell projektmapp."""
+    """Get current project folder."""
     global _current_project_dir
     return _current_project_dir or fallback
 
 
 def set_project_dir_internal(path: str) -> str:
-    """Sätt projektmapp internt."""
+    """Set project folder internally."""
     global _current_project_dir
     _current_project_dir = path
     return path
@@ -28,30 +28,30 @@ def set_project_dir_internal(path: str) -> str:
 TOOLS = [
     {
         "name": "set_project_dir",
-        "description": "Sätt projektmapp. KÖR DETTA FÖRST för att välja var filer ska skapas.",
+        "description": "Set project folder. RUN THIS FIRST to choose where files should be created.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Sökväg till projektmappen"},
-                "create": {"type": "boolean", "description": "Skapa mappen om den inte finns"}
+                "path": {"type": "string", "description": "Path to project folder"},
+                "create": {"type": "boolean", "description": "Create folder if it doesn't exist"}
             },
             "required": ["path"]
         }
     },
     {
         "name": "read_file",
-        "description": "Läs en fil i projektet.",
+        "description": "Read a file in the project.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "file": {"type": "string", "description": "Filnamn"}
+                "file": {"type": "string", "description": "Filename"}
             },
             "required": ["file"]
         }
     },
     {
         "name": "list_files",
-        "description": "Lista alla filer i projektet.",
+        "description": "List all files in the project.",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -60,7 +60,7 @@ TOOLS = [
     },
     {
         "name": "read_playbook",
-        "description": "Läs projektets playbook.",
+        "description": "Read the project's playbook.",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -69,7 +69,7 @@ TOOLS = [
     },
     {
         "name": "update_playbook",
-        "description": "Uppdatera en sektion i playbook.",
+        "description": "Update a section in playbook.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -83,7 +83,7 @@ TOOLS = [
 
 
 def read_file(arguments: dict, cwd: str) -> dict:
-    """Läs en fil."""
+    """Read a file."""
     file = arguments.get("file", "")
     file_path = Path(cwd) / file
 
@@ -91,25 +91,25 @@ def read_file(arguments: dict, cwd: str) -> dict:
         try:
             content = file_path.read_text()
             if len(content) > 5000:
-                content = content[:5000] + f"\n\n... (trunkerad, {len(content)} tecken totalt)"
-            log_to_sprint(cwd, f"📄 Läste: {file}")
+                content = content[:5000] + f"\n\n... (truncated, {len(content)} chars total)"
+            log_to_sprint(cwd, f"📄 Read: {file}")
             return make_response(f"📄 {file}:\n\n```\n{content}\n```")
         except Exception as e:
-            return make_response(f"❌ Kunde inte läsa {file}: {e}")
+            return make_response(f"❌ Could not read {file}: {e}")
     else:
         available = [
             str(f.relative_to(cwd)) for f in Path(cwd).rglob("*")
             if f.is_file() and not f.name.startswith(".") and "__pycache__" not in str(f)
         ]
         return make_response(
-            f"❌ Filen '{file}' finns inte.\n\nTillgängliga filer:\n" +
+            f"❌ File '{file}' does not exist.\n\nAvailable files:\n" +
             "\n".join(f"  - {f}" for f in available[:20])
         )
 
 
 def list_files(arguments: dict, cwd: str) -> dict:
-    """Lista alla filer i projektmappen."""
-    # Mappar att ignorera
+    """List all files in the project folder."""
+    # Folders to ignore
     IGNORE_DIRS = {
         "__pycache__", "node_modules", ".git", ".venv", "venv",
         ".pytest_cache", ".mypy_cache", ".ruff_cache",
@@ -118,10 +118,10 @@ def list_files(arguments: dict, cwd: str) -> dict:
     }
 
     files = []
-    max_files = 100  # Begränsa för att undvika överflöd
+    max_files = 100  # Limit to avoid overflow
 
     for f in Path(cwd).rglob("*"):
-        # Skippa ignorerade mappar
+        # Skip ignored folders
         if any(ignored in f.parts for ignored in IGNORE_DIRS):
             continue
 
@@ -135,29 +135,29 @@ def list_files(arguments: dict, cwd: str) -> dict:
                 break
 
     if files:
-        # Sortera efter sökväg
+        # Sort by path
         files.sort(key=lambda x: x[0])
         file_list = "\n".join(f"  {f[0]} ({f[1]})" for f in files)
 
         truncated = ""
         if len(files) >= max_files:
-            truncated = f"\n\n⚠️ Visar max {max_files} filer. Använd read_file() för specifika filer."
+            truncated = f"\n\n⚠️ Showing max {max_files} files. Use read_file() for specific files."
 
-        log_to_sprint(cwd, f"📁 Listade {len(files)} filer")
-        return make_response(f"📁 Filer ({len(files)} st):\n\n{file_list}{truncated}")
+        log_to_sprint(cwd, f"📁 Listed {len(files)} files")
+        return make_response(f"📁 Files ({len(files)}):\n\n{file_list}{truncated}")
     else:
-        return make_response("📁 Inga filer i projektet ännu.")
+        return make_response("📁 No files in the project yet.")
 
 
 def _get_playbook_path() -> Path:
-    """Returnera sökväg till playbook."""
+    """Return path to playbook."""
     docs_dir = Path(__file__).parent.parent.parent / "docs"
     docs_dir.mkdir(exist_ok=True)
     return docs_dir / "PLAYBOOK.md"
 
 
 def _get_playbook_template() -> str:
-    """Generera playbook-mall från config."""
+    """Generate playbook template from config."""
     team_lines = []
     for role, ai in WORKER_CLI.items():
         if role != "chef":
@@ -166,44 +166,44 @@ def _get_playbook_template() -> str:
     return f"""# Playbook
 
 ## Vision
-_Vad bygger vi? Varför?_
+_What are we building? Why?_
 
 ## Team
-_Vem gör vad?_
+_Who does what?_
 {chr(10).join(team_lines)}
 
-Tillgängliga AI:er: {', '.join(AVAILABLE_AIS)}
+Available AIs: {', '.join(AVAILABLE_AIS)}
 
 ## Sprints
-_Hur delar vi upp arbetet?_
+_How do we break down the work?_
 
 ### Sprint 1
 - [ ]
 
-## Nu
-_Vad händer just nu?_
+## Now
+_What's happening right now?_
 
-## Anteckningar
-_Fritt utrymme för tankar_
+## Notes
+_Free space for thoughts_
 
 """
 
 
 def read_playbook(arguments: dict, cwd: str) -> dict:
-    """Läs playbook."""
+    """Read playbook."""
     playbook_path = _get_playbook_path()
 
     if not playbook_path.exists():
         template = _get_playbook_template()
         playbook_path.write_text(template)
-        log_to_sprint(cwd, "📓 Skapade ny PLAYBOOK.md")
+        log_to_sprint(cwd, "📓 Created new PLAYBOOK.md")
 
     content = playbook_path.read_text()
     return make_response(f"📓 PLAYBOOK:\n\n{content}")
 
 
 def update_playbook(arguments: dict, cwd: str) -> dict:
-    """Uppdatera en sektion i playbook."""
+    """Update a section in playbook."""
     section = arguments.get("section", "notes")
     new_content = arguments.get("content", "")
 
@@ -211,8 +211,8 @@ def update_playbook(arguments: dict, cwd: str) -> dict:
         "vision": "## Vision",
         "team": "## Team",
         "sprints": "## Sprints",
-        "current": "## Nu",
-        "notes": "## Anteckningar"
+        "current": "## Now",
+        "notes": "## Notes"
     }
 
     playbook_path = _get_playbook_path()
@@ -222,7 +222,7 @@ def update_playbook(arguments: dict, cwd: str) -> dict:
     else:
         content = _get_playbook_template()
 
-    title = section_titles.get(section, "## Anteckningar")
+    title = section_titles.get(section, "## Notes")
     pattern = f"({re.escape(title)})\n(.*?)(?=\n## |$)"
     replacement = f"{title}\n{new_content}\n"
 
@@ -232,32 +232,32 @@ def update_playbook(arguments: dict, cwd: str) -> dict:
         content += f"\n{title}\n{new_content}\n"
 
     playbook_path.write_text(content)
-    log_to_sprint(cwd, f"📓 Uppdaterade PLAYBOOK [{section}]")
+    log_to_sprint(cwd, f"📓 Updated PLAYBOOK [{section}]")
 
-    return make_response(f"📓 Uppdaterade '{section}':\n\n{new_content[:200]}...")
+    return make_response(f"📓 Updated '{section}':\n\n{new_content[:200]}...")
 
 
 def set_project_dir(arguments: dict, cwd: str) -> dict:
-    """Sätt projektmapp."""
+    """Set project folder."""
     path = arguments.get("path", "")
     create = arguments.get("create", True)
 
     if not path:
-        return make_response("❌ Ange en sökväg!")
+        return make_response("❌ Please provide a path!")
 
     project_path = Path(path)
 
-    # Skapa om den inte finns
+    # Create if it doesn't exist
     if not project_path.exists() and create:
         project_path.mkdir(parents=True, exist_ok=True)
 
     if not project_path.exists():
-        return make_response(f"❌ Mappen '{path}' finns inte. Sätt create=true för att skapa den.")
+        return make_response(f"❌ Folder '{path}' does not exist. Set create=true to create it.")
 
-    # Uppdatera global variabel
+    # Update global variable
     set_project_dir_internal(str(project_path.absolute()))
 
-    return make_response(f"📁 Projektmapp satt till: {project_path.absolute()}\n\nAlla filer kommer nu skapas här.")
+    return make_response(f"📁 Project folder set to: {project_path.absolute()}\n\nAll files will now be created here.")
 
 
 HANDLERS = {

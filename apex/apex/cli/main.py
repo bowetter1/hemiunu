@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-apex CLI - AI organisation (lokal version)
+apex CLI - AI organization (local version)
 
-Opus (claude) är chefen med MCP-tools för att anropa andra agents.
+Opus (claude) is the boss with MCP-tools to call other agents.
 """
 import sys
 import subprocess
 import os
 from pathlib import Path
 
-# Lägg till apex-mappen i path
+# Add apex folder to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.config import get_chef_prompt
@@ -17,27 +17,27 @@ from core.config import get_chef_prompt
 
 def main():
     if len(sys.argv) < 2:
-        print("apex 'vad du vill bygga'")
-        print("\nOpus (claude) är chefen med MCP-tools.")
-        print("Tillgängliga workers: AD, Architect, Backend, Frontend, Tester, Reviewer, DevOps")
+        print("apex 'what you want to build'")
+        print("\nOpus (claude) is the boss with MCP-tools.")
+        print("Available workers: AD, Architect, Backend, Frontend, Tester, Reviewer, Security, DevOps")
         sys.exit(1)
 
     task = " ".join(sys.argv[1:])
 
-    # Projektmapp
+    # Project folder
     name = "".join(c if c.isalnum() else "-" for c in task.lower())[:30].strip("-")
     project = Path.cwd() / name
     project.mkdir(exist_ok=True)
 
     print(f"📂 {project}")
     print(f"🎯 {task}")
-    print(f"📋 Logg: {project}/sprint.log")
+    print(f"📋 Log: {project}/sprint.log")
     print()
 
     # MCP config path
     mcp_config = Path(__file__).parent.parent / "mcp-agents.json"
 
-    # Kör Opus (claude) med MCP tools
+    # Run Opus (claude) with MCP tools
     cmd = [
         "claude",
         "--mcp-config", str(mcp_config),
@@ -45,33 +45,33 @@ def main():
         "-p", get_chef_prompt(task)
     ]
 
-    print("→ OPUS startar...")
+    print("→ OPUS starting...")
     print("=" * 50)
 
     env = os.environ.copy()
     env["PROJECT_DIR"] = str(project)
 
-    # Skapa loggfil (loggar skrivs av MCP-servern)
+    # Create log file (logs written by MCP server)
     log_file = project / "sprint.log"
     log_file.touch()
 
-    # Kör i projektmappen
+    # Run in project folder
     subprocess.run(cmd, cwd=str(project), timeout=3600, env=env)  # 60 min
 
-    # Lista skapade filer
+    # List created files
     print()
     print("=" * 50)
-    print(f"📂 Projekt: {project}")
+    print(f"📂 Project: {project}")
     files = [f for f in project.rglob("*") if f.is_file() and not f.name.startswith(".")]
     if files:
-        print("📁 Filer:")
+        print("📁 Files:")
         for f in sorted(files)[:20]:
             size = f.stat().st_size
             print(f"   {f.relative_to(project)} ({size} bytes)")
     else:
-        print("   (inga filer skapade)")
+        print("   (no files created)")
 
-    print("\n✅ Klar!")
+    print("\n✅ Done!")
 
 
 if __name__ == "__main__":

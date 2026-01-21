@@ -1,6 +1,6 @@
 """
 Testing tools - run_tests, run_lint, run_typecheck
-Kör riktiga tester, inte bara AI-analys.
+Run real tests, not just AI analysis.
 """
 import subprocess
 from pathlib import Path
@@ -11,22 +11,22 @@ from .base import make_response, log_to_sprint
 TOOLS = [
     {
         "name": "run_tests",
-        "description": "KÖR befintliga tester (pytest, npm test). OBS: Använd assign_tester() FÖRST för att SKRIVA tester!",
+        "description": "RUN existing tests (pytest, npm test). NOTE: Use assign_tester() FIRST to WRITE tests!",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "framework": {
                     "type": "string",
                     "enum": ["auto", "pytest", "npm", "bun", "go"],
-                    "description": "Testramverk (auto = detektera automatiskt)"
+                    "description": "Test framework (auto = detect automatically)"
                 },
                 "path": {
                     "type": "string",
-                    "description": "Specifik fil/mapp att testa"
+                    "description": "Specific file/folder to test"
                 },
                 "verbose": {
                     "type": "boolean",
-                    "description": "Visa detaljerad output"
+                    "description": "Show detailed output"
                 }
             },
             "required": []
@@ -34,22 +34,22 @@ TOOLS = [
     },
     {
         "name": "run_lint",
-        "description": "Kör linting för kodkvalitet (flake8, eslint, etc).",
+        "description": "Run linting for code quality (flake8, eslint, etc).",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "framework": {
                     "type": "string",
                     "enum": ["auto", "flake8", "ruff", "eslint", "prettier"],
-                    "description": "Lint-verktyg (auto = detektera automatiskt)"
+                    "description": "Lint tool (auto = detect automatically)"
                 },
                 "path": {
                     "type": "string",
-                    "description": "Specifik fil/mapp att linta"
+                    "description": "Specific file/folder to lint"
                 },
                 "fix": {
                     "type": "boolean",
-                    "description": "Försök fixa automatiskt (om stöds)"
+                    "description": "Try to fix automatically (if supported)"
                 }
             },
             "required": []
@@ -57,18 +57,18 @@ TOOLS = [
     },
     {
         "name": "run_typecheck",
-        "description": "Kör typkontroll (mypy, tsc, pyright).",
+        "description": "Run type checking (mypy, tsc, pyright).",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "framework": {
                     "type": "string",
                     "enum": ["auto", "mypy", "pyright", "tsc"],
-                    "description": "Typchecker (auto = detektera automatiskt)"
+                    "description": "Type checker (auto = detect automatically)"
                 },
                 "path": {
                     "type": "string",
-                    "description": "Specifik fil/mapp att typechecka"
+                    "description": "Specific file/folder to typecheck"
                 }
             },
             "required": []
@@ -78,7 +78,7 @@ TOOLS = [
 
 
 def detect_project_type(cwd: str) -> dict:
-    """Detektera projekttyp baserat på filer."""
+    """Detect project type based on files."""
     cwd_path = Path(cwd)
 
     info = {
@@ -112,7 +112,7 @@ def detect_project_type(cwd: str) -> dict:
 
 
 def run_command(cmd: list, cwd: str, timeout: int = 120) -> tuple[bool, str]:
-    """Kör kommando och returnera (success, output)."""
+    """Run command and return (success, output)."""
     try:
         result = subprocess.run(
             cmd,
@@ -125,28 +125,28 @@ def run_command(cmd: list, cwd: str, timeout: int = 120) -> tuple[bool, str]:
         success = result.returncode == 0
         return success, output
     except subprocess.TimeoutExpired:
-        return False, f"TIMEOUT efter {timeout}s"
+        return False, f"TIMEOUT after {timeout}s"
     except FileNotFoundError:
-        return False, f"Kommando ej hittat: {cmd[0]}"
+        return False, f"Command not found: {cmd[0]}"
     except Exception as e:
-        return False, f"Fel: {e}"
+        return False, f"Error: {e}"
 
 
 def run_tests(arguments: dict, cwd: str) -> dict:
-    """Kör tester."""
+    """Run tests."""
     framework = arguments.get("framework", "auto")
     path = arguments.get("path", "")
     verbose = arguments.get("verbose", False)
 
-    log_to_sprint(cwd, f"🧪 STARTAR TESTER ({framework})...")
+    log_to_sprint(cwd, f"🧪 STARTING TESTS ({framework})...")
 
     project = detect_project_type(cwd)
     results = []
     any_success = False
 
-    # Auto-detect eller specifikt ramverk
+    # Auto-detect or specific framework
     if framework == "auto":
-        # Prova i ordning
+        # Try in order
         if project["python"]:
             framework = "pytest"
         elif project["node"]:
@@ -154,9 +154,9 @@ def run_tests(arguments: dict, cwd: str) -> dict:
         elif project["go"]:
             framework = "go"
         else:
-            return make_response("❌ Kunde inte detektera testramverk. Ange framework manuellt.")
+            return make_response("❌ Could not detect test framework. Specify framework manually.")
 
-    # Kör tester baserat på ramverk
+    # Run tests based on framework
     if framework == "pytest":
         cmd = ["pytest"]
         if verbose:
@@ -164,7 +164,7 @@ def run_tests(arguments: dict, cwd: str) -> dict:
         if path:
             cmd.append(path)
         else:
-            # Leta efter tests-mapp
+            # Look for tests folder
             if (Path(cwd) / "tests").exists():
                 cmd.append("tests/")
 
@@ -198,19 +198,19 @@ def run_tests(arguments: dict, cwd: str) -> dict:
         status = "✅ PASS" if success else "❌ FAIL"
         results.append(f"**go test** {status}\n```\n{output[-2000:]}\n```")
 
-    final_status = "✅ TESTER GODKÄNDA" if any_success else "❌ TESTER MISSLYCKADES"
+    final_status = "✅ TESTS PASSED" if any_success else "❌ TESTS FAILED"
     log_to_sprint(cwd, f"🧪 {final_status}")
 
-    return make_response(f"🧪 TEST RESULTAT: {final_status}\n\n" + "\n\n".join(results))
+    return make_response(f"🧪 TEST RESULT: {final_status}\n\n" + "\n\n".join(results))
 
 
 def run_lint(arguments: dict, cwd: str) -> dict:
-    """Kör linting."""
+    """Run linting."""
     framework = arguments.get("framework", "auto")
     path = arguments.get("path", ".")
     fix = arguments.get("fix", False)
 
-    log_to_sprint(cwd, f"🔍 STARTAR LINTING ({framework})...")
+    log_to_sprint(cwd, f"🔍 STARTING LINTING ({framework})...")
 
     project = detect_project_type(cwd)
     results = []
@@ -219,13 +219,13 @@ def run_lint(arguments: dict, cwd: str) -> dict:
     # Auto-detect
     if framework == "auto":
         if project["python"]:
-            framework = "ruff"  # Ruff är snabbast
+            framework = "ruff"  # Ruff is fastest
         elif project["node"]:
             framework = "eslint"
         else:
-            return make_response("❌ Kunde inte detektera lint-verktyg. Ange framework manuellt.")
+            return make_response("❌ Could not detect lint tool. Specify framework manually.")
 
-    # Kör lint
+    # Run lint
     if framework == "ruff":
         cmd = ["ruff", "check", path]
         if fix:
@@ -260,18 +260,18 @@ def run_lint(arguments: dict, cwd: str) -> dict:
         status = "✅ FORMATTED" if success else "⚠️ NEEDS FORMAT"
         results.append(f"**prettier** {status}\n```\n{output[-2000:]}\n```")
 
-    final_status = "⚠️ LINT ISSUES HITTADE" if any_issues else "✅ LINT CLEAN"
+    final_status = "⚠️ LINT ISSUES FOUND" if any_issues else "✅ LINT CLEAN"
     log_to_sprint(cwd, f"🔍 {final_status}")
 
-    return make_response(f"🔍 LINT RESULTAT: {final_status}\n\n" + "\n\n".join(results))
+    return make_response(f"🔍 LINT RESULT: {final_status}\n\n" + "\n\n".join(results))
 
 
 def run_typecheck(arguments: dict, cwd: str) -> dict:
-    """Kör typkontroll."""
+    """Run type checking."""
     framework = arguments.get("framework", "auto")
     path = arguments.get("path", ".")
 
-    log_to_sprint(cwd, f"📝 STARTAR TYPECHECK ({framework})...")
+    log_to_sprint(cwd, f"📝 STARTING TYPECHECK ({framework})...")
 
     project = detect_project_type(cwd)
     results = []
@@ -284,9 +284,9 @@ def run_typecheck(arguments: dict, cwd: str) -> dict:
         elif project["node"]:
             framework = "tsc"
         else:
-            return make_response("❌ Kunde inte detektera typechecker. Ange framework manuellt.")
+            return make_response("❌ Could not detect type checker. Specify framework manually.")
 
-    # Kör typecheck
+    # Run typecheck
     if framework == "mypy":
         cmd = ["mypy", path]
         success, output = run_command(cmd, cwd)
@@ -308,10 +308,10 @@ def run_typecheck(arguments: dict, cwd: str) -> dict:
         status = "✅ CLEAN" if success else "❌ TYPE ERRORS"
         results.append(f"**tsc** {status}\n```\n{output[-2000:]}\n```")
 
-    final_status = "❌ TYPFEL HITTADE" if any_errors else "✅ TYPER OK"
+    final_status = "❌ TYPE ERRORS FOUND" if any_errors else "✅ TYPES OK"
     log_to_sprint(cwd, f"📝 {final_status}")
 
-    return make_response(f"📝 TYPECHECK RESULTAT: {final_status}\n\n" + "\n\n".join(results))
+    return make_response(f"📝 TYPECHECK RESULT: {final_status}\n\n" + "\n\n".join(results))
 
 
 HANDLERS = {

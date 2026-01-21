@@ -124,7 +124,7 @@ def run_cli(cli: str, prompt: str, cwd: str, worker: str = None, continue_sessio
         return output
     except subprocess.TimeoutExpired:
         log_to_sprint(cwd, f"⏰ {cli.upper()} timeout (4 min)")
-        return "ERROR: Timeout efter 5 minuter"
+        return "ERROR: Timeout after 5 minutes"
     except FileNotFoundError:
         log_to_sprint(cwd, f"❌ {cli.upper()} not found")
         return f"ERROR: CLI '{cli}' is not installed"

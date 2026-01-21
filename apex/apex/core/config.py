@@ -4,13 +4,13 @@ Apex Configuration - Single Source of Truth
 """
 import os
 
-# Sökväg till prompts-mappen
+# Path to prompts folder
 PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts")
 
-# === TILLGÄNGLIGA AI:er ===
+# === AVAILABLE AIs ===
 AVAILABLE_AIS = ["claude", "sonnet", "gemini"]
 
-# === WORKER CLI MAPPNING ===
+# === WORKER CLI MAPPING ===
 WORKER_CLI = {
     "chef": "claude",      # Opus - orchestration
     "ad": "gemini",        # Gemini - design (faster)
@@ -23,7 +23,7 @@ WORKER_CLI = {
     "devops": "claude",    # Opus - deploy
 }
 
-# === ROLLER ===
+# === ROLES ===
 ALL_ROLES = ["chef", "ad", "architect", "backend", "frontend", "tester", "reviewer", "security", "devops"]
 
 ROLE_NAMES = {
@@ -38,7 +38,7 @@ ROLE_NAMES = {
     "devops": "DevOps",
 }
 
-# === CLI FLAGGOR ===
+# === CLI FLAGS ===
 CLI_FLAGS = {
     "claude": ["-p", "--dangerously-skip-permissions"],
     "sonnet": ["-p", "--dangerously-skip-permissions", "--model", "sonnet"],
@@ -47,31 +47,31 @@ CLI_FLAGS = {
 
 
 def get_worker_cli(worker: str, ai: str = None) -> str:
-    """Hämta CLI för en worker."""
+    """Get CLI for a worker."""
     if ai and ai in AVAILABLE_AIS:
         return ai
     return WORKER_CLI.get(worker, "sonnet")
 
 
 def _load_prompt(filename: str) -> str:
-    """Ladda en prompt från prompts-mappen."""
+    """Load a prompt from the prompts folder."""
     path = os.path.join(PROMPTS_DIR, filename)
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
 
 def get_chef_prompt(task: str) -> str:
-    """Chef-prompt - laddas från prompts/chef.md."""
+    """Chef prompt - loaded from prompts/chef.md."""
     template = _load_prompt("chef.md")
     return template.format(task=task)
 
 
 def get_web_chef_prompt(task: str, cwd: str) -> str:
-    """Chef-prompt för web med projektmapp."""
+    """Chef prompt for web with project folder."""
     base = get_chef_prompt(task)
     return base + f"""
 
-PROJEKTMAPP: {cwd}
+PROJECT FOLDER: {cwd}
 
 BROWSER (Playwright):
 - mcp__playwright__browser_navigate(url)

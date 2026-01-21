@@ -99,7 +99,7 @@ async function startSprint() {
     document.getElementById('start').disabled = true;
     document.getElementById('status').className = 'terminal-status running';
     document.getElementById('status').textContent = 'running';
-    document.getElementById('tokens').textContent = '0 tokens';
+    document.getElementById('tokens').textContent = '0 tokens ($0.00)';
     document.getElementById('log').innerHTML = '';
     document.getElementById('files-list').innerHTML = '<div class="file-item" style="color: #444;">Vantar pa filer...</div>';
     knownFiles = new Set();
@@ -178,10 +178,17 @@ async function pollLogs() {
         if (statusResponse.ok) {
             const sprint = await statusResponse.json();
 
-            // Update token counter
-            const totalTokens = (sprint.input_tokens || 0) + (sprint.output_tokens || 0);
+            // Update token counter with cost estimate
+            const inputTokens = sprint.input_tokens || 0;
+            const outputTokens = sprint.output_tokens || 0;
+            const totalTokens = inputTokens + outputTokens;
+
+            // Claude Opus 4 pricing: $15/M input, $75/M output
+            const costUsd = (inputTokens * 15 / 1000000) + (outputTokens * 75 / 1000000);
+
             const tokenText = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens;
-            document.getElementById('tokens').textContent = `${tokenText} tokens`;
+            const costText = costUsd >= 0.01 ? `$${costUsd.toFixed(2)}` : `$${costUsd.toFixed(3)}`;
+            document.getElementById('tokens').textContent = `${tokenText} tokens (${costText})`;
 
             if (sprint.status === 'completed' || sprint.status === 'failed') {
                 // Sprint is done - stop polling

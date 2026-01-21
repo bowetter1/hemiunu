@@ -1,7 +1,7 @@
 """
 Deploy tools - deploy_railway, check_railway_status, run_qa, open_browser
 
-BORTTAGET: ask_user() med JSON-polling - onödigt komplext
+REMOVED: ask_user() with JSON-polling - unnecessarily complex
 """
 import subprocess
 from pathlib import Path
@@ -13,18 +13,18 @@ from .base import run_cli, make_response, log_to_sprint
 TOOLS = [
     {
         "name": "run_qa",
-        "description": "Kör QA-analys på projektet.",
+        "description": "Run QA analysis on the project.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "focus": {"type": "string", "description": "Vad ska analyseras?"}
+                "focus": {"type": "string", "description": "What should be analyzed?"}
             },
             "required": []
         }
     },
     {
         "name": "deploy_railway",
-        "description": "Deploya projektet till Railway.",
+        "description": "Deploy the project to Railway.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -35,7 +35,7 @@ TOOLS = [
     },
     {
         "name": "check_railway_status",
-        "description": "Kolla Railway deployment status.",
+        "description": "Check Railway deployment status.",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -44,11 +44,11 @@ TOOLS = [
     },
     {
         "name": "open_browser",
-        "description": "Öppna en HTML-fil i webbläsaren.",
+        "description": "Open an HTML file in the browser.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "file": {"type": "string", "description": "Fil att öppna"}
+                "file": {"type": "string", "description": "File to open"}
             },
             "required": []
         }
@@ -57,17 +57,17 @@ TOOLS = [
 
 
 def run_qa(arguments: dict, cwd: str) -> dict:
-    """Kör QA-analys."""
-    focus = arguments.get("focus", "fullständig analys")
+    """Run QA analysis."""
+    focus = arguments.get("focus", "full analysis")
     cli = get_worker_cli("tester")
 
-    prompt = f"Analysera projektet. Fokus: {focus}. Svara med PASS/FAIL och eventuella issues."
+    prompt = f"Analyze the project. Focus: {focus}. Respond with PASS/FAIL and any issues."
     result = run_cli(cli, prompt, cwd)
     return make_response(f"🧪 QA: {result}")
 
 
 def deploy_railway(arguments: dict, cwd: str) -> dict:
-    """Deploya till Railway."""
+    """Deploy to Railway."""
     with_db = arguments.get("with_database", "none")
     project_name = Path(cwd).name
 
@@ -85,7 +85,7 @@ def deploy_railway(arguments: dict, cwd: str) -> dict:
         except Exception as e:
             results.append(f"{cmd_name}: {e}")
 
-    # Databas om begärd
+    # Database if requested
     if with_db != "none":
         try:
             r = subprocess.run(["railway", "add", "--database", with_db],
@@ -98,7 +98,7 @@ def deploy_railway(arguments: dict, cwd: str) -> dict:
 
 
 def check_railway_status(arguments: dict, cwd: str) -> dict:
-    """Kolla Railway status."""
+    """Check Railway status."""
     results = []
 
     for cmd_name, cmd in [
@@ -108,7 +108,7 @@ def check_railway_status(arguments: dict, cwd: str) -> dict:
     ]:
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=cwd)
-            results.append(f"{cmd_name}: {r.stdout or r.stderr or '(tom)'}")
+            results.append(f"{cmd_name}: {r.stdout or r.stderr or '(empty)'}")
         except Exception as e:
             results.append(f"{cmd_name}: {e}")
 
@@ -116,7 +116,7 @@ def check_railway_status(arguments: dict, cwd: str) -> dict:
 
 
 def open_browser(arguments: dict, cwd: str) -> dict:
-    """Öppna fil i webbläsaren."""
+    """Open file in browser."""
     file = arguments.get("file", "index.html")
     file_path = Path(cwd) / file
 
@@ -125,8 +125,8 @@ def open_browser(arguments: dict, cwd: str) -> dict:
 
     if file_path.exists():
         subprocess.run(["open", str(file_path)])
-        return make_response(f"🌐 Öppnade {file}")
-    return make_response(f"❌ Hittade inte {file}")
+        return make_response(f"🌐 Opened {file}")
+    return make_response(f"❌ Could not find {file}")
 
 
 HANDLERS = {

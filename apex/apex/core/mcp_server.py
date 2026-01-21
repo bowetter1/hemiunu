@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-MCP Server - AI Team för Opus (Chef Edition)
+MCP Server - AI Team for Opus (Chef Edition)
 
-Tunn wrapper som hanterar MCP-protokollet.
-All tool-logik finns i tools/-modulerna.
+Thin wrapper that handles the MCP protocol.
+All tool logic is in the tools/ modules.
 """
 import json
 import sys
 import os
 
-# Lägg till apex-katalogen i path för tools-import
+# Add apex directory to path for tools import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tools import ALL_TOOLS, ALL_HANDLERS
@@ -18,21 +18,21 @@ from tools.base import log_to_sprint
 
 
 def handle_list_tools() -> dict:
-    """Returnera alla tillgängliga tools."""
+    """Return all available tools."""
     return {"tools": ALL_TOOLS}
 
 
 def handle_call_tool(name: str, arguments: dict, cwd: str) -> dict:
-    """Kör ett tool."""
-    # Använd dynamisk projektmapp om satt
+    """Call a tool."""
+    # Use dynamic project folder if set
     actual_cwd = get_project_dir(cwd)
-    log_to_sprint(actual_cwd, f"🔧 {name} anropat med {arguments}")
+    log_to_sprint(actual_cwd, f"🔧 {name} called with {arguments}")
 
     handler = ALL_HANDLERS.get(name)
     if handler:
         return handler(arguments, actual_cwd)
     else:
-        return {"content": [{"type": "text", "text": f"Okänt tool: {name}"}]}
+        return {"content": [{"type": "text", "text": f"Unknown tool: {name}"}]}
 
 
 def main():

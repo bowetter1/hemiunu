@@ -1,5 +1,5 @@
 """
-Prompt loader - laddar prompts från markdown-filer
+Prompt loader - loads prompts from markdown files
 """
 from pathlib import Path
 
@@ -8,39 +8,39 @@ PROMPTS_DIR = Path(__file__).parent
 
 def load_prompt(role: str, **kwargs) -> str:
     """
-    Ladda och formatera en prompt för en roll.
+    Load and format a prompt for a role.
 
     Args:
-        role: Rollnamn (ad, architect, backend, frontend, reviewer, tester, devops)
-        **kwargs: Variabler att ersätta i prompten (task, context, file, files, focus)
+        role: Role name (ad, architect, backend, frontend, reviewer, tester, devops, security)
+        **kwargs: Variables to replace in prompt (task, context, file, files, focus)
 
     Returns:
-        Formaterad prompt-sträng
+        Formatted prompt string
     """
-    # Ladda base-prompt
+    # Load base prompt
     base_file = PROMPTS_DIR / "_base.md"
     base_content = base_file.read_text(encoding="utf-8") if base_file.exists() else ""
 
-    # Ladda roll-specifik prompt
+    # Load role-specific prompt
     role_file = PROMPTS_DIR / f"{role}.md"
     if not role_file.exists():
-        raise ValueError(f"Ingen prompt finns för roll: {role}")
+        raise ValueError(f"No prompt exists for role: {role}")
 
     role_content = role_file.read_text(encoding="utf-8")
 
-    # Kombinera och formatera
+    # Combine and format
     full_prompt = base_content + "\n\n---\n\n" + role_content
 
-    # Ersätt placeholders
-    # Hantera optional context/file med tom sträng som default
+    # Replace placeholders
+    # Handle optional context/file with empty string as default
     formatted = full_prompt
     for key, value in kwargs.items():
         placeholder = "{" + key + "}"
         if value:
             if key == "context":
-                formatted = formatted.replace(placeholder, f"**Kontext:** {value}")
+                formatted = formatted.replace(placeholder, f"**Context:** {value}")
             elif key == "file":
-                formatted = formatted.replace(placeholder, f"**Fil:** {value}")
+                formatted = formatted.replace(placeholder, f"**File:** {value}")
             elif key == "files":
                 formatted = formatted.replace(placeholder, value)
             elif key == "focus":
@@ -50,12 +50,12 @@ def load_prompt(role: str, **kwargs) -> str:
         else:
             formatted = formatted.replace(placeholder, "")
 
-    # Lägg till feedback-instruktion
-    return formatted.strip() + "\n\nVIKTIGT: Säg ifrån om uppdraget är oklart eller om du har en bättre idé."
+    # Add feedback instruction
+    return formatted.strip() + "\n\nIMPORTANT: Speak up if the task is unclear or if you have a better idea."
 
 
 def get_available_roles() -> list[str]:
-    """Lista alla tillgängliga roller med prompts."""
+    """List all available roles with prompts."""
     return [
         f.stem for f in PROMPTS_DIR.glob("*.md")
         if not f.name.startswith("_")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Apex Web Server - Starta sprints från webbläsaren med live-loggning.
+Apex Web Server - Start sprints from the browser with live logging.
 """
 import subprocess
 import json
@@ -16,10 +16,10 @@ import socketserver
 
 from ..core.config import get_web_chef_prompt
 
-# Global event queue för live updates
+# Global event queue for live updates
 events = queue.Queue()
 
-# Store för aktiv sprint
+# Store for active sprint
 active_sprint = {
     "running": False,
     "task": "",
@@ -32,7 +32,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 
 def log_event(event_type: str, message: str, data: dict = None):
-    """Logga event till queue, terminal och fil i projektmappen."""
+    """Log event to queue, terminal and file in project folder."""
     event = {
         "time": datetime.now().strftime("%H:%M:%S"),
         "type": event_type,
@@ -45,7 +45,7 @@ def log_event(event_type: str, message: str, data: dict = None):
     # Terminal
     print(f"[{event['time']}] {event_type}: {message}")
 
-    # Fil i projektmappen
+    # File in project folder
     if active_sprint.get("project"):
         log_file = Path(active_sprint["project"]) / "sprint.log"
         with open(log_file, "a") as f:
@@ -55,8 +55,8 @@ def log_event(event_type: str, message: str, data: dict = None):
 
 
 def run_cli(cli: str, prompt: str, cwd: str) -> str:
-    """Kör en CLI - MCP för Claude så vi ser tool-anrop."""
-    log_event("cli_start", f"Startar {cli.upper()}...", {"cli": cli})
+    """Run a CLI - MCP for Claude so we see tool calls."""
+    log_event("cli_start", f"Starting {cli.upper()}...", {"cli": cli})
 
     if cli == "qwen":
         cmd = ["qwen", "-y", prompt]
@@ -70,21 +70,21 @@ def run_cli(cli: str, prompt: str, cwd: str) -> str:
         env["PROJECT_DIR"] = cwd
 
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=900, cwd=cwd, env=env)
-        output = r.stdout.strip() or "(ingen output)"
+        output = r.stdout.strip() or "(no output)"
 
-        log_event("cli_done", f"{cli.upper()} klar", {"cli": cli, "output_length": len(output)})
+        log_event("cli_done", f"{cli.upper()} done", {"cli": cli, "output_length": len(output)})
         return output
 
     except subprocess.TimeoutExpired:
-        log_event("cli_timeout", f"{cli.upper()} timeout efter 15 min", {"cli": cli})
-        return "TIMEOUT: Kommandot tog för lång tid"
+        log_event("cli_timeout", f"{cli.upper()} timeout after 15 min", {"cli": cli})
+        return "TIMEOUT: Command took too long"
     except Exception as e:
         log_event("cli_error", f"{cli.upper()} error: {e}", {"cli": cli})
         return f"ERROR: {e}"
 
 
 def run_sprint(task: str, project_path: str):
-    """Kör en sprint - Opus styr ALLT via bash."""
+    """Run a sprint - Opus controls EVERYTHING via bash."""
     active_sprint["running"] = True
     active_sprint["task"] = task
     active_sprint["project"] = project_path
@@ -92,25 +92,25 @@ def run_sprint(task: str, project_path: str):
 
     cwd = project_path
 
-    # Skapa loggfil i projektmappen
+    # Create log file in project folder
     log_file = Path(project_path) / "sprint.log"
     with open(log_file, "w") as f:
         f.write(f"=== SPRINT START: {task} ===\n")
-        f.write(f"=== Projekt: {project_path} ===\n")
-        f.write(f"=== Tid: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
+        f.write(f"=== Project: {project_path} ===\n")
+        f.write(f"=== Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
 
     try:
-        log_event("meeting", "CEO OPUS TAR KOMMANDO", {"phase": "opus_control"})
-        log_event("opus", f"CEO Opus: 'Jag bygger {task} med mitt team!'")
+        log_event("meeting", "CEO OPUS TAKES COMMAND", {"phase": "opus_control"})
+        log_event("opus", f"CEO Opus: 'I'm building {task} with my team!'")
 
         opus_result = run_cli("claude", get_web_chef_prompt(task, cwd), cwd)
-        log_event("opus", f"CEO Opus klar: {opus_result[:500]}...", {"full_result": opus_result})
+        log_event("opus", f"CEO Opus done: {opus_result[:500]}...", {"full_result": opus_result})
 
-        # === KLAR ===
+        # === DONE ===
         files = list(Path(cwd).rglob("*"))
         files = [f for f in files if f.is_file() and not f.name.startswith(".")]
 
-        log_event("sprint_done", "SPRINT KLAR!", {
+        log_event("sprint_done", "SPRINT COMPLETE!", {
             "files": [str(f.name) for f in files],
             "file_count": len(files)
         })
@@ -123,7 +123,7 @@ def run_sprint(task: str, project_path: str):
 
 
 class ApexHandler(SimpleHTTPRequestHandler):
-    """HTTP handler för apex."""
+    """HTTP handler for apex."""
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -221,7 +221,7 @@ class ApexHandler(SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode())
 
     def serve_files(self):
-        """Lista filer i projektmappen."""
+        """List files in project folder."""
         project = active_sprint.get("project", "")
         files = []
 
@@ -239,7 +239,7 @@ class ApexHandler(SimpleHTTPRequestHandler):
         self.serve_json(files)
 
     def serve_sprint_log(self):
-        """Läs sprint.log direkt från fil för live MCP-uppdateringar."""
+        """Read sprint.log directly from file for live MCP updates."""
         project = active_sprint.get("project", "")
         lines = []
 
@@ -252,7 +252,7 @@ class ApexHandler(SimpleHTTPRequestHandler):
         self.serve_json({"lines": lines, "running": active_sprint["running"]})
 
     def serve_question(self):
-        """Läs questions.json för att se om Opus har en fråga."""
+        """Read questions.json to see if Opus has a question."""
         project = active_sprint.get("project", "")
         question_data = None
 
@@ -268,7 +268,7 @@ class ApexHandler(SimpleHTTPRequestHandler):
         self.serve_json(question_data or {"question": None})
 
     def serve_events(self):
-        """Server-Sent Events för live updates."""
+        """Server-Sent Events for live updates."""
         self.send_response(200)
         self.send_header('Content-type', 'text/event-stream')
         self.send_header('Cache-Control', 'no-cache')
@@ -288,7 +288,7 @@ class ApexHandler(SimpleHTTPRequestHandler):
 def main():
     port = 8080
 
-    # Byt till apex root-mappen
+    # Change to apex root folder
     os.chdir(Path(__file__).parent.parent.parent)
 
     print(f"""
@@ -296,10 +296,10 @@ def main():
 ║                                                               ║
 ║   APEX WEB SERVER                                             ║
 ║                                                               ║
-║   Öppna i webbläsaren:                                        ║
+║   Open in browser:                                            ║
 ║   → http://localhost:{port}                                     ║
 ║                                                               ║
-║   Tryck Ctrl+C för att avsluta                                ║
+║   Press Ctrl+C to exit                                        ║
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 """)
