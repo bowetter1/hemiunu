@@ -223,9 +223,6 @@ function addLogFromServer(log) {
 function updateTeamFromLog(log) {
     if (!log.worker) return;
 
-    // Remove active from all workers
-    document.querySelectorAll('.team-member').forEach(el => el.classList.remove('active'));
-
     // Map all workers to their badge IDs
     const workerMap = {
         'chef': 'team-chef',
@@ -239,8 +236,22 @@ function updateTeamFromLog(log) {
     };
 
     const teamId = workerMap[log.worker.toLowerCase()];
-    if (teamId) {
-        document.getElementById(teamId)?.classList.add('active');
+    if (!teamId) return;
+
+    const element = document.getElementById(teamId);
+    if (!element) return;
+
+    // Worker started -> light up
+    if (log.log_type === 'worker_start') {
+        element.classList.add('active');
+    }
+    // Worker done -> turn off
+    else if (log.log_type === 'worker_done') {
+        element.classList.remove('active');
+    }
+    // Other log types -> make sure it's lit while working
+    else {
+        element.classList.add('active');
     }
 }
 

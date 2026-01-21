@@ -13,11 +13,11 @@ AVAILABLE_AIS = ["claude", "sonnet", "gemini"]
 # === WORKER CLI MAPPNING ===
 WORKER_CLI = {
     "chef": "claude",      # Opus - orchestration
-    "ad": "claude",        # Opus - visual review
+    "ad": "gemini",        # Gemini - design (faster)
     "architect": "claude", # Opus - planning
     "backend": "gemini",   # Gemini - backend coding
-    "frontend": "claude",  # Opus - frontend coding
-    "tester": "gemini",    # Gemini - test writing
+    "frontend": "gemini",  # Gemini - frontend coding (faster)
+    "tester": "claude",    # Opus - test writing (more reliable)
     "reviewer": "gemini",  # Gemini - code review
     "security": "gemini",  # Gemini - security audit
     "devops": "claude",    # Opus - deploy
