@@ -597,10 +597,14 @@ def edit_page(
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
 
+    print(f"[EDIT] Page found, current version: {page.current_version}", flush=True)
+
     # Save current state as version before edit (if not already saved)
     existing_versions = db.query(PageVersion).filter(PageVersion.page_id == page_id).count()
+    print(f"[EDIT] Existing versions count: {existing_versions}", flush=True)
     if existing_versions == 0:
         # Create initial version (v1) from current state
+        print(f"[EDIT] Creating initial version v1", flush=True)
         initial_version = PageVersion(
             page_id=page.id,
             version=1,
@@ -613,8 +617,13 @@ def edit_page(
     gen = Generator(project, db)
     new_html = gen.edit_page(str(page_id), request.instruction)
 
+    # Refresh page from db after generator commit
+    db.refresh(page)
+    print(f"[EDIT] After generator, page.current_version: {page.current_version}", flush=True)
+
     # Create new version
     new_version_num = page.current_version + 1
+    print(f"[EDIT] Creating new version v{new_version_num}", flush=True)
     new_version = PageVersion(
         page_id=page.id,
         version=new_version_num,
@@ -628,6 +637,7 @@ def edit_page(
     page.current_version = new_version_num
     db.commit()
 
+    print(f"[EDIT] Returning page with version: {page.current_version}", flush=True)
     return PageResponse(
         id=str(page.id),
         name=page.name,
