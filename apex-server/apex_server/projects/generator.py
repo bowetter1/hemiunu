@@ -1,8 +1,11 @@
-"""Project generator - Simple Opus calls for moodboard and layouts"""
+"""Project generator - Opus calls for moodboard and layouts with web research"""
 import json
+import re
+import httpx
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+from bs4 import BeautifulSoup
 
 from sqlalchemy.orm import Session
 from anthropic import Anthropic
@@ -11,6 +14,49 @@ from apex_server.config import get_settings
 from .models import Project, Page, ProjectLog, ProjectStatus
 
 settings = get_settings()
+
+
+def fetch_page_content(url: str, timeout: float = 10.0) -> dict:
+    """Fetch and extract content from a URL"""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; ApexBot/1.0)"}
+        response = httpx.get(url, headers=headers, timeout=timeout, follow_redirects=True)
+
+        if response.status_code != 200:
+            return {"url": url, "error": f"HTTP {response.status_code}"}
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Remove script and style elements
+        for element in soup(['script', 'style', 'nav', 'footer', 'header']):
+            element.decompose()
+
+        # Extract title
+        title = soup.title.string if soup.title else ""
+
+        # Extract text content (limited)
+        text = soup.get_text(separator=' ', strip=True)[:2000]
+
+        # Try to find colors (hex codes)
+        colors = re.findall(r'#[0-9A-Fa-f]{6}\b', response.text)
+        unique_colors = list(dict.fromkeys(colors))[:10]  # Top 10 unique
+
+        # Look for brand-specific patterns
+        brand_colors = []
+        if 'brandfetch' in url.lower():
+            # Brandfetch has structured color data
+            color_matches = re.findall(r'"hex":\s*"([^"]+)"', response.text)
+            brand_colors = list(dict.fromkeys(color_matches))[:5]
+
+        return {
+            "url": url,
+            "title": title,
+            "text": text,
+            "colors_found": unique_colors,
+            "brand_colors": brand_colors
+        }
+    except Exception as e:
+        return {"url": url, "error": str(e)}
 
 
 class Generator:
@@ -43,23 +89,145 @@ class Generator:
         self.db.commit()
 
     def generate_moodboard(self) -> list:
-        """Generate 3 moodboard alternatives based on the brief, with web research"""
+        """
+        Generate 3 moodboard alternatives with deep web research.
+
+        Flow:
+        1. Claude searches for relevant URLs (brand colors, competitors, trends)
+        2. We FETCH actual content from top URLs
+        3. Haiku summarizes findings
+        4. Sonnet creates moodboards based on real data
+        """
         print(f"[MOODBOARD] Starting for project {self.project.id}", flush=True)
         print(f"[MOODBOARD] Brief: {self.project.brief[:100]}...", flush=True)
-        self.log("moodboard", "Starting moodboard generation with web research...")
+        self.log("moodboard", "Starting moodboard generation...")
 
-        # Anthropic's built-in web search tool
+        # ============================================
+        # STEP 1: Search for relevant URLs
+        # ============================================
+        print("[STEP 1] Searching for URLs...", flush=True)
+        self.log("moodboard", "Step 1: Searching web for brand info and inspiration...")
+
         web_search_tool = {
             "type": "web_search_20250305",
             "name": "web_search",
-            "max_uses": 5  # Limit searches per request
+            "max_uses": 5
         }
-        print("[MOODBOARD] Web search tool configured", flush=True)
 
-        # Tool for saving moodboards (structured output)
+        search_response = self.client.beta.messages.create(
+            model="claude-haiku-3-5-20241022",  # Fast & cheap for search
+            max_tokens=1000,
+            betas=["web-search-2025-03-05"],
+            tools=[web_search_tool],
+            messages=[{
+                "role": "user",
+                "content": f"""Search for information about this project. Find:
+1. Brand colors and visual identity (if a company is mentioned)
+2. Competitor websites in the same industry
+3. Current design trends
+
+Project: {self.project.brief}
+
+Do 2-3 targeted searches to find the most relevant information."""
+            }]
+        )
+        self.track_usage(search_response)
+
+        # Extract URLs from search results
+        urls_to_fetch = []
+        search_queries = []
+
+        for block in search_response.content:
+            if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
+                query = getattr(block, 'input', {}).get('query', '')
+                if query:
+                    search_queries.append(query)
+                    print(f"[STEP 1] Search: {query}", flush=True)
+
+            if block.type == "web_search_tool_result":
+                content = getattr(block, 'content', [])
+                if isinstance(content, list):
+                    for item in content[:3]:  # Top 3 from each search
+                        url = getattr(item, 'url', '')
+                        if url and url not in urls_to_fetch:
+                            urls_to_fetch.append(url)
+                            print(f"[STEP 1] Found: {url[:60]}...", flush=True)
+
+        self.log("moodboard", f"Found {len(urls_to_fetch)} URLs to analyze")
+
+        # ============================================
+        # STEP 2: Fetch actual content from URLs
+        # ============================================
+        print(f"[STEP 2] Fetching content from {len(urls_to_fetch)} URLs...", flush=True)
+        self.log("moodboard", "Step 2: Fetching page content...")
+
+        fetched_content = []
+        all_colors_found = []
+
+        for url in urls_to_fetch[:6]:  # Limit to 6 URLs
+            print(f"[STEP 2] Fetching: {url[:50]}...", flush=True)
+            content = fetch_page_content(url)
+
+            if "error" not in content:
+                fetched_content.append(content)
+                all_colors_found.extend(content.get("brand_colors", []))
+                all_colors_found.extend(content.get("colors_found", [])[:3])
+                print(f"[STEP 2] Got: {content.get('title', 'No title')[:40]}", flush=True)
+
+                if content.get("brand_colors"):
+                    print(f"[STEP 2] Brand colors: {content['brand_colors']}", flush=True)
+                    self.log("moodboard", f"Found brand colors: {content['brand_colors']}")
+
+        # Deduplicate colors
+        unique_colors = list(dict.fromkeys(all_colors_found))[:15]
+        print(f"[STEP 2] Total unique colors found: {unique_colors}", flush=True)
+
+        # ============================================
+        # STEP 3: Summarize findings with Haiku
+        # ============================================
+        print("[STEP 3] Summarizing findings...", flush=True)
+        self.log("moodboard", "Step 3: Analyzing and summarizing research...")
+
+        # Build content summary
+        content_for_summary = []
+        for c in fetched_content:
+            content_for_summary.append(f"URL: {c['url']}\nTitle: {c.get('title', 'N/A')}\nContent: {c.get('text', '')[:500]}")
+
+        summary_response = self.client.messages.create(
+            model="claude-haiku-3-5-20241022",
+            max_tokens=800,
+            messages=[{
+                "role": "user",
+                "content": f"""Summarize the key findings for a web design project.
+
+PROJECT: {self.project.brief}
+
+COLORS FOUND ON PAGES: {unique_colors}
+
+PAGE CONTENTS:
+{chr(10).join(content_for_summary[:4])}
+
+Provide a brief summary (max 200 words) with:
+1. Brand colors identified (exact hex codes if found)
+2. Design style/mood from competitors
+3. Key visual elements to consider"""
+            }]
+        )
+        self.track_usage(summary_response)
+
+        research_summary = summary_response.content[0].text
+        print(f"[STEP 3] Summary: {research_summary[:200]}...", flush=True)
+        self.log("moodboard", f"Research summary: {research_summary[:300]}...")
+
+        # ============================================
+        # STEP 4: Create moodboards with Sonnet
+        # ============================================
+        print("[STEP 4] Creating moodboards with research...", flush=True)
+        self.log("moodboard", "Step 4: Creating moodboards based on research...")
+
         moodboard_tool = {
             "name": "save_moodboards",
-            "description": "Save the final moodboard alternatives after research is complete",
+            "description": "Save the moodboard alternatives",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -68,18 +236,15 @@ class Generator:
                         "items": {
                             "type": "object",
                             "properties": {
-                                "name": {"type": "string", "description": "Short style name"},
+                                "name": {"type": "string"},
                                 "palette": {"type": "array", "items": {"type": "string"}, "description": "3-5 hex colors"},
                                 "fonts": {
                                     "type": "object",
-                                    "properties": {
-                                        "heading": {"type": "string"},
-                                        "body": {"type": "string"}
-                                    },
+                                    "properties": {"heading": {"type": "string"}, "body": {"type": "string"}},
                                     "required": ["heading", "body"]
                                 },
-                                "mood": {"type": "array", "items": {"type": "string"}, "description": "3 mood keywords"},
-                                "rationale": {"type": "string", "description": "Why this direction fits, referencing research"}
+                                "mood": {"type": "array", "items": {"type": "string"}},
+                                "rationale": {"type": "string"}
                             },
                             "required": ["name", "palette", "fonts", "mood", "rationale"]
                         }
@@ -89,117 +254,61 @@ class Generator:
             }
         }
 
-        system_prompt = """You are an expert web designer at a premium design agency.
-
-IMPORTANT: Before creating moodboards, USE WEB SEARCH to research:
-1. If a brand/company is mentioned → search for their brand colors and visual identity
-2. Search for competitor websites in the same industry
-3. Search for current design trends relevant to the project
-
-Your design philosophy:
-- Clean, purposeful layouts with clear hierarchy
-- Strategic use of whitespace
-- Typography that enhances readability and brand voice
-- Color palettes that evoke the right emotions
-
-When creating moodboards:
-- Use ACTUAL brand colors if researched (don't guess!)
-- Reference what you learned from research
-- Offer genuinely different creative directions"""
-
-        # Use beta API for web search
-        print("[MOODBOARD] Calling Anthropic API with web search...", flush=True)
-        self.log("moodboard", "Calling Claude with web search enabled...")
-
-        response = self.client.beta.messages.create(
+        moodboard_response = self.client.messages.create(
             model="claude-sonnet-4-5-20250929",
-            max_tokens=4000,
-            system=system_prompt,
-            tools=[web_search_tool, moodboard_tool],
-            betas=["web-search-2025-03-05"],
-            messages=[
-                {"role": "user", "content": f"""Create THREE distinct moodboard alternatives for this website:
+            max_tokens=3000,
+            tools=[moodboard_tool],
+            tool_choice={"type": "tool", "name": "save_moodboards"},
+            messages=[{
+                "role": "user",
+                "content": f"""Create THREE moodboard alternatives for this website.
 
-PROJECT BRIEF:
-{self.project.brief}
+PROJECT BRIEF: {self.project.brief}
 
-STEPS:
-1. First, use web_search to research:
-   - If a company/brand is mentioned, search for their brand colors
-   - Search for design inspiration in this industry
+RESEARCH FINDINGS:
+{research_summary}
 
-2. Then, call save_moodboards with 3 moodboards that offer DIFFERENT creative directions
+COLORS FOUND IN RESEARCH: {unique_colors}
 
-Each moodboard needs:
-- A memorable style name
-- 3-5 colors (use researched brand colors!)
-- Google Fonts (heading + body)
-- 3 mood keywords
-- Rationale explaining the direction"""}
-            ]
+IMPORTANT:
+- Use the ACTUAL brand colors from research (not generic colors!)
+- If brand colors were found, the first moodboard MUST use them
+- Each moodboard should offer a different creative direction
+- Use Google Fonts for typography
+
+Create 3 moodboards now."""
+            }]
         )
+        self.track_usage(moodboard_response)
 
-        print(f"[MOODBOARD] API response received, stop_reason: {response.stop_reason}", flush=True)
-        self.track_usage(response)
-
-        # Extract web search results and moodboards from response
-        web_searches = []
+        # Extract moodboards
         moodboards = []
-        current_search_query = None
-
-        for block in response.content:
-            print(f"[MOODBOARD] Block type: {block.type}", flush=True)
-
-            # Capture search query from server_tool_use
-            if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
-                current_search_query = getattr(block, 'input', {}).get('query', 'unknown')
-                print(f"[MOODBOARD] Search query: {current_search_query}", flush=True)
-
-            # Capture web search results
-            if block.type == "web_search_tool_result":
-                content = getattr(block, 'content', [])
-                search_data = {
-                    "query": current_search_query or "unknown",
-                    "results": []
-                }
-
-                # content is a list of search result objects
-                if isinstance(content, list):
-                    for item in content[:5]:
-                        if hasattr(item, 'title'):
-                            search_data["results"].append({
-                                "title": getattr(item, 'title', ''),
-                                "url": getattr(item, 'url', ''),
-                                "snippet": str(getattr(item, 'snippet', getattr(item, 'page_content', '')))[:200]
-                            })
-
-                if search_data["results"]:
-                    web_searches.append(search_data)
-                    print(f"[MOODBOARD] Got {len(search_data['results'])} results for: {current_search_query}", flush=True)
-                    self.log("moodboard", f"Searched: {current_search_query} ({len(search_data['results'])} results)")
-
-                current_search_query = None  # Reset for next search
-
-            # Capture moodboards
+        for block in moodboard_response.content:
             if block.type == "tool_use" and block.name == "save_moodboards":
                 moodboards = block.input.get("moodboards", [])
-                print(f"[MOODBOARD] Got {len(moodboards)} moodboards", flush=True)
+                print(f"[STEP 4] Created {len(moodboards)} moodboards", flush=True)
 
         if moodboards:
-            # Save moodboards WITH search data
+            # Save everything
             self.project.moodboard = {
                 "moodboards": moodboards,
-                "web_searches": web_searches  # Save search results!
+                "research": {
+                    "queries": search_queries,
+                    "urls_fetched": [c["url"] for c in fetched_content],
+                    "colors_found": unique_colors,
+                    "summary": research_summary
+                }
             }
             self.project.status = ProjectStatus.MOODBOARD
             self.db.commit()
-            self.log("moodboard", f"Created {len(moodboards)} moodboards with {len(web_searches)} searches")
-            print(f"[MOODBOARD] Success! {len(moodboards)} moodboards, {len(web_searches)} searches saved", flush=True)
+
+            self.log("moodboard", f"Success! Created {len(moodboards)} moodboards")
+            print(f"[MOODBOARD] Done! {len(moodboards)} moodboards created", flush=True)
             return moodboards
 
-        # Fallback if no tool use found
-        print("[MOODBOARD] No moodboards found, using fallback", flush=True)
-        self.log("moodboard", "Warning: Using fallback moodboard generation")
+        # Fallback
+        print("[MOODBOARD] No moodboards created, using fallback", flush=True)
+        self.log("moodboard", "Warning: Using fallback")
         return self._generate_moodboard_fallback()
 
     def _generate_moodboard_fallback(self) -> list:
