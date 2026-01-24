@@ -181,6 +181,7 @@ def create_project(
     db: Session = Depends(get_db)
 ):
     """Create a new project and start PHASE 1 (search and maybe clarify)"""
+    print(f"[CREATE] Creating project with brief: {request.brief[:50]}...", flush=True)
     project_id = uuid.uuid4()
     project_dir = str(Path(settings.storage_path) / str(project_id))
 
@@ -202,6 +203,7 @@ def create_project(
 
     # Start PHASE 1 in background: search and check if clarification needed
     def phase1_search_bg(project_id: uuid.UUID):
+        print(f"[PHASE1] Starting background search for {project_id}", flush=True)
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         db_url = str(settings.database_url)
@@ -213,8 +215,10 @@ def create_project(
         try:
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
+                print(f"[PHASE1] Found project, calling search_and_clarify", flush=True)
                 gen = Generator(project, db)
                 result = gen.search_and_clarify()
+                print(f"[PHASE1] search_and_clarify result: {result}", flush=True)
 
                 if result.get("needs_clarification"):
                     # Send WebSocket notification with question
@@ -579,12 +583,14 @@ def edit_page(
     db: Session = Depends(get_db)
 ):
     """Edit a page with an instruction - creates a new version"""
+    print(f"[EDIT] Editing page {page_id}: {request.instruction[:50]}...", flush=True)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
     ).first()
 
     if not project:
+        print(f"[EDIT] Project not found: {project_id}", flush=True)
         raise HTTPException(status_code=404, detail="Project not found")
 
     page = db.query(Page).filter(Page.id == page_id).first()
@@ -732,12 +738,14 @@ def structured_edit_page(
     Client applies edits locally, then syncs back.
     Much more token-efficient!
     """
+    print(f"[STRUCTURED-EDIT] Editing page {page_id}: {request.instruction[:50]}...", flush=True)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
     ).first()
 
     if not project:
+        print(f"[STRUCTURED-EDIT] Project not found: {project_id}", flush=True)
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Get moodboard for context
@@ -749,11 +757,13 @@ def structured_edit_page(
             moodboard = moodboards[idx]
 
     # Generate structured edits
+    print(f"[STRUCTURED-EDIT] Calling AI to generate edits...", flush=True)
     result = generate_structured_edit(
         html=request.html,
         instruction=request.instruction,
         moodboard=moodboard
     )
+    print(f"[STRUCTURED-EDIT] Got {len(result.edits)} edits", flush=True)
 
     # Log the edit
     log = ProjectLog(
