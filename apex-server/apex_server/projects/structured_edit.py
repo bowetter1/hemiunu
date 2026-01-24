@@ -110,6 +110,9 @@ Design context:
 - Mood: {', '.join(moodboard.get('mood', []))}
 """
 
+    print(f"[STRUCTURED-EDIT] Calling Claude with instruction: {instruction[:50]}...", flush=True)
+    print(f"[STRUCTURED-EDIT] HTML length: {len(html)}", flush=True)
+
     response = client.messages.create(
         model="claude-opus-4-5-20251101",
         max_tokens=1000,  # Much smaller - we're just returning instructions
@@ -150,13 +153,20 @@ Return structured edits to make this change."""
     )
 
     # Extract structured data from tool use
+    print(f"[STRUCTURED-EDIT] Response blocks: {len(response.content)}", flush=True)
     for block in response.content:
+        print(f"[STRUCTURED-EDIT] Block type: {block.type}", flush=True)
         if block.type == "tool_use" and block.name == "apply_edits":
             data = block.input
+            edits = data.get("edits", [])
+            print(f"[STRUCTURED-EDIT] Got {len(edits)} edits from Claude", flush=True)
+            for i, edit in enumerate(edits):
+                print(f"[STRUCTURED-EDIT]   Edit {i+1}: {edit.get('action')} on {edit.get('selector')}", flush=True)
             return StructuredEditResponse(
-                edits=[StructuredEdit(**edit) for edit in data.get("edits", [])],
+                edits=[StructuredEdit(**edit) for edit in edits],
                 explanation=data.get("explanation", "")
             )
 
     # Fallback if something went wrong
+    print(f"[STRUCTURED-EDIT] No tool_use block found!", flush=True)
     return StructuredEditResponse(edits=[], explanation="Could not generate edits")
