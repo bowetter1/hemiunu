@@ -115,7 +115,7 @@ class Generator:
         }
 
         search_response = self.client.beta.messages.create(
-            model="claude-haiku-3-5-20241022",  # Fast & cheap for search
+            model="claude-3-5-haiku-20241022",  # Fast & cheap for search
             max_tokens=1000,
             betas=["web-search-2025-03-05"],
             tools=[web_search_tool],
@@ -194,7 +194,7 @@ Do 2-3 targeted searches to find the most relevant information."""
             content_for_summary.append(f"URL: {c['url']}\nTitle: {c.get('title', 'N/A')}\nContent: {c.get('text', '')[:500]}")
 
         summary_response = self.client.messages.create(
-            model="claude-haiku-3-5-20241022",
+            model="claude-3-5-haiku-20241022",
             max_tokens=800,
             messages=[{
                 "role": "user",
