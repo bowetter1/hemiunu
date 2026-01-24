@@ -43,10 +43,114 @@ class Generator:
         self.db.commit()
 
     def generate_moodboard(self) -> list:
-        """Generate 3 moodboard alternatives based on the brief"""
-        self.log("moodboard", "Generating 3 moodboard alternatives...")
+        """Generate 3 moodboard alternatives based on the brief, with web research"""
+        self.log("moodboard", "Researching and generating moodboard alternatives...")
 
-        # Define tool for structured output
+        # Anthropic's built-in web search tool
+        web_search_tool = {
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": 5  # Limit searches per request
+        }
+
+        # Tool for saving moodboards (structured output)
+        moodboard_tool = {
+            "name": "save_moodboards",
+            "description": "Save the final moodboard alternatives after research is complete",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "moodboards": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string", "description": "Short style name"},
+                                "palette": {"type": "array", "items": {"type": "string"}, "description": "3-5 hex colors"},
+                                "fonts": {
+                                    "type": "object",
+                                    "properties": {
+                                        "heading": {"type": "string"},
+                                        "body": {"type": "string"}
+                                    },
+                                    "required": ["heading", "body"]
+                                },
+                                "mood": {"type": "array", "items": {"type": "string"}, "description": "3 mood keywords"},
+                                "rationale": {"type": "string", "description": "Why this direction fits, referencing research"}
+                            },
+                            "required": ["name", "palette", "fonts", "mood", "rationale"]
+                        }
+                    }
+                },
+                "required": ["moodboards"]
+            }
+        }
+
+        system_prompt = """You are an expert web designer at a premium design agency.
+
+IMPORTANT: Before creating moodboards, USE WEB SEARCH to research:
+1. If a brand/company is mentioned → search for their brand colors and visual identity
+2. Search for competitor websites in the same industry
+3. Search for current design trends relevant to the project
+
+Your design philosophy:
+- Clean, purposeful layouts with clear hierarchy
+- Strategic use of whitespace
+- Typography that enhances readability and brand voice
+- Color palettes that evoke the right emotions
+
+When creating moodboards:
+- Use ACTUAL brand colors if researched (don't guess!)
+- Reference what you learned from research
+- Offer genuinely different creative directions"""
+
+        # Use beta header for web search
+        response = self.client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4000,
+            system=system_prompt,
+            tools=[web_search_tool, moodboard_tool],
+            betas=["web-search-2025-03-05"],
+            messages=[
+                {"role": "user", "content": f"""Create THREE distinct moodboard alternatives for this website:
+
+PROJECT BRIEF:
+{self.project.brief}
+
+STEPS:
+1. First, use web_search to research:
+   - If a company/brand is mentioned, search for their brand colors
+   - Search for design inspiration in this industry
+
+2. Then, call save_moodboards with 3 moodboards that offer DIFFERENT creative directions
+
+Each moodboard needs:
+- A memorable style name
+- 3-5 colors (use researched brand colors!)
+- Google Fonts (heading + body)
+- 3 mood keywords
+- Rationale explaining the direction"""}
+            ]
+        )
+
+        self.track_usage(response)
+
+        # Extract moodboards from response
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "save_moodboards":
+                moodboards = block.input.get("moodboards", [])
+                self.project.moodboard = {"moodboards": moodboards}
+                self.project.status = ProjectStatus.MOODBOARD
+                self.db.commit()
+                self.log("moodboard", f"Created {len(moodboards)} moodboard alternatives")
+                return moodboards
+
+        # Fallback if no tool use found
+        self.log("moodboard", "Warning: Using fallback moodboard generation")
+        return self._generate_moodboard_fallback()
+
+    def _generate_moodboard_fallback(self) -> list:
+        """Fallback moodboard generation without web search"""
         moodboard_tool = {
             "name": "save_moodboards",
             "description": "Save the generated moodboard alternatives",
@@ -58,18 +162,11 @@ class Generator:
                         "items": {
                             "type": "object",
                             "properties": {
-                                "name": {"type": "string", "description": "Short style name"},
-                                "palette": {"type": "array", "items": {"type": "string"}, "description": "5 hex colors"},
-                                "fonts": {
-                                    "type": "object",
-                                    "properties": {
-                                        "heading": {"type": "string"},
-                                        "body": {"type": "string"}
-                                    },
-                                    "required": ["heading", "body"]
-                                },
-                                "mood": {"type": "array", "items": {"type": "string"}, "description": "3 mood keywords"},
-                                "rationale": {"type": "string", "description": "Brief explanation"}
+                                "name": {"type": "string"},
+                                "palette": {"type": "array", "items": {"type": "string"}},
+                                "fonts": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
+                                "mood": {"type": "array", "items": {"type": "string"}},
+                                "rationale": {"type": "string"}
                             },
                             "required": ["name", "palette", "fonts", "mood", "rationale"]
                         }
@@ -80,39 +177,24 @@ class Generator:
         }
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=4000,
             tools=[moodboard_tool],
             tool_choice={"type": "tool", "name": "save_moodboards"},
-            messages=[
-                {"role": "user", "content": f"""Create THREE different moodboard alternatives for this website brief:
-
-Brief: {self.project.brief}
-
-Each moodboard should have a DISTINCT style:
-1. One minimalist/modern
-2. One warm/organic
-3. One bold/expressive
-
-Use Google Fonts names. Choose 5 colors per palette that fit the brief."""}
-            ]
+            messages=[{"role": "user", "content": f"Create 3 moodboards for: {self.project.brief}"}]
         )
 
         self.track_usage(response)
 
-        # Extract structured data from tool use
-        moodboards = []
         for block in response.content:
             if block.type == "tool_use" and block.name == "save_moodboards":
                 moodboards = block.input.get("moodboards", [])
+                self.project.moodboard = {"moodboards": moodboards}
+                self.project.status = ProjectStatus.MOODBOARD
+                self.db.commit()
+                return moodboards
 
-        # Save all moodboards to project (as a list)
-        self.project.moodboard = {"moodboards": moodboards}
-        self.project.status = ProjectStatus.MOODBOARD
-        self.db.commit()
-
-        self.log("moodboard", f"Created {len(moodboards)} moodboard alternatives", {"count": len(moodboards)})
-        return moodboards
+        return []
 
     def generate_layouts(self) -> list[dict]:
         """Generate 3 layout alternatives using the selected moodboard"""
@@ -156,7 +238,7 @@ Use Google Fonts names. Choose 5 colors per palette that fit the brief."""}
         }
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-opus-4-5-20251101",
             max_tokens=16000,
             tools=[layout_tool],
             tool_choice={"type": "tool", "name": "save_layouts"},
@@ -239,7 +321,7 @@ Rules:
         return layouts
 
     def select_layout(self, variant: int):
-        """Select a layout and move to editing phase"""
+        """Select a layout and move to editing phase (keeps all 3 alternatives)"""
         page = self.db.query(Page).filter(
             Page.project_id == self.project.id,
             Page.layout_variant == variant
@@ -256,17 +338,8 @@ Rules:
         except Exception as e:
             print(f"Could not save file (non-critical): {e}")
 
-        # Update page to be the main page
-        page.name = "Home"
-        page.layout_variant = None  # No longer a variant
-
-        # Remove other layout variants
-        self.db.query(Page).filter(
-            Page.project_id == self.project.id,
-            Page.layout_variant != None,
-            Page.id != page.id
-        ).delete()
-
+        # Keep all 3 layouts - just mark which one is selected
+        # (Previously we deleted alternatives - now we keep them for browsing)
         self.project.selected_layout = variant
         self.project.status = ProjectStatus.EDITING
         self.db.commit()
@@ -282,7 +355,7 @@ Rules:
         self.log("edit", f"Editing: {instruction}")
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-opus-4-5-20251101",
             max_tokens=8000,
             system="""You are a web developer. Modify the HTML code based on the instruction.
 Respond ONLY with the updated HTML code, nothing else.""",
@@ -331,7 +404,7 @@ Respond ONLY with the updated HTML code, nothing else.""",
             prompt += f" Description: {description}"
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-opus-4-5-20251101",
             max_tokens=8000,
             system=f"""You are a web developer. Create a new HTML page that matches the style.
 
