@@ -645,17 +645,22 @@ def get_page_versions(
     db: Session = Depends(get_db)
 ):
     """Get all versions of a page"""
+    print(f"[VERSIONS] Getting versions for page {page_id} in project {project_id}", flush=True)
+
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
     ).first()
 
     if not project:
+        print(f"[VERSIONS] Project not found or not owned by user", flush=True)
         raise HTTPException(status_code=404, detail="Project not found")
 
     versions = db.query(PageVersion).filter(
         PageVersion.page_id == page_id
     ).order_by(PageVersion.version).all()
+
+    print(f"[VERSIONS] Found {len(versions)} versions", flush=True)
 
     return [
         PageVersionResponse(
