@@ -82,12 +82,20 @@ def _run_migrations():
     create_page_versions = """
     CREATE TABLE IF NOT EXISTS page_versions (
         id VARCHAR(36) PRIMARY KEY,
-        page_id VARCHAR(36) NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        page_id VARCHAR(36) NOT NULL,
         version INTEGER NOT NULL,
         html TEXT NOT NULL,
         instruction TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_page_versions_page FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
     )
+    """
+
+    # Fix existing foreign key if it doesn't have CASCADE
+    fix_fk = """
+    ALTER TABLE page_versions DROP CONSTRAINT IF EXISTS page_versions_page_id_fkey;
+    ALTER TABLE page_versions ADD CONSTRAINT page_versions_page_id_fkey
+        FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE;
     """
     with engine.connect() as conn:
         try:
@@ -96,6 +104,15 @@ def _run_migrations():
             print("Migration: Ensured page_versions table exists", flush=True)
         except Exception as e:
             print(f"page_versions table migration: {e}", flush=True)
+
+    # Fix foreign key to have CASCADE
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(fix_fk))
+            conn.commit()
+            print("Migration: Fixed page_versions foreign key with CASCADE", flush=True)
+        except Exception as e:
+            print(f"FK fix migration: {e}", flush=True)
 
     migrations = [
         # Add selected_moodboard to projects table
