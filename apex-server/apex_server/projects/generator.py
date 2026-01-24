@@ -44,7 +44,9 @@ class Generator:
 
     def generate_moodboard(self) -> list:
         """Generate 3 moodboard alternatives based on the brief, with web research"""
-        self.log("moodboard", "Researching and generating moodboard alternatives...")
+        print(f"[MOODBOARD] Starting for project {self.project.id}")
+        print(f"[MOODBOARD] Brief: {self.project.brief[:100]}...")
+        self.log("moodboard", "Starting moodboard generation with web research...")
 
         # Anthropic's built-in web search tool
         web_search_tool = {
@@ -52,6 +54,7 @@ class Generator:
             "name": "web_search",
             "max_uses": 5  # Limit searches per request
         }
+        print("[MOODBOARD] Web search tool configured")
 
         # Tool for saving moodboards (structured output)
         moodboard_tool = {
@@ -105,6 +108,9 @@ When creating moodboards:
 - Offer genuinely different creative directions"""
 
         # Use beta API for web search
+        print("[MOODBOARD] Calling Anthropic API with web search...")
+        self.log("moodboard", "Calling Claude with web search enabled...")
+
         response = self.client.beta.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=4000,
@@ -133,19 +139,52 @@ Each moodboard needs:
             ]
         )
 
+        print(f"[MOODBOARD] API response received, stop_reason: {response.stop_reason}")
         self.track_usage(response)
 
-        # Extract moodboards from response
+        # Extract web search results and moodboards from response
+        web_searches = []
+        moodboards = []
+
         for block in response.content:
+            print(f"[MOODBOARD] Processing block type: {block.type}")
+
+            # Capture web search results
+            if block.type == "web_search_tool_result":
+                search_data = {
+                    "query": getattr(block, 'query', 'unknown'),
+                    "results": []
+                }
+                if hasattr(block, 'search_results'):
+                    for result in block.search_results[:5]:  # Top 5 results
+                        search_data["results"].append({
+                            "title": getattr(result, 'title', ''),
+                            "url": getattr(result, 'url', ''),
+                            "snippet": getattr(result, 'snippet', '')[:200] if hasattr(result, 'snippet') else ''
+                        })
+                web_searches.append(search_data)
+                print(f"[MOODBOARD] Web search: {search_data.get('query', 'unknown')}")
+                self.log("moodboard", f"Searched: {search_data.get('query', 'unknown')}")
+
+            # Capture moodboards
             if block.type == "tool_use" and block.name == "save_moodboards":
                 moodboards = block.input.get("moodboards", [])
-                self.project.moodboard = {"moodboards": moodboards}
-                self.project.status = ProjectStatus.MOODBOARD
-                self.db.commit()
-                self.log("moodboard", f"Created {len(moodboards)} moodboard alternatives")
-                return moodboards
+                print(f"[MOODBOARD] Got {len(moodboards)} moodboards")
+
+        if moodboards:
+            # Save moodboards WITH search data
+            self.project.moodboard = {
+                "moodboards": moodboards,
+                "web_searches": web_searches  # Save search results!
+            }
+            self.project.status = ProjectStatus.MOODBOARD
+            self.db.commit()
+            self.log("moodboard", f"Created {len(moodboards)} moodboards with {len(web_searches)} searches")
+            print(f"[MOODBOARD] Success! {len(moodboards)} moodboards, {len(web_searches)} searches saved")
+            return moodboards
 
         # Fallback if no tool use found
+        print("[MOODBOARD] No moodboards found, using fallback")
         self.log("moodboard", "Warning: Using fallback moodboard generation")
         return self._generate_moodboard_fallback()
 
