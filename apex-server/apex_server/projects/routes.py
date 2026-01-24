@@ -13,7 +13,7 @@ from apex_server.config import get_settings
 from apex_server.shared.database import get_db
 from apex_server.shared.dependencies import get_current_user
 from apex_server.auth.models import User
-from .models import Project, Page, ProjectLog, ProjectStatus
+from .models import Project, Page, PageVersion, ProjectLog, ProjectStatus
 from .generator import Generator
 from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error, notify_clarification_needed
 from .structured_edit import generate_structured_edit, StructuredEditResponse
@@ -99,6 +99,17 @@ class PageResponse(BaseModel):
     name: str
     html: str
     layout_variant: Optional[int] = None
+    current_version: int = 1
+
+    class Config:
+        from_attributes = True
+
+
+class PageVersionResponse(BaseModel):
+    id: str
+    version: int
+    instruction: Optional[str] = None
+    created_at: str
 
     class Config:
         from_attributes = True
@@ -529,7 +540,8 @@ def get_pages(
         id=str(p.id),
         name=p.name,
         html=p.html,
-        layout_variant=p.layout_variant
+        layout_variant=p.layout_variant,
+        current_version=p.current_version
     ) for p in pages]
 
 
@@ -553,7 +565,8 @@ def get_page(
         id=str(page.id),
         name=page.name,
         html=page.html,
-        layout_variant=page.layout_variant
+        layout_variant=page.layout_variant,
+        current_version=page.current_version
     )
 
 
@@ -565,7 +578,7 @@ def edit_page(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Edit a page with an instruction (returns full HTML - legacy)"""
+    """Edit a page with an instruction - creates a new version"""
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
@@ -574,15 +587,125 @@ def edit_page(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    gen = Generator(project, db)
-    html = gen.edit_page(str(page_id), request.instruction)
-
     page = db.query(Page).filter(Page.id == page_id).first()
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    # Save current state as version before edit (if not already saved)
+    existing_versions = db.query(PageVersion).filter(PageVersion.page_id == page_id).count()
+    if existing_versions == 0:
+        # Create initial version (v1) from current state
+        initial_version = PageVersion(
+            page_id=page.id,
+            version=1,
+            html=page.html,
+            instruction="Initial version"
+        )
+        db.add(initial_version)
+
+    # Generate new HTML
+    gen = Generator(project, db)
+    new_html = gen.edit_page(str(page_id), request.instruction)
+
+    # Create new version
+    new_version_num = page.current_version + 1
+    new_version = PageVersion(
+        page_id=page.id,
+        version=new_version_num,
+        html=new_html,
+        instruction=request.instruction
+    )
+    db.add(new_version)
+
+    # Update page with new HTML and version
+    page.html = new_html
+    page.current_version = new_version_num
+    db.commit()
+
     return PageResponse(
         id=str(page.id),
         name=page.name,
-        html=html,
-        layout_variant=page.layout_variant
+        html=new_html,
+        layout_variant=page.layout_variant,
+        current_version=page.current_version
+    )
+
+
+@router.get("/{project_id}/pages/{page_id}/versions", response_model=List[PageVersionResponse])
+def get_page_versions(
+    project_id: uuid.UUID,
+    page_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all versions of a page"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    versions = db.query(PageVersion).filter(
+        PageVersion.page_id == page_id
+    ).order_by(PageVersion.version).all()
+
+    return [
+        PageVersionResponse(
+            id=str(v.id),
+            version=v.version,
+            instruction=v.instruction,
+            created_at=v.created_at.isoformat()
+        )
+        for v in versions
+    ]
+
+
+class RestoreVersionRequest(BaseModel):
+    version: int
+
+
+@router.post("/{project_id}/pages/{page_id}/restore", response_model=PageResponse)
+def restore_page_version(
+    project_id: uuid.UUID,
+    page_id: uuid.UUID,
+    request: RestoreVersionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Restore a page to a specific version"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    page = db.query(Page).filter(Page.id == page_id).first()
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    version = db.query(PageVersion).filter(
+        PageVersion.page_id == page_id,
+        PageVersion.version == request.version
+    ).first()
+
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    # Update page to this version's HTML
+    page.html = version.html
+    page.current_version = version.version
+    db.commit()
+
+    return PageResponse(
+        id=str(page.id),
+        name=page.name,
+        html=page.html,
+        layout_variant=page.layout_variant,
+        current_version=page.current_version
     )
 
 
@@ -688,7 +811,8 @@ def sync_page(
         id=str(page.id),
         name=page.name,
         html=page.html,
-        layout_variant=page.layout_variant
+        layout_variant=page.layout_variant,
+        current_version=page.current_version
     )
 
 
@@ -715,7 +839,8 @@ def add_page(
         id=str(page.id),
         name=page.name,
         html=page.html,
-        layout_variant=page.layout_variant
+        layout_variant=page.layout_variant,
+        current_version=page.current_version
     )
 
 

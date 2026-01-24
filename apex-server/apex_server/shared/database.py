@@ -66,7 +66,7 @@ def init_db():
     """Create all tables"""
     # Import all models so they register with Base
     from apex_server.auth.models import User
-    from apex_server.projects.models import Project, Page, ProjectLog
+    from apex_server.projects.models import Project, Page, PageVersion, ProjectLog
 
     Base.metadata.create_all(bind=engine)
 
@@ -81,19 +81,39 @@ def _run_migrations():
     migrations = [
         # Add selected_moodboard to projects table
         ("projects", "selected_moodboard", "ALTER TABLE projects ADD COLUMN selected_moodboard INTEGER"),
+        # Add clarification JSON column for two-phase flow
+        ("projects", "clarification", "ALTER TABLE projects ADD COLUMN clarification JSON"),
+        # Add current_version to pages table for version history
+        ("pages", "current_version", "ALTER TABLE pages ADD COLUMN current_version INTEGER DEFAULT 1"),
     ]
 
-    with engine.connect() as conn:
-        for table, column, sql in migrations:
+    # Add new enum values (PostgreSQL specific)
+    enum_migrations = [
+        ("projectstatus", "CLARIFICATION", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'CLARIFICATION'"),
+    ]
+
+    for enum_type, value, sql in enum_migrations:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+                print(f"Migration: Added {value} to enum {enum_type}", flush=True)
+            except Exception as e:
+                # May already exist or not supported
+                print(f"Enum migration skipped for {value}: {e}", flush=True)
+
+    for table, column, sql in migrations:
+        with engine.connect() as conn:
             try:
                 # Check if column exists
                 result = conn.execute(text(f"SELECT {column} FROM {table} LIMIT 1"))
                 result.close()
             except Exception:
-                # Column doesn't exist, add it
+                # Column doesn't exist, rollback and try to add it
+                conn.rollback()
                 try:
                     conn.execute(text(sql))
                     conn.commit()
-                    print(f"Migration: Added {column} to {table}")
+                    print(f"Migration: Added {column} to {table}", flush=True)
                 except Exception as e:
-                    print(f"Migration failed for {column}: {e}")
+                    print(f"Migration failed for {column}: {e}", flush=True)

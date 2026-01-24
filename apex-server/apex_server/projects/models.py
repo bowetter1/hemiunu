@@ -13,6 +13,7 @@ from apex_server.shared.database import Base, TimestampMixin, GUID
 class ProjectStatus(str, enum.Enum):
     """Project generation status"""
     BRIEF = "brief"           # User entered brief
+    CLARIFICATION = "clarification"  # Waiting for user clarification
     MOODBOARD = "moodboard"   # Generating/showing moodboard
     LAYOUTS = "layouts"       # Generating/showing 3 layouts
     EDITING = "editing"       # User is editing
@@ -34,6 +35,9 @@ class Project(Base, TimestampMixin):
 
     # Moodboard (JSON)
     moodboard: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # Clarification (JSON) - question and options when status is CLARIFICATION
+    clarification: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Selected moodboard (1, 2, or 3)
     selected_moodboard: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -73,7 +77,26 @@ class Page(Base, TimestampMixin):
     # For layout alternatives (1, 2, 3) - null for final pages
     layout_variant: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
+    # Current version number
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+
     project: Mapped["Project"] = relationship("Project", back_populates="pages")
+    versions: Mapped[List["PageVersion"]] = relationship("PageVersion", back_populates="page", cascade="all, delete-orphan")
+
+
+class PageVersion(Base):
+    """A version of a page - created on each edit"""
+    __tablename__ = "page_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    page_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("pages.id"))
+
+    version: Mapped[int] = mapped_column(Integer)  # 1, 2, 3...
+    html: Mapped[str] = mapped_column(Text)
+    instruction: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Edit instruction that created this version
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    page: Mapped["Page"] = relationship("Page", back_populates="versions")
 
 
 class ProjectLog(Base):
