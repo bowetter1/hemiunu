@@ -2,6 +2,7 @@
 import json
 import re
 import httpx
+import time
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -92,21 +93,30 @@ class Generator:
         """
         Generate 3 moodboard alternatives with deep web research.
 
-        Flow:
-        1. Claude searches for relevant URLs (brand colors, competitors, trends)
-        2. We FETCH actual content from top URLs
-        3. Haiku summarizes findings
-        4. Sonnet creates moodboards based on real data
+        This is PHASE 2 - called after clarification (if needed).
+        For Phase 1 (initial search), use search_and_clarify().
         """
-        print(f"[MOODBOARD] Starting for project {self.project.id}", flush=True)
-        print(f"[MOODBOARD] Brief: {self.project.brief[:100]}...", flush=True)
-        self.log("moodboard", "Starting moodboard generation...")
+        phase_start = time.time()
+        print(f"[MOODBOARD PHASE 2] Starting for project {self.project.id}", flush=True)
+
+        # Get clarification data if available
+        clarification = self.project.clarification or {}
+        user_answer = clarification.get("answer", "")
+        initial_research = clarification.get("initial_research", {})
+
+        # Build search context from clarification
+        search_context = self.project.brief
+        if user_answer:
+            search_context = f"{self.project.brief}\n\nUser clarification: {user_answer}"
+            print(f"[MOODBOARD] Using clarification: {user_answer}", flush=True)
+
+        self.log("moodboard", "Starting targeted search with clarification...")
 
         # ============================================
-        # STEP 1: Search for relevant URLs
+        # STEP 1: Targeted search with clarification
         # ============================================
-        print("[STEP 1] Searching for URLs...", flush=True)
-        self.log("moodboard", "Step 1: Searching web for brand info and inspiration...")
+        step1_start = time.time()
+        print("[STEP 1] Targeted search...", flush=True)
 
         web_search_tool = {
             "type": "web_search_20250305",
@@ -115,20 +125,22 @@ class Generator:
         }
 
         search_response = self.client.beta.messages.create(
-            model="claude-3-5-haiku-20241022",  # Fast & cheap for search
+            model="claude-opus-4-5-20251101",
             max_tokens=1000,
             betas=["web-search-2025-03-05"],
             tools=[web_search_tool],
             messages=[{
                 "role": "user",
-                "content": f"""Search for information about this project. Find:
-1. Brand colors and visual identity (if a company is mentioned)
-2. Competitor websites in the same industry
-3. Current design trends
+                "content": f"""Find brand colors and visual identity for this web design project.
 
-Project: {self.project.brief}
+Project: {search_context}
 
-Do 2-3 targeted searches to find the most relevant information."""
+IMPORTANT: Do these searches IN ORDER:
+1. FIRST search for the company's official website directly (e.g. "site:forex.se" or just the domain)
+2. THEN search for brand colors (e.g. "forex.se colors" or "company brandfetch")
+3. THEN search for competitors
+
+The FIRST search result should be the company's own website - we will fetch it to extract their actual colors."""
             }]
         )
         self.track_usage(search_response)
@@ -147,13 +159,391 @@ Do 2-3 targeted searches to find the most relevant information."""
             if block.type == "web_search_tool_result":
                 content = getattr(block, 'content', [])
                 if isinstance(content, list):
-                    for item in content[:3]:  # Top 3 from each search
+                    for item in content[:3]:
                         url = getattr(item, 'url', '')
                         if url and url not in urls_to_fetch:
                             urls_to_fetch.append(url)
                             print(f"[STEP 1] Found: {url[:60]}...", flush=True)
 
         self.log("moodboard", f"Found {len(urls_to_fetch)} URLs to analyze")
+        print(f"[TIMING] Step 1 (web search): {time.time() - step1_start:.1f}s", flush=True)
+
+        # ============================================
+        # STEP 2: Fetch actual content from URLs
+        # ============================================
+        step2_start = time.time()
+        print("[STEP 2] Fetching URL content...", flush=True)
+        fetched_content = []
+        all_colors_found = []
+
+        for url in urls_to_fetch[:6]:  # Limit to 6 URLs
+            print(f"[STEP 2] Fetching: {url[:50]}...", flush=True)
+            content = fetch_page_content(url)
+            fetched_content.append(content)
+
+            # Collect colors
+            all_colors_found.extend(content.get("brand_colors", []))
+            all_colors_found.extend(content.get("colors_found", []))
+
+        unique_colors = list(dict.fromkeys(all_colors_found))[:15]
+        print(f"[STEP 2] Found {len(unique_colors)} unique colors", flush=True)
+        print(f"[TIMING] Step 2 (fetch URLs): {time.time() - step2_start:.1f}s", flush=True)
+
+        # ============================================
+        # STEP 3: Summarize research with Opus
+        # ============================================
+        step3_start = time.time()
+        print("[STEP 3] Summarizing research...", flush=True)
+
+        research_text = "\n\n".join([
+            f"URL: {c.get('url', 'unknown')}\nTitle: {c.get('title', 'unknown')}\nColors: {c.get('brand_colors', []) or c.get('colors_found', [])}\nContent: {c.get('text', '')[:500]}"
+            for c in fetched_content if not c.get("error")
+        ])
+
+        summary_response = self.client.messages.create(
+            model="claude-opus-4-5-20251101",
+            max_tokens=800,
+            messages=[{
+                "role": "user",
+                "content": f"""Summarize this research for a web design project. Extract:
+1. Brand colors found (list hex codes)
+2. Design style and visual identity
+3. Key elements to incorporate
+
+Research data:
+{research_text}
+
+Colors found: {unique_colors}
+
+Be concise but thorough."""
+            }]
+        )
+        self.track_usage(summary_response)
+
+        research_summary = summary_response.content[0].text
+        print(f"[STEP 3] Summary: {research_summary[:200]}...", flush=True)
+        print(f"[TIMING] Step 3 (summarize): {time.time() - step3_start:.1f}s", flush=True)
+
+        # ============================================
+        # STEP 4: Create moodboards using research
+        # ============================================
+        step4_start = time.time()
+        print("[STEP 4] Creating moodboards...", flush=True)
+
+        moodboard_tool = {
+            "name": "save_moodboards",
+            "description": "Save 3 moodboard alternatives with exactly 3 colors each",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "moodboards": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string", "description": "Short, punchy name (2-3 words)"},
+                                "palette": {"type": "array", "items": {"type": "string"}, "minItems": 3, "maxItems": 3, "description": "Exactly 3 hex colors"},
+                                "fonts": {"type": "object", "properties": {"heading": {"type": "string"}, "body": {"type": "string"}}},
+                                "mood": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
+                                "rationale": {"type": "string", "description": "One sentence explanation"}
+                            },
+                            "required": ["name", "palette", "fonts", "mood", "rationale"]
+                        }
+                    }
+                },
+                "required": ["moodboards"]
+            }
+        }
+
+        moodboard_response = self.client.messages.create(
+            model="claude-opus-4-5-20251101",
+            max_tokens=3000,
+            tools=[moodboard_tool],
+            tool_choice={"type": "tool", "name": "save_moodboards"},
+            messages=[{
+                "role": "user",
+                "content": f"""Create 3 moodboard alternatives for this project.
+
+PROJECT: {self.project.brief}
+
+RESEARCH: {research_summary}
+
+BRAND COLORS: {unique_colors}
+
+RULES:
+- Each moodboard has EXACTLY 3 colors (primary, secondary, accent)
+- Short punchy names (2-3 words max)
+- One sentence rationale
+- Use actual brand colors from research for moodboard 1
+
+Create:
+1. Brand Faithful - matches existing brand
+2. Modern Evolution - refined and contemporary
+3. Bold Reimagining - fresh and daring"""
+            }]
+        )
+        self.track_usage(moodboard_response)
+
+        # Extract moodboards from tool use
+        moodboards = []
+        for block in moodboard_response.content:
+            if block.type == "tool_use" and block.name == "save_moodboards":
+                moodboards = block.input.get("moodboards", [])
+                break
+
+        if moodboards:
+            # Build research object
+            research_data = {
+                "queries": search_queries,
+                "urls_fetched": [c["url"] for c in fetched_content],
+                "colors_found": unique_colors,
+                "summary": research_summary
+            }
+
+            # Log full research data
+            print("[RESEARCH DATA] Full JSON:", flush=True)
+            print(json.dumps(research_data, indent=2, ensure_ascii=False), flush=True)
+
+            # Save everything
+            self.project.moodboard = {
+                "moodboards": moodboards,
+                "research": research_data
+            }
+            self.project.status = ProjectStatus.MOODBOARD
+            self.db.commit()
+
+            # Log moodboards
+            print("[MOODBOARDS] Full JSON:", flush=True)
+            print(json.dumps(moodboards, indent=2, ensure_ascii=False), flush=True)
+
+            self.log("moodboard", f"Success! Created {len(moodboards)} moodboards")
+            print(f"[TIMING] Step 4 (create moodboards): {time.time() - step4_start:.1f}s", flush=True)
+            print(f"[TIMING] TOTAL Phase 2: {time.time() - phase_start:.1f}s", flush=True)
+            print(f"[MOODBOARD] Done! {len(moodboards)} moodboards created", flush=True)
+
+            return moodboards
+
+        # Fallback
+        return self._fallback_moodboard()
+
+    def _fallback_moodboard(self) -> list:
+        """Fallback moodboard generation without research"""
+        print("[FALLBACK] Creating moodboards without research...", flush=True)
+
+        moodboard_tool = {
+            "name": "save_moodboards",
+            "description": "Save 3 moodboard alternatives",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "moodboards": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "palette": {"type": "array", "items": {"type": "string"}},
+                                "fonts": {"type": "object"},
+                                "mood": {"type": "array", "items": {"type": "string"}},
+                                "rationale": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        response = self.client.messages.create(
+            model="claude-opus-4-5-20251101",
+            max_tokens=4000,
+            tools=[moodboard_tool],
+            tool_choice={"type": "tool", "name": "save_moodboards"},
+            messages=[{"role": "user", "content": f"Create 3 moodboards for: {self.project.brief}"}]
+        )
+        self.track_usage(response)
+
+        moodboards = []
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "save_moodboards":
+                moodboards = block.input.get("moodboards", [])
+                break
+
+        if moodboards:
+            self.project.moodboard = {"moodboards": moodboards}
+            self.project.status = ProjectStatus.MOODBOARD
+            self.db.commit()
+
+        return moodboards
+
+    def search_and_clarify(self) -> dict:
+        """
+        PHASE 1: Initial search to identify if clarification is needed.
+
+        Returns:
+            dict with either:
+            - {"needs_clarification": True, "question": "...", "options": [...]}
+            - {"needs_clarification": False} (continue to Phase 2)
+        """
+        phase1_start = time.time()
+        print(f"[PHASE 1] Initial search for project {self.project.id}", flush=True)
+        print(f"[PHASE 1] Brief: {self.project.brief[:100]}...", flush=True)
+        self.log("moodboard", "Phase 1: Initial search to identify brand...")
+
+        search_start = time.time()
+        web_search_tool = {
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": 3
+        }
+
+        # First, do a broad search
+        search_response = self.client.beta.messages.create(
+            model="claude-opus-4-5-20251101",
+            max_tokens=1000,
+            betas=["web-search-2025-03-05"],
+            tools=[web_search_tool],
+            messages=[{
+                "role": "user",
+                "content": f"""Search for the company/brand mentioned in this project brief:
+
+"{self.project.brief}"
+
+Do 1-2 searches to identify:
+1. What company/brand is this about?
+2. Is there any ambiguity (e.g., multiple companies with similar names)?
+
+Search now."""
+            }]
+        )
+        self.track_usage(search_response)
+
+        # Collect search results for analysis
+        search_results_text = []
+        urls_found = []
+
+        for block in search_response.content:
+            if block.type == "text":
+                search_results_text.append(block.text)
+            if block.type == "web_search_tool_result":
+                content = getattr(block, 'content', [])
+                if isinstance(content, list):
+                    for item in content[:5]:
+                        url = getattr(item, 'url', '')
+                        title = getattr(item, 'title', '')
+                        if url:
+                            urls_found.append({"url": url, "title": title})
+                            print(f"[PHASE 1] Found: {title[:50]} - {url[:40]}", flush=True)
+
+        print(f"[TIMING] Phase 1 search: {time.time() - search_start:.1f}s", flush=True)
+
+        # Now ask Opus to analyze if clarification is needed
+        analysis_start = time.time()
+        clarify_tool = {
+            "name": "clarification_decision",
+            "description": "Decide if user clarification is needed",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "needs_clarification": {
+                        "type": "boolean",
+                        "description": "True if the brand/company is ambiguous and we need to ask the user"
+                    },
+                    "question": {
+                        "type": "string",
+                        "description": "Question to ask the user (if needs_clarification is true)"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "2-4 options for the user to choose from"
+                    },
+                    "identified_brand": {
+                        "type": "string",
+                        "description": "The brand/company identified (if clear)"
+                    },
+                    "confidence": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "Confidence in the identification"
+                    }
+                },
+                "required": ["needs_clarification", "confidence"]
+            }
+        }
+
+        analysis_response = self.client.messages.create(
+            model="claude-opus-4-5-20251101",
+            max_tokens=500,
+            tools=[clarify_tool],
+            tool_choice={"type": "tool", "name": "clarification_decision"},
+            messages=[{
+                "role": "user",
+                "content": f"""Analyze these search results and decide if we need to ask the user for clarification.
+
+PROJECT BRIEF: "{self.project.brief}"
+
+SEARCH RESULTS FOUND:
+{json.dumps(urls_found, indent=2)}
+
+ANALYSIS:
+{chr(10).join(search_results_text)}
+
+DECIDE:
+- If the company/brand is CLEAR (e.g., search found their official website), set needs_clarification=false
+- If AMBIGUOUS (e.g., "Forex" could be forex.se OR forex trading sites), set needs_clarification=true and provide a question with options
+
+Examples of when to ask:
+- "Forex" → Could be Forex Bank Sweden (forex.se) or general forex trading
+- "Apple" → Could be Apple Inc or a local business
+- Generic terms that match multiple companies"""
+            }]
+        )
+        self.track_usage(analysis_response)
+
+        print(f"[TIMING] Phase 1 analysis: {time.time() - analysis_start:.1f}s", flush=True)
+
+        # Extract decision
+        for block in analysis_response.content:
+            if block.type == "tool_use" and block.name == "clarification_decision":
+                decision = block.input
+                print(f"[PHASE 1] Decision: {decision}", flush=True)
+                print(f"[TIMING] TOTAL Phase 1: {time.time() - phase1_start:.1f}s", flush=True)
+
+                if decision.get("needs_clarification"):
+                    # Save initial research and return question
+                    self.project.clarification = {
+                        "question": decision.get("question", "Which company do you mean?"),
+                        "options": decision.get("options", []),
+                        "initial_research": {
+                            "urls_found": urls_found,
+                            "analysis": search_results_text
+                        }
+                    }
+                    self.project.status = ProjectStatus.CLARIFICATION
+                    self.db.commit()
+
+                    self.log("moodboard", f"Needs clarification: {decision.get('question')}")
+                    return {
+                        "needs_clarification": True,
+                        "question": decision.get("question"),
+                        "options": decision.get("options", [])
+                    }
+                else:
+                    # Clear to proceed
+                    self.project.clarification = {
+                        "identified_brand": decision.get("identified_brand", ""),
+                        "confidence": decision.get("confidence", "high"),
+                        "initial_research": {
+                            "urls_found": urls_found
+                        }
+                    }
+                    self.db.commit()
+
+                    self.log("moodboard", f"Brand identified: {decision.get('identified_brand')}")
+                    return {"needs_clarification": False}
+
+        # Fallback - proceed without clarification
+        return {"needs_clarification": False}
 
         # ============================================
         # STEP 2: Fetch actual content from URLs
@@ -194,7 +584,7 @@ Do 2-3 targeted searches to find the most relevant information."""
             content_for_summary.append(f"URL: {c['url']}\nTitle: {c.get('title', 'N/A')}\nContent: {c.get('text', '')[:500]}")
 
         summary_response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-opus-4-5-20251101",  # Opus for better quality
             max_tokens=800,
             messages=[{
                 "role": "user",
@@ -255,7 +645,7 @@ Provide a brief summary (max 200 words) with:
         }
 
         moodboard_response = self.client.messages.create(
-            model="claude-sonnet-4-5-20250929",
+            model="claude-opus-4-5-20251101",  # Opus for best quality
             max_tokens=3000,
             tools=[moodboard_tool],
             tool_choice={"type": "tool", "name": "save_moodboards"},
@@ -289,18 +679,29 @@ Create 3 moodboards now."""
                 print(f"[STEP 4] Created {len(moodboards)} moodboards", flush=True)
 
         if moodboards:
+            # Build research object
+            research_data = {
+                "queries": search_queries,
+                "urls_fetched": [c["url"] for c in fetched_content],
+                "colors_found": unique_colors,
+                "summary": research_summary
+            }
+
+            # Log full research data
+            print("[RESEARCH DATA] Full JSON:", flush=True)
+            print(json.dumps(research_data, indent=2, ensure_ascii=False), flush=True)
+
             # Save everything
             self.project.moodboard = {
                 "moodboards": moodboards,
-                "research": {
-                    "queries": search_queries,
-                    "urls_fetched": [c["url"] for c in fetched_content],
-                    "colors_found": unique_colors,
-                    "summary": research_summary
-                }
+                "research": research_data
             }
             self.project.status = ProjectStatus.MOODBOARD
             self.db.commit()
+
+            # Log moodboards
+            print("[MOODBOARDS] Full JSON:", flush=True)
+            print(json.dumps(moodboards, indent=2, ensure_ascii=False), flush=True)
 
             self.log("moodboard", f"Success! Created {len(moodboards)} moodboards")
             print(f"[MOODBOARD] Done! {len(moodboards)} moodboards created", flush=True)
@@ -339,7 +740,7 @@ Create 3 moodboards now."""
         }
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-5-20250929",
+            model="claude-opus-4-5-20251101",  # Opus
             max_tokens=4000,
             tools=[moodboard_tool],
             tool_choice={"type": "tool", "name": "save_moodboards"},
@@ -360,6 +761,8 @@ Create 3 moodboards now."""
 
     def generate_layouts(self) -> list[dict]:
         """Generate 3 layout alternatives using the selected moodboard"""
+        layouts_start = time.time()
+        print("[GENERATE_LAYOUTS] Starting...", flush=True)
         self.log("layouts", "Generating 3 layout alternatives...")
 
         # Get the selected moodboard
@@ -399,6 +802,8 @@ Create 3 moodboards now."""
             }
         }
 
+        opus_start = time.time()
+        print(f"[GENERATE_LAYOUTS] Calling Opus with moodboard: {moodboard.get('name', 'unknown')}", flush=True)
         response = self.client.messages.create(
             model="claude-opus-4-5-20251101",
             max_tokens=16000,
@@ -429,12 +834,16 @@ Rules:
         )
 
         self.track_usage(response)
+        print(f"[TIMING] Opus layout generation: {time.time() - opus_start:.1f}s", flush=True)
+        print(f"[GENERATE_LAYOUTS] Opus response received, stop_reason: {response.stop_reason}", flush=True)
 
         # Extract structured data from tool use
         layouts = []
         for block in response.content:
             if block.type == "tool_use" and block.name == "save_layouts":
                 layouts = block.input.get("layouts", [])
+
+        print(f"[GENERATE_LAYOUTS] Extracted {len(layouts)} layouts", flush=True)
 
         # Save layouts as pages
         for i, layout in enumerate(layouts, 1):
@@ -458,6 +867,7 @@ Rules:
         self.project.status = ProjectStatus.LAYOUTS
         self.db.commit()
 
+        print(f"[TIMING] TOTAL layout generation: {time.time() - layouts_start:.1f}s", flush=True)
         self.log("layouts", f"Created {len(layouts)} layouts", {"count": len(layouts)})
         return layouts
 
