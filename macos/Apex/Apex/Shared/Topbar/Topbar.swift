@@ -35,6 +35,11 @@ struct Topbar: View {
 
             // Right group
             HStack(spacing: 12) {
+                // Live activity indicator
+                if hasProject {
+                    ActivityIndicator(logs: logs)
+                }
+
                 // Logs
                 LogsButton(logs: logs, iconSize: iconSize, hasProject: hasProject)
 
@@ -222,6 +227,79 @@ struct LogRow: View {
     var phaseColor: Color {
         switch log.phase {
         case "brief": return .blue
+        case "moodboard": return .purple
+        case "layouts": return .orange
+        case "editing": return .green
+        default: return .secondary
+        }
+    }
+}
+
+// MARK: - Activity Indicator
+
+struct ActivityIndicator: View {
+    let logs: [LogEntry]
+    @State private var animating = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Show last 3 activities as dots
+            ForEach(Array(recentLogs.enumerated()), id: \.offset) { index, log in
+                ActivityDot(phase: log.phase, isLatest: index == recentLogs.count - 1)
+            }
+
+            // Current activity text
+            if let latest = logs.last {
+                Text(shortMessage(latest.message))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 150, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(6)
+    }
+
+    private var recentLogs: [LogEntry] {
+        Array(logs.suffix(4))
+    }
+
+    private func shortMessage(_ message: String) -> String {
+        // Truncate long messages
+        if message.count > 25 {
+            return String(message.prefix(22)) + "..."
+        }
+        return message
+    }
+}
+
+struct ActivityDot: View {
+    let phase: String
+    let isLatest: Bool
+    @State private var pulsing = false
+
+    var body: some View {
+        Circle()
+            .fill(phaseColor)
+            .frame(width: 6, height: 6)
+            .scaleEffect(isLatest && pulsing ? 1.3 : 1.0)
+            .opacity(isLatest ? 1.0 : 0.5)
+            .animation(
+                isLatest ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .default,
+                value: pulsing
+            )
+            .onAppear {
+                if isLatest { pulsing = true }
+            }
+    }
+
+    var phaseColor: Color {
+        switch phase {
+        case "brief": return .blue
+        case "clarification": return .orange
         case "moodboard": return .purple
         case "layouts": return .orange
         case "editing": return .green

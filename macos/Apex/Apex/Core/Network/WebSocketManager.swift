@@ -7,6 +7,7 @@ enum WebSocketEvent: Equatable {
     case layoutsReady(count: Int)
     case statusChanged(status: String)
     case pageUpdated(pageId: String)
+    case clarificationNeeded(question: String, options: [String])
     case error(message: String)
     case connected
     case disconnected
@@ -17,6 +18,7 @@ class WebSocketManager: ObservableObject {
     private var webSocketTask: URLSessionWebSocketTask?
     private var pingTimer: Timer?
     private let baseURL: String
+    private var currentProjectId: String?
 
     @Published var isConnected = false
     @Published var lastEvent: WebSocketEvent?
@@ -27,7 +29,13 @@ class WebSocketManager: ObservableObject {
 
     /// Connect to a project's WebSocket
     func connect(projectId: String, token: String) {
+        // Don't reconnect if already connected to same project
+        if currentProjectId == projectId && isConnected {
+            return
+        }
+
         disconnect()
+        currentProjectId = projectId
 
         // Convert https to wss
         let wsURL = baseURL
@@ -51,7 +59,7 @@ class WebSocketManager: ObservableObject {
         print("WebSocket connecting to \(url)")
 
         // Start receiving messages
-        receiveMessage()
+        receiveMessage(forProject: projectId)
 
         // Start ping timer to keep connection alive
         startPingTimer()
@@ -63,34 +71,42 @@ class WebSocketManager: ObservableObject {
         pingTimer = nil
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
+        currentProjectId = nil
         isConnected = false
-        lastEvent = .disconnected
     }
 
     // MARK: - Private
 
-    private func receiveMessage() {
+    private func receiveMessage(forProject projectId: String) {
         webSocketTask?.receive { [weak self] result in
+            guard let self = self else { return }
+
+            // Stop if we've switched to a different project
+            guard self.currentProjectId == projectId else { return }
+
             switch result {
             case .success(let message):
                 switch message {
                 case .string(let text):
-                    self?.handleMessage(text)
+                    self.handleMessage(text)
                 case .data(let data):
                     if let text = String(data: data, encoding: .utf8) {
-                        self?.handleMessage(text)
+                        self.handleMessage(text)
                     }
                 @unknown default:
                     break
                 }
-                // Continue receiving
-                self?.receiveMessage()
+                // Continue receiving only if still same project
+                if self.currentProjectId == projectId {
+                    self.receiveMessage(forProject: projectId)
+                }
 
-            case .failure(let error):
-                print("WebSocket receive error: \(error)")
-                DispatchQueue.main.async {
-                    self?.isConnected = false
-                    self?.lastEvent = .disconnected
+            case .failure:
+                // Only log if we're still supposed to be connected to this project
+                if self.currentProjectId == projectId {
+                    DispatchQueue.main.async {
+                        self.isConnected = false
+                    }
                 }
             }
         }
@@ -131,6 +147,11 @@ class WebSocketManager: ObservableObject {
             case "error":
                 let message = eventData["message"] as? String ?? "Unknown error"
                 self?.lastEvent = .error(message: message)
+
+            case "clarification_needed":
+                let question = eventData["question"] as? String ?? "Please clarify"
+                let options = eventData["options"] as? [String] ?? []
+                self?.lastEvent = .clarificationNeeded(question: question, options: options)
 
             default:
                 print("Unknown WebSocket event: \(event)")

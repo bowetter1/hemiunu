@@ -16,6 +16,7 @@ struct AppRouter: View {
                 ProjectsSidebar(
                     client: client,
                     selectedProjectId: $appState.selectedProjectId,
+                    selectedPageId: $appState.selectedPageId,
                     onNewProject: {
                         appState.clearCurrentProject()
                     }
@@ -47,7 +48,11 @@ struct AppRouter: View {
                         // Chat panel (Design mode only)
                         if appState.currentMode == .design {
                             Divider()
-                            ChatPanel(client: client) { projectId in
+                            ChatPanel(
+                                client: client,
+                                webSocket: appState.wsClient,
+                                selectedPageId: appState.selectedPageId
+                            ) { projectId in
                                 // Set selectedProjectId to trigger WebSocket connection
                                 appState.selectedProjectId = projectId
                             }
@@ -100,7 +105,8 @@ struct AppRouter: View {
             DesignView(
                 client: client,
                 wsClient: appState.wsClient,
-                sidebarVisible: appState.showSidebar
+                sidebarVisible: appState.showSidebar,
+                selectedPageId: appState.selectedPageId
             )
         case .code:
             CodeView()
@@ -118,6 +124,9 @@ struct AppRouter: View {
         Task {
             switch event {
             case .moodboardReady, .layoutsReady, .statusChanged, .pageUpdated:
+                await appState.loadProject(id: projectId)
+            case .clarificationNeeded:
+                // Also reload project to update status
                 await appState.loadProject(id: projectId)
             case .error(let message):
                 appState.errorMessage = message

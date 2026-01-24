@@ -65,6 +65,7 @@ class AppState: ObservableObject {
     // MARK: - Projects
 
     @Published var selectedProjectId: String?
+    @Published var selectedPageId: String?
 
     // MARK: - Services
 
@@ -101,6 +102,8 @@ class AppState: ObservableObject {
 
     // MARK: - Projects
 
+    private var connectedProjectId: String?
+
     func loadProject(id: String) async {
         do {
             let project = try await client.getProject(id: id)
@@ -110,12 +113,18 @@ class AppState: ObservableObject {
             let pages = try await client.getPages(projectId: id)
             client.pages = pages
 
+            // Auto-select first page (layout 1 or main page)
+            if let firstPage = pages.first {
+                selectedPageId = firstPage.id
+            }
+
             // Load logs
             let logs = try await client.getProjectLogs(projectId: id)
             client.projectLogs = logs
 
-            // Connect WebSocket
-            if let token = client.authToken {
+            // Connect WebSocket only if not already connected to this project
+            if connectedProjectId != id, let token = client.authToken {
+                connectedProjectId = id
                 wsClient.connect(projectId: id, token: token)
             }
         } catch {
@@ -128,6 +137,8 @@ class AppState: ObservableObject {
         client.pages = []
         client.projectLogs = []
         selectedProjectId = nil
+        selectedPageId = nil
+        connectedProjectId = nil
         wsClient.disconnect()
     }
 }

@@ -89,3 +89,12 @@ async def notify_error(project_id: str, message: str):
     await manager.broadcast(str(project_id), "error", {
         "message": message
     })
+
+
+async def notify_clarification_needed(project_id: str, question: str, options: list):
+    """Notify clients that clarification is needed"""
+    print(f"[WS] Sending clarification_needed to {project_id}", flush=True)
+    await manager.broadcast(str(project_id), "clarification_needed", {
+        "question": question,
+        "options": options
+    })

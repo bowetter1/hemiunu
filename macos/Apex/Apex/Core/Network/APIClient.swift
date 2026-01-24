@@ -183,6 +183,28 @@ class APIClient: ObservableObject {
         return projects
     }
 
+    /// Send clarification answer and continue moodboard generation
+    func clarifyProject(projectId: String, answer: String) async throws -> Project {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/clarify")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        struct ClarifyRequest: Codable {
+            let answer: String
+        }
+
+        request.httpBody = try JSONEncoder().encode(ClarifyRequest(answer: answer))
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let project = try JSONDecoder().decode(Project.self, from: data)
+
+        await MainActor.run {
+            self.currentProject = project
+        }
+
+        return project
+    }
+
     /// Select a moodboard (1, 2, or 3) and start layout generation
     func selectMoodboard(projectId: String, variant: Int) async throws -> Project {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/select-moodboard")
@@ -312,5 +334,67 @@ class APIClient: ObservableObject {
         let request = authorizedRequest(url: url)
         let (data, _) = try await URLSession.shared.data(for: request)
         return try JSONDecoder().decode([LogEntry].self, from: data)
+    }
+
+    /// Delete a project
+    func deleteProject(projectId: String) async throws {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+
+        await MainActor.run {
+            // Remove from local list
+            self.projects.removeAll { $0.id == projectId }
+            // Clear current if it was the deleted one
+            if self.currentProject?.id == projectId {
+                self.currentProject = nil
+                self.pages = []
+                self.projectLogs = []
+            }
+        }
+    }
+
+    // MARK: - Page Versions
+
+    /// Get all versions of a page
+    func getPageVersions(projectId: String, pageId: String) async throws -> [PageVersion] {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/pages/\(pageId)/versions")
+        let request = authorizedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Handle 404 - no versions yet is normal
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 404 {
+            return []
+        }
+
+        // Try to decode as array, return empty if it fails (e.g., error response)
+        do {
+            return try JSONDecoder().decode([PageVersion].self, from: data)
+        } catch {
+            print("Failed to decode versions: \(error)")
+            return []
+        }
+    }
+
+    /// Restore a page to a specific version
+    func restorePageVersion(projectId: String, pageId: String, version: Int) async throws -> Page {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/pages/\(pageId)/restore")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        struct RestoreVersionRequest: Codable {
+            let version: Int
+        }
+
+        request.httpBody = try JSONEncoder().encode(RestoreVersionRequest(version: version))
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return try JSONDecoder().decode(Page.self, from: data)
     }
 }

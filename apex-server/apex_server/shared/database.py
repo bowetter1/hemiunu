@@ -78,6 +78,25 @@ def _run_migrations():
     """Add new columns to existing tables (SQLAlchemy create_all doesn't do this)"""
     from sqlalchemy import text
 
+    # First, ensure page_versions table exists
+    create_page_versions = """
+    CREATE TABLE IF NOT EXISTS page_versions (
+        id VARCHAR(36) PRIMARY KEY,
+        page_id VARCHAR(36) NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL,
+        html TEXT NOT NULL,
+        instruction TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(create_page_versions))
+            conn.commit()
+            print("Migration: Ensured page_versions table exists", flush=True)
+        except Exception as e:
+            print(f"page_versions table migration: {e}", flush=True)
+
     migrations = [
         # Add selected_moodboard to projects table
         ("projects", "selected_moodboard", "ALTER TABLE projects ADD COLUMN selected_moodboard INTEGER"),

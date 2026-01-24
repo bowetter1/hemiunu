@@ -16,12 +16,48 @@ struct ChatMessage: Identifiable {
 /// Right-side chat panel for AI conversation
 struct ChatPanel: View {
     @ObservedObject var client: APIClient
+    @ObservedObject var webSocket: WebSocketManager
+    var selectedPageId: String? = nil
     var onProjectCreated: ((String) -> Void)? = nil
-    @State private var messages: [ChatMessage] = []
+
+    // Messages stored per page (pageId -> messages)
+    @State private var messagesByPage: [String: [ChatMessage]] = [:]
+    // Messages for when no page is selected (new project flow)
+    @State private var globalMessages: [ChatMessage] = []
+
     @State private var inputText = ""
     @State private var isLoading = false
+    @State private var clarificationQuestion: String?
+    @State private var clarificationOptions: [String] = []
 
     private let panelWidth: CGFloat = 320
+
+    // Get the selected page or fall back to first non-layout page
+    private var selectedPage: Page? {
+        if let pageId = selectedPageId {
+            return client.pages.first { $0.id == pageId }
+        }
+        return client.pages.first { $0.layoutVariant == nil }
+    }
+
+    // Current messages based on selected page
+    private var messages: [ChatMessage] {
+        if let pageId = selectedPageId {
+            return messagesByPage[pageId] ?? []
+        }
+        return globalMessages
+    }
+
+    private func addMessage(_ message: ChatMessage) {
+        if let pageId = selectedPageId {
+            if messagesByPage[pageId] == nil {
+                messagesByPage[pageId] = []
+            }
+            messagesByPage[pageId]?.append(message)
+        } else {
+            globalMessages.append(message)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,6 +76,28 @@ struct ChatPanel: View {
         }
         .frame(width: panelWidth)
         .background(Color(nsColor: .controlBackgroundColor))
+        .onChange(of: client.currentProject?.id) { _, _ in
+            // When project changes, check if it needs clarification
+            checkForClarification()
+        }
+        .onAppear {
+            checkForClarification()
+        }
+    }
+
+    private func checkForClarification() {
+        guard let project = client.currentProject,
+              project.status == .clarification,
+              let clarification = project.clarification,
+              let question = clarification.question,
+              let options = clarification.options,
+              !options.isEmpty else {
+            return
+        }
+
+        // Show clarification UI
+        clarificationQuestion = question
+        clarificationOptions = options
     }
 
     private var chatHeader: some View {
@@ -66,6 +124,7 @@ struct ChatPanel: View {
     private func statusText(for status: ProjectStatus) -> String {
         switch status {
         case .brief: return "Starting..."
+        case .clarification: return "Need info"
         case .moodboard: return "Moodboard ready"
         case .layouts: return "Layouts ready"
         case .editing: return "Ready to edit"
@@ -88,6 +147,11 @@ struct ChatPanel: View {
                             .id(message.id)
                     }
 
+                    // Clarification options
+                    if let question = clarificationQuestion, !clarificationOptions.isEmpty {
+                        clarificationView(question: question, options: clarificationOptions)
+                    }
+
                     if isLoading {
                         loadingIndicator
                     }
@@ -99,6 +163,122 @@ struct ChatPanel: View {
                     withAnimation {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
+                }
+            }
+            .onChange(of: webSocket.lastEvent) { _, event in
+                handleWebSocketEvent(event)
+            }
+        }
+    }
+
+    private func clarificationView(question: String, options: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(question)
+                .font(.system(size: 13))
+                .foregroundColor(.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .cornerRadius(12)
+
+            ForEach(options, id: \.self) { option in
+                Button(action: {
+                    selectClarificationOption(option)
+                }) {
+                    Text(option)
+                        .font(.system(size: 13))
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func handleWebSocketEvent(_ event: WebSocketEvent?) {
+        guard let event = event else { return }
+
+        switch event {
+        case .clarificationNeeded(let question, let options):
+            isLoading = false
+            clarificationQuestion = question
+            clarificationOptions = options
+            let response = ChatMessage(
+                role: .assistant,
+                content: "I need some clarification before I continue:",
+                timestamp: Date()
+            )
+            addMessage(response)
+
+        case .moodboardReady:
+            clarificationQuestion = nil
+            clarificationOptions = []
+            let response = ChatMessage(
+                role: .assistant,
+                content: "Great! I've created 3 moodboard options for you. Select one to continue.",
+                timestamp: Date()
+            )
+            addMessage(response)
+            // Refresh project
+            Task {
+                if let projectId = client.currentProject?.id {
+                    let project = try? await client.getProject(id: projectId)
+                    await MainActor.run {
+                        client.currentProject = project
+                    }
+                }
+            }
+
+        case .error(let message):
+            isLoading = false
+            let response = ChatMessage(
+                role: .assistant,
+                content: "Error: \(message)",
+                timestamp: Date()
+            )
+            addMessage(response)
+
+        default:
+            break
+        }
+    }
+
+    private func selectClarificationOption(_ option: String) {
+        guard let projectId = client.currentProject?.id else { return }
+
+        // Add user message
+        let userMessage = ChatMessage(role: .user, content: option, timestamp: Date())
+        addMessage(userMessage)
+
+        // Clear clarification UI
+        clarificationQuestion = nil
+        clarificationOptions = []
+        isLoading = true
+
+        Task {
+            do {
+                let _ = try await client.clarifyProject(projectId: projectId, answer: option)
+                await MainActor.run {
+                    let response = ChatMessage(
+                        role: .assistant,
+                        content: "Got it! Now searching for \(option) brand info...",
+                        timestamp: Date()
+                    )
+                    addMessage(response)
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    let response = ChatMessage(
+                        role: .assistant,
+                        content: "Error: \(error.localizedDescription)",
+                        timestamp: Date()
+                    )
+                    addMessage(response)
                 }
             }
         }
@@ -160,10 +340,14 @@ struct ChatPanel: View {
 
     private var placeholderText: String {
         if let project = client.currentProject {
-            switch project.status {
-            case .editing, .done:
-                return "Describe changes..."
-            default:
+            if project.status == .clarification {
+                return "Type your answer or select above..."
+            } else if !client.pages.isEmpty {
+                if let page = selectedPage {
+                    return "Edit \(page.name)..."
+                }
+                return "Select a page in sidebar to edit..."
+            } else {
                 return "Waiting for generation..."
             }
         }
@@ -178,33 +362,46 @@ struct ChatPanel: View {
 
         // Add user message
         let userMessage = ChatMessage(role: .user, content: text, timestamp: Date())
-        messages.append(userMessage)
+        addMessage(userMessage)
 
         isLoading = true
 
-        if let project = client.currentProject,
-           project.status == .editing || project.status == .done {
-            // Edit existing page
-            editPage(instruction: text)
-        } else if client.currentProject == nil {
-            // Create new project
-            createProject(brief: text)
+        print("[CHAT] Sending message: \(text.prefix(50))...")
+        print("[CHAT] Current project: \(client.currentProject?.id ?? "nil")")
+        print("[CHAT] Project status: \(client.currentProject?.status.rawValue ?? "nil")")
+        print("[CHAT] Selected page: \(selectedPageId ?? "nil")")
+
+        if let project = client.currentProject {
+            if project.status == .clarification {
+                print("[CHAT] -> Sending clarification")
+                selectClarificationOption(text)
+            } else if !client.pages.isEmpty {
+                // If we have pages, allow editing
+                print("[CHAT] -> Editing page (have \(client.pages.count) pages)")
+                editPage(instruction: text)
+            } else {
+                print("[CHAT] -> No pages yet (status: \(project.status)), showing wait message")
+                isLoading = false
+                let response = ChatMessage(
+                    role: .assistant,
+                    content: "Please wait while I finish generating...",
+                    timestamp: Date()
+                )
+                addMessage(response)
+            }
         } else {
-            // Project is generating, add waiting message
-            isLoading = false
-            let response = ChatMessage(
-                role: .assistant,
-                content: "Please wait while I finish generating...",
-                timestamp: Date()
-            )
-            messages.append(response)
+            print("[CHAT] -> Creating new project")
+            createProject(brief: text)
         }
     }
 
     private func createProject(brief: String) {
+        print("[CHAT] createProject called with: \(brief.prefix(50))...")
         Task {
             do {
+                print("[CHAT] Calling API createProject...")
                 let project = try await client.createProject(brief: brief)
+                print("[CHAT] Project created: \(project.id)")
                 await MainActor.run {
                     isLoading = false
                     // Notify parent to set selectedProjectId and connect WebSocket
@@ -214,9 +411,10 @@ struct ChatPanel: View {
                         content: "I'm creating your website. First, I'll generate some moodboard options for you to choose from...",
                         timestamp: Date()
                     )
-                    messages.append(response)
+                    addMessage(response)
                 }
             } catch {
+                print("[CHAT] createProject error: \(error)")
                 await MainActor.run {
                     isLoading = false
                     let response = ChatMessage(
@@ -224,79 +422,85 @@ struct ChatPanel: View {
                         content: "Sorry, something went wrong: \(error.localizedDescription)",
                         timestamp: Date()
                     )
-                    messages.append(response)
+                    addMessage(response)
                 }
             }
         }
     }
 
     private func editPage(instruction: String) {
+        print("[CHAT] editPage called with: \(instruction.prefix(50))...")
         guard let project = client.currentProject,
-              let page = client.pages.first(where: { $0.layoutVariant == nil }) else {
+              let page = selectedPage else {
+            print("[CHAT] editPage - no project or page selected")
+            print("[CHAT]   project: \(client.currentProject?.id ?? "nil")")
+            print("[CHAT]   selectedPage: \(selectedPage?.id ?? "nil")")
+            print("[CHAT]   selectedPageId: \(selectedPageId ?? "nil")")
+            print("[CHAT]   pages count: \(client.pages.count)")
             isLoading = false
+            let response = ChatMessage(
+                role: .assistant,
+                content: "Please select a page from the sidebar first.",
+                timestamp: Date()
+            )
+            addMessage(response)
             return
         }
+        print("[CHAT] editPage - editing page: \(page.id) (\(page.name))")
 
         Task {
             do {
-                // 1. Get structured edit instructions from server (small, fast)
-                let editResponse = try await client.getStructuredEdit(
+                // Use editPage which creates versions automatically
+                print("[CHAT] Calling editPage API...")
+                let updated = try await client.editPage(
                     projectId: project.id,
                     pageId: page.id,
-                    instruction: instruction,
-                    currentHtml: page.html
+                    instruction: instruction
                 )
+                print("[CHAT] Edit succeeded, new version: \(updated.currentVersion)")
 
-                // 2. Apply edits locally (instant!)
-                let updatedHtml = HTMLEditor.apply(edits: editResponse.edits, to: page.html)
-
-                // 3. Update local state immediately
                 await MainActor.run {
+                    // Update page in local array
+                    print("[CHAT] Got updated page with version: \(updated.currentVersion)")
                     if let index = client.pages.firstIndex(where: { $0.id == page.id }) {
-                        var updatedPage = client.pages[index]
-                        updatedPage = Page(
-                            id: updatedPage.id,
-                            name: updatedPage.name,
-                            html: updatedHtml,
-                            layoutVariant: updatedPage.layoutVariant
-                        )
-                        client.pages[index] = updatedPage
+                        let oldVersion = client.pages[index].currentVersion
+                        client.pages[index] = updated
+                        print("[CHAT] Updated page in array: v\(oldVersion) -> v\(updated.currentVersion)")
                     }
+                    isLoading = false
+                    let response = ChatMessage(
+                        role: .assistant,
+                        content: "Done! Updated to version \(updated.currentVersion).",
+                        timestamp: Date()
+                    )
+                    addMessage(response)
                 }
-
-                // 4. Sync to server in background (non-blocking)
-                let _ = try await client.syncPage(
-                    projectId: project.id,
-                    pageId: page.id,
-                    html: updatedHtml
-                )
-
+            } catch {
+                print("[CHAT] Edit failed: \(error)")
                 await MainActor.run {
                     isLoading = false
                     let response = ChatMessage(
                         role: .assistant,
-                        content: editResponse.explanation.isEmpty
-                            ? "Done! I've updated the design."
-                            : editResponse.explanation,
+                        content: "Sorry, I couldn't make that change: \(error.localizedDescription)",
                         timestamp: Date()
                     )
-                    messages.append(response)
+                    addMessage(response)
                 }
-            } catch {
-                // Fallback to legacy edit if structured edit fails
-                await fallbackLegacyEdit(project: project, page: page, instruction: instruction)
             }
         }
     }
 
     /// Fallback to full HTML edit if structured edit fails
     private func fallbackLegacyEdit(project: Project, page: Page, instruction: String) async {
+        print("[CHAT] fallbackLegacyEdit called")
         do {
+            print("[CHAT] Calling legacy editPage API...")
             let updated = try await client.editPage(
                 projectId: project.id,
                 pageId: page.id,
                 instruction: instruction
             )
+            print("[CHAT] Legacy edit succeeded")
             await MainActor.run {
                 if let index = client.pages.firstIndex(where: { $0.id == page.id }) {
                     client.pages[index] = updated
@@ -307,9 +511,10 @@ struct ChatPanel: View {
                     content: "Done! I've updated the design.",
                     timestamp: Date()
                 )
-                messages.append(response)
+                addMessage(response)
             }
         } catch {
+            print("[CHAT] Legacy edit failed: \(error)")
             await MainActor.run {
                 isLoading = false
                 let response = ChatMessage(
@@ -317,7 +522,7 @@ struct ChatPanel: View {
                     content: "Sorry, I couldn't make that change: \(error.localizedDescription)",
                     timestamp: Date()
                 )
-                messages.append(response)
+                addMessage(response)
             }
         }
     }

@@ -1,79 +1,78 @@
 import SwiftUI
 
-/// View for displaying and selecting layout alternatives
+/// View for displaying and selecting layout alternatives - one at a time with dot navigation
 struct LayoutCarousel: View {
     let pages: [Page]
     @Binding var selectedVariant: Int?
     let onSelect: () -> Void
 
+    @State private var currentIndex: Int = 0
+
     // Filter to only layout variants
     var layoutVariants: [Page] {
-        pages.filter { $0.layoutVariant != nil }
+        pages.filter { $0.layoutVariant != nil }.sorted { ($0.layoutVariant ?? 0) < ($1.layoutVariant ?? 0) }
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text("Choose a layout")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(layoutVariants) { page in
-                        LayoutCard(
-                            page: page,
-                            isSelected: selectedVariant == page.layoutVariant
-                        ) {
-                            selectedVariant = page.layoutVariant
-                        }
-                    }
-                }
-                .padding(.horizontal, 40)
+        ZStack(alignment: .top) {
+            // Full-size preview of current layout
+            if !layoutVariants.isEmpty && currentIndex < layoutVariants.count {
+                HTMLWebView(html: layoutVariants[currentIndex].html)
+                    .ignoresSafeArea()
             }
 
-            if selectedVariant != nil {
-                Button(action: onSelect) {
-                    Text("Continue with this layout")
-                        .font(.system(size: 14, weight: .medium))
+            // Navigation overlay at top
+            VStack(spacing: 0) {
+                // Dot navigation
+                HStack(spacing: 12) {
+                    ForEach(Array(layoutVariants.enumerated()), id: \.offset) { index, page in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                currentIndex = index
+                                selectedVariant = page.layoutVariant
+                            }
+                        } label: {
+                            Circle()
+                                .fill(currentIndex == index ? Color.primary : Color.secondary.opacity(0.4))
+                                .frame(width: currentIndex == index ? 10 : 8, height: currentIndex == index ? 10 : 8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 20)
+                .background(.ultraThinMaterial)
+                .cornerRadius(20)
+                .padding(.top, 16)
+
+                Spacer()
+
+                // Continue button at bottom
+                if selectedVariant != nil {
+                    Button(action: onSelect) {
+                        HStack(spacing: 8) {
+                            Text("Use this layout")
+                                .font(.system(size: 14, weight: .semibold))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
                         .foregroundColor(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(Color.blue)
-                        .cornerRadius(8)
+                        .cornerRadius(100)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 24)
                 }
-                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct LayoutCard: View {
-    let page: Page
-    let isSelected: Bool
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            VStack(spacing: 12) {
-                // Mini preview
-                HTMLWebView(html: page.html)
-                    .frame(width: 300, height: 400)
-                    .cornerRadius(8)
-                    .clipped()
-
-                Text("Layout \(page.layoutVariant ?? 0)")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.primary)
+        .onAppear {
+            // Select first layout by default
+            if selectedVariant == nil && !layoutVariants.isEmpty {
+                selectedVariant = layoutVariants[0].layoutVariant
             }
-            .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
-            )
         }
-        .buttonStyle(.plain)
     }
 }
