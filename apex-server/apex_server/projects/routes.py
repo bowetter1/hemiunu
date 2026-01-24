@@ -15,23 +15,39 @@ from apex_server.shared.dependencies import get_current_user
 from apex_server.auth.models import User
 from .models import Project, Page, ProjectLog, ProjectStatus
 from .generator import Generator
-from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error
+from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error, notify_clarification_needed
 from .structured_edit import generate_structured_edit, StructuredEditResponse
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 settings = get_settings()
 
 # Event loop for async notifications from sync code
-_loop = None
+_main_loop = None
 
-def get_event_loop():
-    global _loop
-    if _loop is None:
+def set_main_loop():
+    """Store reference to main event loop (call from async context)"""
+    global _main_loop
+    try:
+        _main_loop = asyncio.get_running_loop()
+        print("[MAIN LOOP] Stored main event loop reference", flush=True)
+    except RuntimeError:
+        pass
+
+def notify_from_thread(coro):
+    """Run an async notification from a background thread"""
+    global _main_loop
+    if _main_loop is not None and _main_loop.is_running():
+        # Schedule on main loop - this is the correct way!
+        future = asyncio.run_coroutine_threadsafe(coro, _main_loop)
         try:
-            _loop = asyncio.get_running_loop()
-        except RuntimeError:
-            _loop = asyncio.new_event_loop()
-    return _loop
+            future.result(timeout=5)  # Wait up to 5 seconds
+            print("[WS] Notification sent via main loop", flush=True)
+        except Exception as e:
+            print(f"[WS] Notification failed: {e}", flush=True)
+    else:
+        # Fallback: create new loop (won't have connections, but won't crash)
+        print("[WS] Warning: No main loop, using asyncio.run()", flush=True)
+        asyncio.run(coro)
 
 
 # === WebSocket Endpoint ===
@@ -39,6 +55,9 @@ def get_event_loop():
 @router.websocket("/{project_id}/ws")
 async def websocket_endpoint(websocket: WebSocket, project_id: uuid.UUID):
     """WebSocket connection for real-time project updates"""
+    # Store main loop reference for background thread notifications
+    set_main_loop()
+
     await manager.connect(websocket, str(project_id))
     try:
         while True:
@@ -62,6 +81,7 @@ class ProjectResponse(BaseModel):
     brief: str
     status: str
     moodboard: Optional[dict] = None
+    clarification: Optional[dict] = None  # Question and options when status is CLARIFICATION
     selected_moodboard: Optional[int] = None
     selected_layout: Optional[int] = None
     created_at: str
@@ -104,6 +124,10 @@ class AddPageRequest(BaseModel):
     description: Optional[str] = None
 
 
+class ClarifyRequest(BaseModel):
+    answer: str  # User's clarification answer
+
+
 class SelectMoodboardRequest(BaseModel):
     variant: int  # 1, 2, or 3
 
@@ -120,6 +144,7 @@ def project_to_response(project: Project) -> ProjectResponse:
         brief=project.brief,
         status=project.status.value,
         moodboard=project.moodboard,
+        clarification=project.clarification,
         selected_moodboard=project.selected_moodboard,
         selected_layout=project.selected_layout,
         created_at=project.created_at.isoformat(),
@@ -144,7 +169,7 @@ def create_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Create a new project and start moodboard generation"""
+    """Create a new project and start PHASE 1 (search and maybe clarify)"""
     project_id = uuid.uuid4()
     project_dir = str(Path(settings.storage_path) / str(project_id))
 
@@ -158,11 +183,89 @@ def create_project(
     db.commit()
     db.refresh(project)
 
-    # Create directory
-    Path(project_dir).mkdir(parents=True, exist_ok=True)
+    # Create directory (may fail on Railway - that's OK)
+    try:
+        Path(project_dir).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
-    # Start moodboard generation in background
-    def generate_moodboard_bg(project_id: uuid.UUID):
+    # Start PHASE 1 in background: search and check if clarification needed
+    def phase1_search_bg(project_id: uuid.UUID):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        db_url = str(settings.database_url)
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        engine = create_engine(db_url)
+        SessionLocal = sessionmaker(bind=engine)
+        db = SessionLocal()
+        try:
+            project = db.query(Project).filter_by(id=project_id).first()
+            if project:
+                gen = Generator(project, db)
+                result = gen.search_and_clarify()
+
+                if result.get("needs_clarification"):
+                    # Send WebSocket notification with question
+                    notify_from_thread(notify_clarification_needed(
+                        str(project_id),
+                        result.get("question", ""),
+                        result.get("options", [])
+                    ))
+                else:
+                    # No clarification needed - continue to Phase 2
+                    moodboards = gen.generate_moodboard()
+                    notify_from_thread(notify_moodboard_ready(str(project_id), moodboards))
+        except Exception as e:
+            print(f"[ERROR] Phase 1 failed: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            project = db.query(Project).filter_by(id=project_id).first()
+            if project:
+                project.status = ProjectStatus.FAILED
+                project.error_message = str(e)
+                db.commit()
+                notify_from_thread(notify_error(str(project_id), str(e)))
+        finally:
+            db.close()
+
+    run_in_background(phase1_search_bg, project.id)
+
+    return project_to_response(project)
+
+
+@router.post("/{project_id}/clarify", response_model=ProjectResponse)
+def clarify_project(
+    project_id: uuid.UUID,
+    request: ClarifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Provide clarification answer and continue to PHASE 2 (moodboard generation).
+    Called when project status is CLARIFICATION.
+    """
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.status != ProjectStatus.CLARIFICATION:
+        raise HTTPException(status_code=400, detail="Project is not waiting for clarification")
+
+    # Save the answer
+    clarification = project.clarification or {}
+    clarification["answer"] = request.answer
+    project.clarification = clarification
+    db.commit()
+
+    print(f"[CLARIFY] Received answer for {project_id}: {request.answer}", flush=True)
+
+    # Continue to Phase 2 in background
+    def phase2_moodboard_bg(project_id: uuid.UUID):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         db_url = str(settings.database_url)
@@ -176,19 +279,21 @@ def create_project(
             if project:
                 gen = Generator(project, db)
                 moodboards = gen.generate_moodboard()
-                # Send WebSocket notification
-                asyncio.run(notify_moodboard_ready(str(project_id), moodboards))
+                notify_from_thread(notify_moodboard_ready(str(project_id), moodboards))
         except Exception as e:
+            print(f"[ERROR] Phase 2 failed: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 project.status = ProjectStatus.FAILED
                 project.error_message = str(e)
                 db.commit()
-                asyncio.run(notify_error(str(project_id), str(e)))
+                notify_from_thread(notify_error(str(project_id), str(e)))
         finally:
             db.close()
 
-    run_in_background(generate_moodboard_bg, project.id)
+    run_in_background(phase2_moodboard_bg, project.id)
 
     return project_to_response(project)
 
@@ -256,6 +361,9 @@ def select_moodboard(
     db: Session = Depends(get_db)
 ):
     """Select a moodboard variant (1, 2, or 3) and start layout generation"""
+    # Refresh to get latest status from database
+    db.expire_all()
+
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
@@ -264,11 +372,17 @@ def select_moodboard(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    print(f"[SELECT-MOODBOARD] Project {project_id} status: {project.status}", flush=True)
+    print(f"[SELECT-MOODBOARD] Moodboard data: {project.moodboard is not None}", flush=True)
+    print(f"[SELECT-MOODBOARD] Requested variant: {request.variant}", flush=True)
+
     if project.status != ProjectStatus.MOODBOARD:
-        raise HTTPException(status_code=400, detail="Project must be in moodboard phase")
+        raise HTTPException(status_code=400, detail=f"Project must be in moodboard phase (current: {project.status})")
 
     # Validate variant
     moodboards = project.moodboard.get("moodboards", []) if project.moodboard else []
+    print(f"[SELECT-MOODBOARD] Number of moodboards: {len(moodboards)}", flush=True)
+
     if request.variant < 1 or request.variant > len(moodboards):
         raise HTTPException(status_code=400, detail=f"Invalid moodboard variant. Must be 1-{len(moodboards)}")
 
@@ -278,6 +392,7 @@ def select_moodboard(
 
     # Generate layouts in background
     def generate_layouts_bg(project_id: uuid.UUID):
+        print(f"[LAYOUTS] Starting layout generation for {project_id}", flush=True)
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         db_url = str(settings.database_url)
@@ -289,20 +404,28 @@ def select_moodboard(
         try:
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
+                print(f"[LAYOUTS] Calling generator for {project_id}", flush=True)
                 gen = Generator(project, db)
                 layouts = gen.generate_layouts()
-                # Send WebSocket notification
-                asyncio.run(notify_layouts_ready(str(project_id), layouts))
+                print(f"[LAYOUTS] Done! Generated {len(layouts)} layouts", flush=True)
+                # Send WebSocket notification via main loop
+                print(f"[LAYOUTS] Sending WebSocket notification...", flush=True)
+                notify_from_thread(notify_layouts_ready(str(project_id), layouts))
+                print(f"[LAYOUTS] WebSocket notification sent!", flush=True)
         except Exception as e:
+            print(f"[LAYOUTS] Error: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 project.status = ProjectStatus.FAILED
                 project.error_message = str(e)
                 db.commit()
-                asyncio.run(notify_error(str(project_id), str(e)))
+                notify_from_thread(notify_error(str(project_id), str(e)))
         finally:
             db.close()
 
+    print(f"[SELECT-MOODBOARD] Starting layout generation in background", flush=True)
     run_in_background(generate_layouts_bg, project.id)
 
     return project_to_response(project)
@@ -344,14 +467,14 @@ def generate_layouts(
             if project:
                 gen = Generator(project, db)
                 layouts = gen.generate_layouts()
-                asyncio.run(notify_layouts_ready(str(project_id), layouts))
+                notify_from_thread(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 project.status = ProjectStatus.FAILED
                 project.error_message = str(e)
                 db.commit()
-                asyncio.run(notify_error(str(project_id), str(e)))
+                notify_from_thread(notify_error(str(project_id), str(e)))
         finally:
             db.close()
 

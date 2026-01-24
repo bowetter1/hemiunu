@@ -14,7 +14,7 @@ from apex_server.shared.database import init_db
 
 # Import routers
 from apex_server.auth.routes import router as auth_router
-from apex_server.projects.routes import router as projects_router
+from apex_server.projects.routes import router as projects_router, set_main_loop
 
 settings = get_settings()
 
@@ -26,6 +26,8 @@ async def lifespan(app: FastAPI):
     print("Starting Apex Server...")
     init_db()
     print("Database initialized")
+    # Store main event loop for background thread notifications
+    set_main_loop()
     yield
     # Shutdown
     print("Shutting down...")
