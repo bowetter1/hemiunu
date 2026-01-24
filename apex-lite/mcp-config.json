@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "apex-lite": {
+      "command": "/usr/bin/env",
+      "args": ["python3", "mcp_server.py"],
+      "cwd": "/Users/bowetter/Desktop/news/apex-lite"
+    }
+  }
+}

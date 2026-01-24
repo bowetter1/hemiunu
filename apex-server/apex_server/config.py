@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Database (SQLite for dev, PostgreSQL for prod)
+    # Railway sets DATABASE_URL automatically when you add PostgreSQL
     database_url: str = "sqlite:///./apex.db"
 
     # Auth

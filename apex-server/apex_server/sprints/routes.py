@@ -13,7 +13,8 @@ from apex_server.shared.dependencies import get_current_user
 from apex_server.shared.tools import list_files, read_file
 from apex_server.auth.models import User
 from .models import SprintStatus, LogEntry
-from .service import SprintService, SprintRunner
+from .service import SprintService
+from .simple_runner import SimpleSprintRunner
 
 router = APIRouter(prefix="/sprints", tags=["sprints"])
 settings = get_settings()
@@ -106,7 +107,7 @@ def run_sprint_background(sprint_id: uuid.UUID, db_url: str):
         try:
             sprint = db.query(Sprint).filter_by(id=sprint_id).first()
             if sprint:
-                runner = SprintRunner(sprint, db)
+                runner = SimpleSprintRunner(sprint, db)
                 runner.run()
         except Exception as e:
             print(f"Sprint error: {e}")

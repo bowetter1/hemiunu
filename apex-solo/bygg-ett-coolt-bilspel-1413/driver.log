@@ -1,0 +1,82 @@
+[14:13:13] THINK: Starting a cool car game project. Following the sprint methodology - Sprint 0 is MANDATORY research before any code. I need to browse real games for inspiration, find color palettes, and create INSPIRATION.md before writing a single line of code.
+[14:13:17] BROWSE: https://itch.io/games/tag-racing
+[14:13:17] BROWSE_OK: 6143 chars from https://itch.io/games/tag-racing
+[14:13:17] BROWSE: https://itch.io/games/top-rated
+[14:13:17] BROWSE_OK: 8021 chars from https://itch.io/games/top-rated
+[14:13:26] BROWSER: https://itch.io/games/tag-racing
+[14:13:26] RESEARCH: Found many racing games - standouts: PolyTrack (high speed low-poly, clean aesthetic), Tanuki Sunset (retro themed, raccoon on longboard - unique!), VEKTOR 2089 (futuristic anti-gravity), Nightmare Kart (PS1 horror kart - gothic style), Pico Racer (pixel art racing). Also noticed "Cursor Car" - race around desktop, very creative! Drift Apocalypse combines driving with zombie running over. Many games use retro/PSX aesthetic or low-poly 3D.
+[14:13:26] BROWSER: https://itch.io/games/top-rated
+[14:13:26] RESEARCH: Top rated games tend to be visual novels and story-driven games. Friday Night Funkin' is top rhythm game. A Short Hike shows polished indie aesthetic with soft colors. Celeste demonstrates tight controls and juicy feedback. Sort the Court shows simple mechanics can be engaging with good polish. Key insight: polish and unique hooks matter more than complexity.
+[14:13:29] BROWSE: https://dribbble.com/search/game-ui
+[14:13:29] BROWSE_OK: 157 chars from https://dribbble.com/search/game-ui
+[14:13:29] BROWSE: https://dribbble.com/search/racing-game
+[14:13:30] BROWSE_OK: 157 chars from https://dribbble.com/search/racing-game
+[14:13:32] BROWSE: https://www.pinterest.com/search/pins/?q=racing%20game%20ui
+[14:13:33] BROWSE_OK: 75 chars from https://www.pinterest.com/search/pins/?q=racing%20game%20ui
+[14:13:33] EXTRACT_COLORS: https://coolors.co/palettes/trending
+[14:13:33] COLORS_FOUND: 15 colors
+[14:13:37] BROWSE: https://lospec.com/palette-list
+[14:13:38] BROWSE_OK: 7945 chars from https://lospec.com/palette-list
+[14:13:38] BROWSE: https://itch.io/games/tag-racing/tag-top-down
+[14:13:38] BROWSE_ERROR: HTTP 403
+[14:13:44] BROWSE: https://lospec.com/palette-list/slso8
+[14:13:45] BROWSE_OK: 6550 chars from https://lospec.com/palette-list/slso8
+[14:13:45] BROWSE: https://colorhunt.co/palettes/dark
+[14:13:45] BROWSE_OK: 1009 chars from https://colorhunt.co/palettes/dark
+[14:13:50] BROWSER: https://lospec.com/palette-list/slso8
+[14:13:50] RESEARCH: SLSO8 is a stunning 8-color palette by Luis Miguel Maldonado. Colors: #0d2b45 (deep navy), #203c56 (dark blue), #544e68 (muted purple), #8d697a (dusty rose), #d08159 (warm orange), #ffaa5e (bright orange), #ffd4a3 (peach), #ffecd6 (cream). This is a warm sunset/cozy palette with 77k downloads - very popular. Great for atmospheric games.
+[14:13:53] BROWSE: https://lospec.com/palette-list/apollo
+[14:13:54] BROWSE_OK: 6368 chars from https://lospec.com/palette-list/apollo
+[14:13:54] GITHUB_SEARCH: phaser 3 racing game top-down
+[14:14:10] BROWSER: https://lospec.com/palette-list/apollo
+[14:14:10] RESEARCH: Apollo palette by AdamCYounis - 46 colors, extremely versatile. Has full color ramps for: blues (#172038 to #a4dddb), greens (#19332d to #d0da91), warm browns/oranges (#4d2b32 to #e7d5b3), reds/oranges (#341c27 to #e8c170), pinks/purples (#241527 to #df84a5), and grays (#090a14 to #ebede9). This is professional-grade and highly popular (170k downloads). Perfect for a polished game with varied environments.
+[14:14:10] THINK: I've done good research. Now I need to think about a UNIQUE concept for a car game. Common car games: racing, driving simulator, destruction derby, delivery games. Let me think of combinations that are unusual.
+
+Ideas:
+1. Racing + music/rhythm - accelerate to the beat
+2. Car + puzzle - arrange roads as you drive
+3. Driving + stealth - evade detection while delivering cargo at night
+4. Car + gardening - you're a car that plants seeds as you drive trails
+5. Drifting + painting - your tire marks create art scores
+6. Taxi + horror - pick up increasingly strange passengers at night
+7. Car + time manipulation - rewind time to avoid crashes
+8. Night driving + atmospheric - focus on mood, not speed
+
+I like the "Drift Painting" concept - your drifts leave trails and you're scored on the art/patterns you create. It combines racing skills with creative expression. Or "Night Drive" - atmospheric driving game where you're just driving through a beautiful night landscape, dodging obstacles, with the goal being to drive as far as possible while enjoying the vibe.
+
+Actually, let me think more uniquely: What about "Delivery + Drifting"? You're a midnight delivery driver, but you can only brake by drifting, and the packages slide around in your car. You need to drift precisely to stop at delivery points without the packages flying out.
+
+Or simpler: "Drift Trail" - top-down drifting game where your tire marks are the score. Create beautiful patterns while avoiding obstacles. The more artistic your drift trail, the higher your score.
+[14:14:12] BROWSE: https://itch.io/games/tag-drift
+[14:14:13] BROWSE_OK: 6431 chars from https://itch.io/games/tag-drift
+[14:14:25] BROWSER: https://itch.io/games/tag-drift
+[14:14:25] RESEARCH: Found "Drift Delivery" by JackRoper - "The delivery game where you can only drift" - someone already did my idea! Also interesting: Tanuki Sunset (longboard drifting), Drift Apocalypse (zombies), CRT Racer (retro look), "perfect park" (competitive parking with drifts). Most drift games focus on TIME or SCORE, not artistic expression. No one seems to be doing "drift art" or trail-based scoring. Also noticed: few games combine drifting with something unexpected. Most are pure racing/simulation.
+[14:14:25] THINK: The "Drift Delivery" concept exists, but "Drift Art" or trail-painting scoring is unique! Let me refine this:
+
+CONCEPT: "NEON TRAILS" or "DRIFT CANVAS"
+- Top-down car game
+- Night setting with neon aesthetic
+- Your car leaves glowing tire trails when you drift
+- Score is based on:
+  1. Trail length (longer drifts = more points)
+  2. Near-misses with obstacles (bonus points)
+  3. Trail patterns (loops, figures, etc.)
+- The trails persist and create a beautiful neon painting
+- Obstacles to avoid: other cars, barriers, hazards
+- Power-ups: different trail colors, thicker trails, shield
+
+Unique hook: "Your driving IS the art. Drift to paint the night."
+
+This is unique because:
+- Most racing games: speed focus
+- Most drift games: technique/time focus
+- This game: creative/aesthetic focus - your gameplay creates visual art
+
+Color palette: I'll use the SLSO8 palette's warm colors against a dark blue background. The sunset oranges will glow beautifully as neon trails.
+[14:14:31] VISION: Neon Drift - Your drifts paint glowing trails - drive to create art in the night
+[14:14:58] WRITE: INSPIRATION.md (78 rader)
+[14:15:06] NPM_INSTALL: phaser
+[14:15:07] NPM_DONE: phaser
+[14:15:15] WRITE: main.py (44 rader)
+[14:15:21] WRITE: index.html (48 rader)
+[14:15:33] WRITE: src/config/constants.js (60 rader)

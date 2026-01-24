@@ -194,10 +194,13 @@ Rules:
 
         # Save layouts as pages
         for i, layout in enumerate(layouts, 1):
-            # Save HTML file
-            file_path = self.project_dir / f"layout_{i}.html"
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(layout["html"])
+            # Try to save HTML file (optional - may fail on Railway)
+            try:
+                file_path = self.project_dir / f"layout_{i}.html"
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text(layout["html"])
+            except Exception:
+                pass  # File storage is optional, DB is the source of truth
 
             # Create page record
             page = Page(
@@ -245,9 +248,13 @@ Rules:
         if not page:
             raise ValueError(f"Layout {variant} not found")
 
-        # Save as index.html
-        file_path = self.project_dir / "index.html"
-        file_path.write_text(page.html)
+        # Try to save as index.html (optional - may fail on Railway)
+        try:
+            self.project_dir.mkdir(parents=True, exist_ok=True)
+            file_path = self.project_dir / "index.html"
+            file_path.write_text(page.html)
+        except Exception as e:
+            print(f"Could not save file (non-critical): {e}")
 
         # Update page to be the main page
         page.name = "Home"
@@ -297,10 +304,14 @@ Respond ONLY with the updated HTML code, nothing else.""",
         page.html = new_html.strip()
         self.db.commit()
 
-        # Save to file
-        file_name = "index.html" if page.name == "Home" else f"{page.name.lower()}.html"
-        file_path = self.project_dir / file_name
-        file_path.write_text(page.html)
+        # Try to save to file (optional)
+        try:
+            file_name = "index.html" if page.name == "Home" else f"{page.name.lower()}.html"
+            file_path = self.project_dir / file_name
+            self.project_dir.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(page.html)
+        except Exception:
+            pass  # File storage optional
 
         self.log("edit", "Edit complete")
         return page.html
@@ -354,9 +365,13 @@ Respond ONLY with complete HTML code.""",
         self.db.add(page)
         self.db.commit()
 
-        # Save to file
-        file_path = self.project_dir / f"{name.lower()}.html"
-        file_path.write_text(page.html)
+        # Try to save to file (optional)
+        try:
+            self.project_dir.mkdir(parents=True, exist_ok=True)
+            file_path = self.project_dir / f"{name.lower()}.html"
+            file_path.write_text(page.html)
+        except Exception:
+            pass  # File storage optional
 
         self.log("edit", f"Page '{name}' created")
         return page

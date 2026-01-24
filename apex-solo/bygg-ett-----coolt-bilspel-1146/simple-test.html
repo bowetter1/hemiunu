@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRAVSHIFT - Simple Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0f;
+            color: #00ffff;
+            font-family: monospace;
+        }
+        #debug-log {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ffff;
+            font-family: monospace;
+            font-size: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            border: 1px solid #00ffff;
+            z-index: 1000;
+        }
+        #game-container {
+            width: 1280px;
+            height: 720px;
+            margin: 20px auto;
+            border: 2px solid #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <h1>GRAVSHIFT - Simple Rendering Test</h1>
+    <p>Testar grundläggande rendering utan alla managers...</p>
+    <div id="debug-log">Debug Log:<br></div>
+    <div id="game-container"></div>
+
+    <!-- Phaser 3 Engine -->
+    <script src="node_modules/phaser/dist/phaser.min.js"></script>
+
+    <!-- Basic test script -->
+    <script>
+        // Override console.log to show in debug panel
+        const originalLog = console.log;
+        const debugLog = document.getElementById('debug-log');
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ');
+            debugLog.innerHTML += message + '<br>';
+            debugLog.scrollTop = debugLog.scrollHeight;
+        };
+
+        // Simple test scene
+        class TestScene extends Phaser.Scene {
+            create() {
+                console.log('TestScene.create() called');
+
+                const width = this.scale.width;
+                const height = this.scale.height;
+
+                // Add background
+                this.add.rectangle(width / 2, height / 2, width, height, 0x0000ff);
+                console.log('Added blue background');
+
+                // Add text
+                this.add.text(width / 2, height / 2, 'RENDERING WORKS!', {
+                    fontSize: '48px',
+                    color: '#ffffff',
+                    fontFamily: 'Arial',
+                }).setOrigin(0.5);
+                console.log('Added test text');
+
+                // Add some shapes
+                this.add.circle(200, 200, 50, 0xff0000);
+                this.add.rectangle(400, 300, 100, 100, 0x00ff00);
+                console.log('Added shapes');
+            }
+
+            update() {
+                console.log('TestScene.update() called');
+            }
+        }
+
+        // Initialize Phaser
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Starting simple Phaser test...');
+
+            const config = {
+                type: Phaser.AUTO,
+                parent: 'game-container',
+                width: 1280,
+                height: 720,
+                backgroundColor: 0x000000,
+                scene: TestScene,
+            };
+
+            const game = new Phaser.Game(config);
+            console.log('Phaser game created');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRAVSHIFT - Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0f;
+            color: #00ffff;
+            font-family: monospace;
+        }
+        button {
+            background: #00ffff;
+            color: #0a0a0f;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #00cccc;
+        }
+        #debug-log {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ffff;
+            font-family: monospace;
+            font-size: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            border: 1px solid #00ffff;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <h1>GRAVSHIFT Debug Test</h1>
+    <p>Öppna browser console (F12) för att använda debug-kommandon:</p>
+    <p><strong>Level 5 - Gravity Storm:</strong> En utmanande bana i Chaos-zonen med slumpmässiga gravity-fluktuationer!</p>
+    <p><strong>Svårighetsgrad:</strong> 5/5 | <strong>Längd:</strong> 7000 enheter | <strong>Mål:</strong> Överlevnad i 60 sekunder</p>
+    <p><strong>Tips:</strong> Använd SHIELD power-ups ofta! Gravity vänder slumpmässigt - håll dig nära mitten av banan!</p>
+    <p><strong>Debug:</strong> <a href="simple-test.html" style="color: #ff00ff;">Testa enkel rendering</a> om GRAVSHIFT inte fungerar</p>
+
+    <button onclick="GRAVSHIFT.goToLevelSelect()">Go to Level Select</button>
+    <button onclick="GRAVSHIFT.goToLevel(1)">Go to Level 1</button>
+    <button onclick="GRAVSHIFT.goToLevel(5)">Go to Level 5 (Gravity Storm)</button>
+    <button onclick="GRAVSHIFT.unlockAll()">Unlock All Levels</button>
+    <button onclick="GRAVSHIFT.resetProgress()">Reset Progress</button>
+    <button onclick="GRAVSHIFT.stats()">Show Stats</button>
+
+    <div id="debug-log">Debug Log:<br></div>
+    <div id="game-container" style="width: 1280px; height: 720px; margin: 20px auto; border: 2px solid #00ffff;"></div>
+
+    <!-- Phaser 3 Engine -->
+    <script src="node_modules/phaser/dist/phaser.min.js"></script>
+
+    <!-- Game scripts -->
+    <script src="src/config/constants.js"></script>
+    <script src="src/config/levels.js"></script>
+    <script src="src/config/tracks.js"></script>
+    <script src="src/utils/math.js"></script>
+    <script src="src/utils/colors.js"></script>
+    <script src="src/utils/easing.js"></script>
+    <script src="src/systems/AudioManager.js"></script>
+    <script src="src/systems/ScoreManager.js"></script>
+    <script src="src/systems/LevelManager.js"></script>
+    <script src="src/systems/ParticleManager.js"></script>
+    <script src="src/systems/InputManager.js"></script>
+    <script src="src/systems/CameraManager.js"></script>
+    <script src="src/systems/CollisionManager.js"></script>
+    <script src="src/systems/EffectsManager.js"></script>
+    <script src="src/systems/AchievementManager.js"></script>
+    <script src="src/systems/GarageManager.js"></script>
+    <script src="src/systems/ReplayManager.js"></script>
+    <script src="src/systems/LeaderboardManager.js"></script>
+    <script src="src/systems/TutorialManager.js"></script>
+    <script src="src/systems/DailyChallengeManager.js"></script>
+    <script src="src/systems/WeatherSystem.js"></script>
+    <script src="src/systems/CameraEffects.js"></script>
+    <script src="src/systems/SaveManager.js"></script>
+    <script src="src/systems/MissionSystem.js"></script>
+    <script src="src/systems/ShopSystem.js"></script>
+    <script src="src/systems/MultiplayerManager.js"></script>
+    <script src="src/systems/AnalyticsManager.js"></script>
+    <script src="src/systems/LocalizationManager.js"></script>
+    <script src="src/systems/NotificationManager.js"></script>
+    <script src="src/systems/SocialManager.js"></script>
+    <script src="src/entities/Vehicle.js"></script>
+    <script src="src/entities/Player.js"></script>
+    <script src="src/entities/Ghost.js"></script>
+    <script src="src/entities/Obstacle.js"></script>
+    <script src="src/entities/PowerUp.js"></script>
+    <script src="src/entities/Checkpoint.js"></script>
+    <script src="src/track/TrackSegment.js"></script>
+    <script src="src/track/TrackBuilder.js"></script>
+    <script src="src/track/TrackRenderer.js"></script>
+    <script src="src/ui/Button.js"></script>
+    <script src="src/ui/HUD.js"></script>
+    <script src="src/ui/Speedometer.js"></script>
+    <script src="src/ui/MiniMap.js"></script>
+    <script src="src/ui/LevelSelect.js"></script>
+    <script src="src/ui/SettingsPanel.js"></script>
+    <script src="src/scenes/BootScene.js"></script>
+    <script src="src/scenes/PreloadScene.js"></script>
+    <script src="src/scenes/MenuScene.js"></script>
+    <script src="src/scenes/TutorialScene.js"></script>
+    <script src="src/scenes/LevelSelectScene.js"></script>
+    <script src="src/scenes/GameScene.js"></script>
+    <script src="src/scenes/PauseScene.js"></script>
+    <script src="src/scenes/GameOverScene.js"></script>
+    <script src="src/scenes/VictoryScene.js"></script>
+    <script src="src/scenes/SettingsScene.js"></script>
+    <script src="src/scenes/CreditsScene.js"></script>
+    <script src="src/scenes/AchievementsScene.js"></script>
+    <script src="src/scenes/GarageScene.js"></script>
+    <script src="src/scenes/StatsScene.js"></script>
+    <script src="src/scenes/LeaderboardScene.js"></script>
+    <script src="src/scenes/ReplayScene.js"></script>
+    <script src="src/scenes/MissionScene.js"></script>
+    <script src="src/scenes/ShopScene.js"></script>
+    <script src="src/scenes/MultiplayerLobbyScene.js"></script>
+    <script src="src/scenes/DailyChallengeScene.js"></script>
+    <script src="src/scenes/ProfileScene.js"></script>
+    <script src="src/scenes/SocialScene.js"></script>
+    <script src="src/game.js"></script>
+
+    <script>
+        // Override console.log to show in debug panel
+        const originalLog = console.log;
+        const debugLog = document.getElementById('debug-log');
+
+        let logCount = 0;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ');
+            debugLog.innerHTML += (++logCount) + ': ' + message + '<br>';
+            // Keep only last 20 messages
+            if (logCount > 20) {
+                const lines = debugLog.innerHTML.split('<br>');
+                debugLog.innerHTML = lines.slice(-21).join('<br>');
+            }
+            debugLog.scrollTop = debugLog.scrollHeight;
+        };
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Auto-unlock level 5 for testing
+            setTimeout(() => {
+                if (window.GRAVSHIFT && window.GRAVSHIFT.unlockAll) {
+                    console.log('Auto-unlocking levels for testing...');
+                    GRAVSHIFT.unlockAll();
+                }
+            }, 1000);
+
+            initGame();
+        });
+    </script>
+</body>
+</html>

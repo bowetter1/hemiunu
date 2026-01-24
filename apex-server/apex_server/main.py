@@ -1,7 +1,6 @@
 """
-Apex Server - Multi-tenant AI Team SaaS
+Apex Server - AI Design Tool Backend
 """
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,7 +14,8 @@ from apex_server.shared.database import init_db
 
 # Import routers
 from apex_server.auth.routes import router as auth_router
-from apex_server.tenants.routes import router as tenants_router
+from apex_server.projects.routes import router as projects_router
+# Keep sprints for backwards compatibility
 from apex_server.sprints.routes import router as sprints_router
 
 settings = get_settings()
@@ -51,8 +51,8 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(tenants_router, prefix="/api/v1")
-app.include_router(sprints_router, prefix="/api/v1")
+app.include_router(projects_router, prefix="/api/v1")
+app.include_router(sprints_router, prefix="/api/v1")  # Backwards compat
 
 
 @app.get("/health")

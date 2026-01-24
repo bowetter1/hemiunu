@@ -92,6 +92,33 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(access_token=token)
 
 
+@router.post("/dev-token", response_model=TokenResponse)
+def get_dev_token(db: Session = Depends(get_db)):
+    """Get a dev token - creates or uses a default dev user"""
+    auth_service = AuthService(db)
+    tenant_service = TenantService(db)
+
+    dev_email = "dev@apex.local"
+    user = auth_service.get_by_email(dev_email)
+
+    if not user:
+        # Create dev tenant and user
+        tenant = tenant_service.get_by_slug("dev")
+        if not tenant:
+            tenant = tenant_service.create(name="Dev Tenant", slug="dev")
+
+        user = auth_service.create_user(
+            email=dev_email,
+            password="dev123",
+            name="Dev User",
+            tenant_id=tenant.id,
+            role="admin"
+        )
+
+    token = auth_service.create_token(user.id, user.tenant_id)
+    return TokenResponse(access_token=token)
+
+
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user = Depends(get_current_user)):
     """Get current user info"""

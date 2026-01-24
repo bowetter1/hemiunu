@@ -43,7 +43,13 @@ class TimestampMixin:
 
 # Engine and session
 settings = get_settings()
-engine = create_engine(settings.database_url)
+
+# Fix Railway's postgres:// URL (SQLAlchemy needs postgresql://)
+_db_url = settings.database_url
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(_db_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -58,6 +64,11 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db():
     """Create all tables"""
+    # Import all models so they register with Base
+    from apex_server.auth.models import User
+    from apex_server.sprints.models import Sprint, LogEntry
+    from apex_server.projects.models import Project, Page, ProjectLog
+
     Base.metadata.create_all(bind=engine)
 
     # Run migrations for new columns
@@ -73,6 +84,8 @@ def _run_migrations():
         ("sprints", "input_tokens", "ALTER TABLE sprints ADD COLUMN input_tokens INTEGER DEFAULT 0"),
         ("sprints", "output_tokens", "ALTER TABLE sprints ADD COLUMN output_tokens INTEGER DEFAULT 0"),
         ("sprints", "cost_usd", "ALTER TABLE sprints ADD COLUMN cost_usd REAL DEFAULT 0.0"),
+        # Add selected_moodboard to projects table
+        ("projects", "selected_moodboard", "ALTER TABLE projects ADD COLUMN selected_moodboard INTEGER"),
     ]
 
     with engine.connect() as conn:
