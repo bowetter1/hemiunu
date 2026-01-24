@@ -223,6 +223,30 @@ def get_project(
     return project_to_response(project)
 
 
+@router.delete("/{project_id}")
+def delete_project(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a project and all its data"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Delete related data
+    db.query(Page).filter(Page.project_id == project_id).delete()
+    db.query(ProjectLog).filter(ProjectLog.project_id == project_id).delete()
+    db.delete(project)
+    db.commit()
+
+    return {"status": "deleted", "id": str(project_id)}
+
+
 @router.post("/{project_id}/select-moodboard", response_model=ProjectResponse)
 def select_moodboard(
     project_id: uuid.UUID,
