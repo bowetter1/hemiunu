@@ -28,7 +28,6 @@ class Tenant(Base, TimestampMixin):
 
     # Relationships
     users: Mapped[list["User"]] = relationship("User", back_populates="tenant")
-    sprints: Mapped[list["Sprint"]] = relationship("Sprint", back_populates="tenant")
 
     def __repr__(self):
         return f"<Tenant {self.slug}>"

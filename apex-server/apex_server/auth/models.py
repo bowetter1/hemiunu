@@ -23,8 +23,5 @@ class User(Base, TimestampMixin):
     tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("tenants.id"))
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="users")
 
-    # Sprints created by this user
-    sprints: Mapped[list["Sprint"]] = relationship("Sprint", back_populates="created_by")
-
     def __repr__(self):
         return f"<User {self.email}>"

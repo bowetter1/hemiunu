@@ -16,6 +16,7 @@ from apex_server.auth.models import User
 from .models import Project, Page, ProjectLog, ProjectStatus
 from .generator import Generator
 from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error
+from .structured_edit import generate_structured_edit, StructuredEditResponse
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 settings = get_settings()
@@ -441,7 +442,7 @@ def edit_page(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Edit a page with an instruction"""
+    """Edit a page with an instruction (returns full HTML - legacy)"""
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
@@ -458,6 +459,112 @@ def edit_page(
         id=str(page.id),
         name=page.name,
         html=html,
+        layout_variant=page.layout_variant
+    )
+
+
+class StructuredEditRequest(BaseModel):
+    instruction: str
+    html: str  # Current HTML from client
+
+
+class StructuredEditApiResponse(BaseModel):
+    edits: list
+    explanation: str
+
+
+@router.post("/{project_id}/pages/{page_id}/structured-edit")
+def structured_edit_page(
+    project_id: uuid.UUID,
+    page_id: uuid.UUID,
+    request: StructuredEditRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate structured edit instructions (not full HTML).
+    Client applies edits locally, then syncs back.
+    Much more token-efficient!
+    """
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get moodboard for context
+    moodboard = None
+    if project.moodboard and project.selected_moodboard:
+        moodboards = project.moodboard.get("moodboards", [])
+        idx = project.selected_moodboard - 1
+        if 0 <= idx < len(moodboards):
+            moodboard = moodboards[idx]
+
+    # Generate structured edits
+    result = generate_structured_edit(
+        html=request.html,
+        instruction=request.instruction,
+        moodboard=moodboard
+    )
+
+    # Log the edit
+    log = ProjectLog(
+        project_id=project.id,
+        phase="edit",
+        message=f"Structured edit: {request.instruction}",
+        data={"edits_count": len(result.edits)}
+    )
+    db.add(log)
+    db.commit()
+
+    return {
+        "edits": [edit.model_dump() for edit in result.edits],
+        "explanation": result.explanation
+    }
+
+
+class SyncPageRequest(BaseModel):
+    html: str  # Updated HTML from client after local edits
+
+
+@router.post("/{project_id}/pages/{page_id}/sync", response_model=PageResponse)
+def sync_page(
+    project_id: uuid.UUID,
+    page_id: uuid.UUID,
+    request: SyncPageRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync updated HTML from client back to server.
+    Called after client applies structured edits locally.
+    """
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    page = db.query(Page).filter(
+        Page.id == page_id,
+        Page.project_id == project_id
+    ).first()
+
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    # Update page HTML
+    page.html = request.html
+    db.commit()
+
+    return PageResponse(
+        id=str(page.id),
+        name=page.name,
+        html=page.html,
         layout_variant=page.layout_variant
     )
 

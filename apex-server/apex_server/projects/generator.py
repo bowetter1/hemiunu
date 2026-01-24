@@ -145,36 +145,40 @@ Each moodboard needs:
         # Extract web search results and moodboards from response
         web_searches = []
         moodboards = []
+        current_search_query = None
 
         for block in response.content:
-            print(f"[MOODBOARD] Processing block type: {block.type}", flush=True)
+            print(f"[MOODBOARD] Block type: {block.type}", flush=True)
+
+            # Capture search query from server_tool_use
+            if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
+                current_search_query = getattr(block, 'input', {}).get('query', 'unknown')
+                print(f"[MOODBOARD] Search query: {current_search_query}", flush=True)
 
             # Capture web search results
             if block.type == "web_search_tool_result":
-                # Debug: print all attributes
-                print(f"[MOODBOARD] Web search block attrs: {dir(block)}", flush=True)
-
-                # Try different attribute names for query
-                query = getattr(block, 'search_query', None) or getattr(block, 'query', None) or 'unknown'
-
+                content = getattr(block, 'content', [])
                 search_data = {
-                    "query": query,
+                    "query": current_search_query or "unknown",
                     "results": []
                 }
 
-                # Try different attribute names for results
-                results = getattr(block, 'search_results', None) or getattr(block, 'results', None) or []
-                if results:
-                    for result in results[:5]:
-                        search_data["results"].append({
-                            "title": getattr(result, 'title', ''),
-                            "url": getattr(result, 'url', ''),
-                            "snippet": getattr(result, 'snippet', getattr(result, 'content', ''))[:200]
-                        })
+                # content is a list of search result objects
+                if isinstance(content, list):
+                    for item in content[:5]:
+                        if hasattr(item, 'title'):
+                            search_data["results"].append({
+                                "title": getattr(item, 'title', ''),
+                                "url": getattr(item, 'url', ''),
+                                "snippet": str(getattr(item, 'snippet', getattr(item, 'page_content', '')))[:200]
+                            })
 
-                web_searches.append(search_data)
-                print(f"[MOODBOARD] Web search query: {query}", flush=True)
-                self.log("moodboard", f"Searched: {query}")
+                if search_data["results"]:
+                    web_searches.append(search_data)
+                    print(f"[MOODBOARD] Got {len(search_data['results'])} results for: {current_search_query}", flush=True)
+                    self.log("moodboard", f"Searched: {current_search_query} ({len(search_data['results'])} results)")
+
+                current_search_query = None  # Reset for next search
 
             # Capture moodboards
             if block.type == "tool_use" and block.name == "save_moodboards":
