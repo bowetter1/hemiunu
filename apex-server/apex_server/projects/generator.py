@@ -104,8 +104,8 @@ When creating moodboards:
 - Reference what you learned from research
 - Offer genuinely different creative directions"""
 
-        # Use beta header for web search
-        response = self.client.messages.create(
+        # Use beta API for web search
+        response = self.client.beta.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=4000,
             system=system_prompt,
