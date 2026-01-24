@@ -1,10 +1,11 @@
 """Project routes - API for macOS app"""
 import uuid
+import asyncio
 import threading
 from typing import List, Optional
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -14,9 +15,39 @@ from apex_server.shared.dependencies import get_current_user
 from apex_server.auth.models import User
 from .models import Project, Page, ProjectLog, ProjectStatus
 from .generator import Generator
+from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 settings = get_settings()
+
+# Event loop for async notifications from sync code
+_loop = None
+
+def get_event_loop():
+    global _loop
+    if _loop is None:
+        try:
+            _loop = asyncio.get_running_loop()
+        except RuntimeError:
+            _loop = asyncio.new_event_loop()
+    return _loop
+
+
+# === WebSocket Endpoint ===
+
+@router.websocket("/{project_id}/ws")
+async def websocket_endpoint(websocket: WebSocket, project_id: uuid.UUID):
+    """WebSocket connection for real-time project updates"""
+    await manager.connect(websocket, str(project_id))
+    try:
+        while True:
+            # Keep connection alive, wait for messages (ping/pong)
+            data = await websocket.receive_text()
+            # Echo back for ping/pong
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, str(project_id))
 
 
 # === Request/Response Models ===
@@ -143,13 +174,16 @@ def create_project(
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 gen = Generator(project, db)
-                gen.generate_moodboard()
+                moodboards = gen.generate_moodboard()
+                # Send WebSocket notification
+                asyncio.run(notify_moodboard_ready(str(project_id), moodboards))
         except Exception as e:
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 project.status = ProjectStatus.FAILED
                 project.error_message = str(e)
                 db.commit()
+                asyncio.run(notify_error(str(project_id), str(e)))
         finally:
             db.close()
 
@@ -231,13 +265,16 @@ def select_moodboard(
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 gen = Generator(project, db)
-                gen.generate_layouts()
+                layouts = gen.generate_layouts()
+                # Send WebSocket notification
+                asyncio.run(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 project.status = ProjectStatus.FAILED
                 project.error_message = str(e)
                 db.commit()
+                asyncio.run(notify_error(str(project_id), str(e)))
         finally:
             db.close()
 
@@ -281,13 +318,15 @@ def generate_layouts(
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 gen = Generator(project, db)
-                gen.generate_layouts()
+                layouts = gen.generate_layouts()
+                asyncio.run(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 project.status = ProjectStatus.FAILED
                 project.error_message = str(e)
                 db.commit()
+                asyncio.run(notify_error(str(project_id), str(e)))
         finally:
             db.close()
 
