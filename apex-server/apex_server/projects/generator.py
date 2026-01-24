@@ -44,8 +44,8 @@ class Generator:
 
     def generate_moodboard(self) -> list:
         """Generate 3 moodboard alternatives based on the brief, with web research"""
-        print(f"[MOODBOARD] Starting for project {self.project.id}")
-        print(f"[MOODBOARD] Brief: {self.project.brief[:100]}...")
+        print(f"[MOODBOARD] Starting for project {self.project.id}", flush=True)
+        print(f"[MOODBOARD] Brief: {self.project.brief[:100]}...", flush=True)
         self.log("moodboard", "Starting moodboard generation with web research...")
 
         # Anthropic's built-in web search tool
@@ -54,7 +54,7 @@ class Generator:
             "name": "web_search",
             "max_uses": 5  # Limit searches per request
         }
-        print("[MOODBOARD] Web search tool configured")
+        print("[MOODBOARD] Web search tool configured", flush=True)
 
         # Tool for saving moodboards (structured output)
         moodboard_tool = {
@@ -108,7 +108,7 @@ When creating moodboards:
 - Offer genuinely different creative directions"""
 
         # Use beta API for web search
-        print("[MOODBOARD] Calling Anthropic API with web search...")
+        print("[MOODBOARD] Calling Anthropic API with web search...", flush=True)
         self.log("moodboard", "Calling Claude with web search enabled...")
 
         response = self.client.beta.messages.create(
@@ -139,7 +139,7 @@ Each moodboard needs:
             ]
         )
 
-        print(f"[MOODBOARD] API response received, stop_reason: {response.stop_reason}")
+        print(f"[MOODBOARD] API response received, stop_reason: {response.stop_reason}", flush=True)
         self.track_usage(response)
 
         # Extract web search results and moodboards from response
@@ -147,29 +147,39 @@ Each moodboard needs:
         moodboards = []
 
         for block in response.content:
-            print(f"[MOODBOARD] Processing block type: {block.type}")
+            print(f"[MOODBOARD] Processing block type: {block.type}", flush=True)
 
             # Capture web search results
             if block.type == "web_search_tool_result":
+                # Debug: print all attributes
+                print(f"[MOODBOARD] Web search block attrs: {dir(block)}", flush=True)
+
+                # Try different attribute names for query
+                query = getattr(block, 'search_query', None) or getattr(block, 'query', None) or 'unknown'
+
                 search_data = {
-                    "query": getattr(block, 'query', 'unknown'),
+                    "query": query,
                     "results": []
                 }
-                if hasattr(block, 'search_results'):
-                    for result in block.search_results[:5]:  # Top 5 results
+
+                # Try different attribute names for results
+                results = getattr(block, 'search_results', None) or getattr(block, 'results', None) or []
+                if results:
+                    for result in results[:5]:
                         search_data["results"].append({
                             "title": getattr(result, 'title', ''),
                             "url": getattr(result, 'url', ''),
-                            "snippet": getattr(result, 'snippet', '')[:200] if hasattr(result, 'snippet') else ''
+                            "snippet": getattr(result, 'snippet', getattr(result, 'content', ''))[:200]
                         })
+
                 web_searches.append(search_data)
-                print(f"[MOODBOARD] Web search: {search_data.get('query', 'unknown')}")
-                self.log("moodboard", f"Searched: {search_data.get('query', 'unknown')}")
+                print(f"[MOODBOARD] Web search query: {query}", flush=True)
+                self.log("moodboard", f"Searched: {query}")
 
             # Capture moodboards
             if block.type == "tool_use" and block.name == "save_moodboards":
                 moodboards = block.input.get("moodboards", [])
-                print(f"[MOODBOARD] Got {len(moodboards)} moodboards")
+                print(f"[MOODBOARD] Got {len(moodboards)} moodboards", flush=True)
 
         if moodboards:
             # Save moodboards WITH search data
@@ -180,11 +190,11 @@ Each moodboard needs:
             self.project.status = ProjectStatus.MOODBOARD
             self.db.commit()
             self.log("moodboard", f"Created {len(moodboards)} moodboards with {len(web_searches)} searches")
-            print(f"[MOODBOARD] Success! {len(moodboards)} moodboards, {len(web_searches)} searches saved")
+            print(f"[MOODBOARD] Success! {len(moodboards)} moodboards, {len(web_searches)} searches saved", flush=True)
             return moodboards
 
         # Fallback if no tool use found
-        print("[MOODBOARD] No moodboards found, using fallback")
+        print("[MOODBOARD] No moodboards found, using fallback", flush=True)
         self.log("moodboard", "Warning: Using fallback moodboard generation")
         return self._generate_moodboard_fallback()
 
@@ -375,7 +385,7 @@ Rules:
             file_path = self.project_dir / "index.html"
             file_path.write_text(page.html)
         except Exception as e:
-            print(f"Could not save file (non-critical): {e}")
+            print(f"Could not save file (non-critical): {e}", flush=True)
 
         # Keep all 3 layouts - just mark which one is selected
         # (Previously we deleted alternatives - now we keep them for browsing)
