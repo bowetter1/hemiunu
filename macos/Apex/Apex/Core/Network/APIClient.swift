@@ -426,18 +426,27 @@ class APIClient: ObservableObject {
     }
 
     /// Generate a complete mini-site from current layout
+    /// Uses extended timeout since AI generation can take 2-3 minutes
     func generateSite(projectId: String, pages: [String]? = nil) async throws -> GenerateSiteResponse {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate-site")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300 // 5 minutes for AI generation
 
         struct GenerateSiteRequest: Codable {
             let pages: [String]?
         }
 
         request.httpBody = try JSONEncoder().encode(GenerateSiteRequest(pages: pages))
-        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Use custom session with extended timeout
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 300
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
         return try decodeResponse(GenerateSiteResponse.self, data: data, response: response)
     }
 
