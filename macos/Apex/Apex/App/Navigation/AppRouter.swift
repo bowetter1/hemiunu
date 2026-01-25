@@ -320,8 +320,7 @@ struct ToolsPanel: View {
 // MARK: - Generation Cards
 
 struct GeneratingCard: View {
-    @State private var dots = ""
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    @State private var dotCount = 0
 
     var body: some View {
         HStack(spacing: 12) {
@@ -330,7 +329,7 @@ struct GeneratingCard: View {
                 .frame(width: 32, height: 32)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Generating Site\(dots)")
+                Text("Generating Site\(String(repeating: ".", count: dotCount))")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.primary)
                 Text("Creating pages...")
@@ -343,8 +342,11 @@ struct GeneratingCard: View {
         .padding(10)
         .background(Color.blue.opacity(0.1))
         .cornerRadius(8)
-        .onReceive(timer) { _ in
-            dots = dots.count >= 3 ? "" : dots + "."
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                dotCount = (dotCount + 1) % 4
+            }
         }
     }
 }
