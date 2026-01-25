@@ -316,52 +316,41 @@ struct TypingIndicator: View {
 struct CodeView: View {
     @ObservedObject var client: APIClient
     @Binding var selectedPageId: String?
-    @State private var showTerminal = false
-    @State private var terminalOutput: String = ""
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             // File explorer - show project pages as files
             CodeFileExplorer(
                 pages: client.pages,
                 selectedPageId: $selectedPageId
             )
-            .frame(minWidth: 180, maxWidth: 220)
+            .frame(width: 200)
 
-            // Editor + Terminal
-            VSplitView {
-                // Code editor with selected page's HTML
-                if let page = selectedPage {
-                    CodeEditor(code: .constant(page.html), language: "html")
-                } else {
-                    VStack {
-                        Spacer()
-                        Text("Select a file to view code")
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .background(Color(nsColor: .textBackgroundColor))
-                }
+            Divider()
 
-                // Terminal (optional)
-                if showTerminal {
-                    TerminalView(output: $terminalOutput)
-                        .frame(minHeight: 100, maxHeight: 200)
+            // Code editor with selected page's HTML
+            if let page = selectedPage {
+                CodeEditor(code: .constant(page.html), language: "html")
+            } else {
+                VStack {
+                    Spacer()
+                    Text("Select a file to view code")
+                        .foregroundColor(.secondary)
+                    Spacer()
                 }
+                .frame(maxWidth: .infinity)
+                .background(Color(nsColor: .textBackgroundColor))
             }
+
+            Divider()
 
             // Live preview
             if let page = selectedPage {
                 WebPreviewPane(html: page.html)
                     .frame(minWidth: 300)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: { showTerminal.toggle() }) {
-                    Image(systemName: "terminal")
-                }
+            } else {
+                Color(nsColor: .windowBackgroundColor)
+                    .frame(minWidth: 300)
             }
         }
     }
