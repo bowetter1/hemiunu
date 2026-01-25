@@ -319,26 +319,21 @@ struct CodeView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // File explorer - show project pages as files
-            CodeFileExplorer(
-                pages: client.pages,
-                selectedPageId: $selectedPageId
-            )
-            .frame(width: 200)
-
-            Divider()
-
             // Code editor with selected page's HTML
             if let page = selectedPage {
                 CodeEditor(code: .constant(page.html), language: "html")
             } else {
                 VStack {
                     Spacer()
-                    Text("Select a file to view code")
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary.opacity(0.5))
+                    Text("Select a file from sidebar")
+                        .font(.system(size: 14))
                         .foregroundColor(.secondary)
                     Spacer()
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .textBackgroundColor))
             }
 
@@ -349,8 +344,18 @@ struct CodeView: View {
                 WebPreviewPane(html: page.html)
                     .frame(minWidth: 300)
             } else {
-                Color(nsColor: .windowBackgroundColor)
-                    .frame(minWidth: 300)
+                VStack {
+                    Spacer()
+                    Image(systemName: "eye")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary.opacity(0.5))
+                    Text("Preview")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .frame(minWidth: 300, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
             }
         }
     }
@@ -358,80 +363,6 @@ struct CodeView: View {
     private var selectedPage: Page? {
         guard let id = selectedPageId else { return nil }
         return client.pages.first { $0.id == id }
-    }
-}
-
-// MARK: - Code File Explorer
-
-struct CodeFileExplorer: View {
-    let pages: [Page]
-    @Binding var selectedPageId: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                Text("Files")
-                    .font(.headline)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(nsColor: .controlBackgroundColor))
-
-            // File list from pages
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    if pages.isEmpty {
-                        Text("No files")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .padding()
-                    } else {
-                        ForEach(pages) { page in
-                            CodeFileRow(
-                                page: page,
-                                isSelected: selectedPageId == page.id,
-                                onSelect: { selectedPageId = page.id }
-                            )
-                        }
-                    }
-                }
-                .padding(8)
-            }
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-}
-
-struct CodeFileRow: View {
-    let page: Page
-    let isSelected: Bool
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 8) {
-                Image(systemName: "doc.text.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(.orange)
-
-                Text(fileName)
-                    .font(.system(size: 12))
-                    .foregroundColor(.primary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.blue.opacity(0.2) : Color.clear)
-            .cornerRadius(4)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var fileName: String {
-        let name = page.name.lowercased().replacingOccurrences(of: " ", with: "-")
-        return "\(name).html"
     }
 }
 
