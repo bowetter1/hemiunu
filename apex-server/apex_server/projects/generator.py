@@ -1389,11 +1389,11 @@ Complete the user's request using the available tools."""
 
     def generate_site(self, pages: list[str] = None) -> dict:
         """
-        Generate a complete mini-site from the current layout.
-        Uses agentic file tools to create multiple pages with consistent styling.
+        Generate additional pages for the site based on navigation links.
+        Parses the existing index/hero page to find linked pages and creates them.
 
         Args:
-            pages: Optional list of page names to create. If None, AI decides.
+            pages: Optional list of page names to create. If None, parsed from nav.
 
         Returns:
             dict with created pages and summary
@@ -1405,9 +1405,13 @@ Complete the user's request using the available tools."""
         if not existing_pages:
             raise ValueError("No existing pages to use as template")
 
-        # Find the main/hero page to use as template
+        # Find the main/hero page to use as template (index page)
         template_page = existing_pages[0]
         template_html = template_page.html
+        template_filename = template_page.name.lower().replace(" ", "-") + ".html"
+
+        # Get list of existing page filenames
+        existing_filenames = [p.name.lower().replace(" ", "-") + ".html" for p in existing_pages]
 
         # Get moodboard for design context
         moodboard_context = ""
@@ -1425,23 +1429,19 @@ Design System:
 - Style: {mb.get('rationale', '')}
 """
 
-        # Build the prompt
-        pages_instruction = ""
-        if pages:
-            pages_instruction = f"Create these specific pages: {', '.join(pages)}"
-        else:
-            pages_instruction = "Create a complete mini-site with: Home (index.html), About (about.html), and Contact (contact.html)"
-
-        system_prompt = f"""You are a professional web developer creating a complete website.
+        system_prompt = f"""You are a professional web developer expanding a website.
 
 {moodboard_context}
 
 Project Brief: {self.project.brief}
 
-EXISTING TEMPLATE (use this style):
+EXISTING INDEX PAGE ({template_filename}) - THIS IS YOUR STYLE TEMPLATE:
 ```html
-{template_html[:3000]}{"..." if len(template_html) > 3000 else ""}
+{template_html}
 ```
+
+EXISTING FILES (DO NOT recreate these):
+{', '.join(existing_filenames)}
 
 You have tools to:
 - list_files: See all files in the project
@@ -1449,27 +1449,25 @@ You have tools to:
 - write_file: Create or update a file
 - delete_file: Remove a file
 
-REQUIREMENTS:
-1. Match the exact visual style of the template (colors, fonts, spacing)
-2. Each page must be complete HTML with all CSS inline in <style> tag
-3. Include Google Fonts import in <head>
-4. Add navigation bar to ALL pages linking between them
-5. Make all pages responsive
-6. Keep consistent header/footer across pages
+YOUR TASK:
+1. Look at the navigation links in the index page (e.g., about.html, contact.html, services.html)
+2. Create ONLY the pages that are linked but don't exist yet
+3. DO NOT recreate {template_filename} - it already exists!
 
-NAVIGATION FORMAT:
-<nav>
-  <a href="index.html">Home</a>
-  <a href="about.html">About</a>
-  <a href="contact.html">Contact</a>
-</nav>
+CRITICAL STYLE REQUIREMENTS:
+1. Copy the EXACT same CSS/styles from the index page
+2. Use the same colors, fonts, spacing, layout structure
+3. Keep the same header/navigation on all pages
+4. Keep the same footer on all pages
+5. Only change the main content section for each page
+6. Include the same Google Fonts import
 
-{pages_instruction}
+Each new page should feel like it belongs to the same website - consistent header, footer, colors, fonts, and overall design language.
 
-Start by reading the existing page to understand the full styling, then create each new page."""
+Create appropriate content for each page based on the page name and the project brief."""
 
         messages = [
-            {"role": "user", "content": "Generate the complete website now. Create each page one by one."}
+            {"role": "user", "content": "Analyze the navigation in the index page and create each missing linked page. Match the exact style."}
         ]
 
         # Agentic loop
