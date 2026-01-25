@@ -15,6 +15,7 @@ struct AppRouter: View {
             if appState.showSidebar {
                 ProjectsSidebar(
                     client: client,
+                    currentMode: appState.currentMode,
                     selectedProjectId: $appState.selectedProjectId,
                     selectedVariantId: $appState.selectedVariantId,
                     selectedPageId: $appState.selectedPageId,

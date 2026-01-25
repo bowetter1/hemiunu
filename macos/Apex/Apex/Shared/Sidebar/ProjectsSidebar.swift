@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProjectsSidebar: View {
     @ObservedObject var client: APIClient
+    let currentMode: AppMode
     @Binding var selectedProjectId: String?
     @Binding var selectedVariantId: String?
     @Binding var selectedPageId: String?
@@ -18,8 +19,13 @@ struct ProjectsSidebar: View {
             Divider()
 
             if client.currentProject != nil {
-                // Show variants and pages for current project
-                variantsSidebar
+                if currentMode == .code {
+                    // Code mode: show files
+                    filesSidebar
+                } else {
+                    // Design mode: show variants and pages
+                    variantsSidebar
+                }
             } else {
                 // Show project list when no project is selected
                 projectsSidebar
@@ -27,6 +33,42 @@ struct ProjectsSidebar: View {
         }
         .frame(width: 220)
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    // MARK: - Files Sidebar (Code mode)
+
+    private var filesSidebar: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "folder")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                Text("Files")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .frame(height: 32)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            // Files list
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(client.pages) { page in
+                        FileRow(
+                            page: page,
+                            isSelected: selectedPageId == page.id,
+                            onSelect: { selectedPageId = page.id }
+                        )
+                    }
+                }
+                .padding(8)
+            }
+
+            Spacer()
+        }
     }
 
     // MARK: - Project Dropdown
@@ -526,9 +568,53 @@ struct ProjectRow: View {
     }
 }
 
+// MARK: - File Row (Code mode)
+
+struct FileRow: View {
+    let page: Page
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 8) {
+                Image(systemName: fileIcon)
+                    .font(.system(size: 12))
+                    .foregroundColor(iconColor)
+
+                Text(fileName)
+                    .font(.system(size: 12))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var fileName: String {
+        let name = page.name.lowercased().replacingOccurrences(of: " ", with: "-")
+        return "\(name).html"
+    }
+
+    private var fileIcon: String {
+        "doc.text.fill"
+    }
+
+    private var iconColor: Color {
+        .orange
+    }
+}
+
 #Preview {
     ProjectsSidebar(
         client: APIClient(),
+        currentMode: .design,
         selectedProjectId: .constant(nil),
         selectedVariantId: .constant(nil),
         selectedPageId: .constant(nil),
