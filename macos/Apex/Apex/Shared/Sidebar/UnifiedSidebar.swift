@@ -237,6 +237,7 @@ struct FilesTabContent: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     if !client.variants.isEmpty {
+                        // Show variants with their pages
                         ForEach(client.variants) { variant in
                             SidebarVariantRow(
                                 variant: variant,
@@ -255,9 +256,23 @@ struct FilesTabContent: View {
                                 }
                             )
                         }
+
+                        // Show pages without variant (generated pages)
+                        if !pagesWithoutVariant.isEmpty {
+                            Divider()
+                                .padding(.vertical, 8)
+
+                            ForEach(pagesWithoutVariant) { page in
+                                SidebarPageRow(
+                                    page: page,
+                                    isSelected: selectedPageId == page.id,
+                                    onSelect: { selectedPageId = page.id }
+                                )
+                            }
+                        }
                     } else {
-                        // Legacy layout pages
-                        ForEach(legacyLayoutPages) { page in
+                        // No variants - show all pages
+                        ForEach(client.pages) { page in
                             SidebarPageRow(
                                 page: page,
                                 isSelected: selectedPageId == page.id,
@@ -277,9 +292,8 @@ struct FilesTabContent: View {
         client.pages.filter { $0.variantId == variantId }
     }
 
-    private var legacyLayoutPages: [Page] {
-        client.pages.filter { $0.layoutVariant != nil }
-            .sorted { ($0.layoutVariant ?? 0) < ($1.layoutVariant ?? 0) }
+    private var pagesWithoutVariant: [Page] {
+        client.pages.filter { $0.variantId == nil }
     }
 
     // MARK: - Projects List
