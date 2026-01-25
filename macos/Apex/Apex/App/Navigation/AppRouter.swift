@@ -110,7 +110,7 @@ struct AppRouter: View {
                 selectedPageId: appState.selectedPageId
             )
         case .code:
-            CodeView()
+            CodeView(client: client, selectedPageId: $appState.selectedPageId)
         case .chat:
             ChatView()
         }
@@ -312,34 +312,48 @@ struct TypingIndicator: View {
 
 // MARK: - Code Mode
 
-/// Main Code editor view - Replit 2.0 style
+/// Main Code editor view - shows project files
 struct CodeView: View {
-    @State private var selectedFile: String? = "index.html"
-    @State private var code: String = sampleHTML
+    @ObservedObject var client: APIClient
+    @Binding var selectedPageId: String?
+    @State private var showTerminal = false
     @State private var terminalOutput: String = ""
-    @State private var showTerminal = true
 
     var body: some View {
         HSplitView {
-            // File explorer
-            FileExplorer(selectedFile: $selectedFile)
-                .frame(minWidth: 180, maxWidth: 220)
+            // File explorer - show project pages as files
+            CodeFileExplorer(
+                pages: client.pages,
+                selectedPageId: $selectedPageId
+            )
+            .frame(minWidth: 180, maxWidth: 220)
 
             // Editor + Terminal
             VSplitView {
-                // Code editor
-                CodeEditor(code: $code, language: fileLanguage)
+                // Code editor with selected page's HTML
+                if let page = selectedPage {
+                    CodeEditor(code: .constant(page.html), language: "html")
+                } else {
+                    VStack {
+                        Spacer()
+                        Text("Select a file to view code")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .background(Color(nsColor: .textBackgroundColor))
+                }
 
-                // Terminal
+                // Terminal (optional)
                 if showTerminal {
                     TerminalView(output: $terminalOutput)
                         .frame(minHeight: 100, maxHeight: 200)
                 }
             }
 
-            // Preview (for web files)
-            if isWebFile {
-                WebPreviewPane(html: code)
+            // Live preview
+            if let page = selectedPage {
+                WebPreviewPane(html: page.html)
                     .frame(minWidth: 300)
             }
         }
@@ -352,34 +366,17 @@ struct CodeView: View {
         }
     }
 
-    private var fileLanguage: String {
-        guard let file = selectedFile else { return "text" }
-        if file.hasSuffix(".html") { return "html" }
-        if file.hasSuffix(".css") { return "css" }
-        if file.hasSuffix(".js") { return "javascript" }
-        if file.hasSuffix(".swift") { return "swift" }
-        return "text"
-    }
-
-    private var isWebFile: Bool {
-        selectedFile?.hasSuffix(".html") ?? false
+    private var selectedPage: Page? {
+        guard let id = selectedPageId else { return nil }
+        return client.pages.first { $0.id == id }
     }
 }
 
-// MARK: - File Explorer
+// MARK: - Code File Explorer
 
-struct FileExplorer: View {
-    @Binding var selectedFile: String?
-
-    let files = [
-        CodeFileItem(name: "src", isFolder: true, children: [
-            CodeFileItem(name: "index.html"),
-            CodeFileItem(name: "styles.css"),
-            CodeFileItem(name: "app.js"),
-        ]),
-        CodeFileItem(name: "package.json"),
-        CodeFileItem(name: "README.md"),
-    ]
+struct CodeFileExplorer: View {
+    let pages: [Page]
+    @Binding var selectedPageId: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -388,21 +385,27 @@ struct FileExplorer: View {
                 Text("Files")
                     .font(.headline)
                 Spacer()
-                Button(action: {}) {
-                    Image(systemName: "plus")
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color(nsColor: .controlBackgroundColor))
 
-            // File tree
+            // File list from pages
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(files) { file in
-                        CodeFileRow(item: file, selectedFile: $selectedFile, depth: 0)
+                    if pages.isEmpty {
+                        Text("No files")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .padding()
+                    } else {
+                        ForEach(pages) { page in
+                            CodeFileRow(
+                                page: page,
+                                isSelected: selectedPageId == page.id,
+                                onSelect: { selectedPageId = page.id }
+                            )
+                        }
                     }
                 }
                 .padding(8)
@@ -412,75 +415,40 @@ struct FileExplorer: View {
     }
 }
 
-struct CodeFileItem: Identifiable {
-    let id = UUID()
-    let name: String
-    var isFolder: Bool = false
-    var children: [CodeFileItem] = []
-}
-
 struct CodeFileRow: View {
-    let item: CodeFileItem
-    @Binding var selectedFile: String?
-    let depth: Int
-    @State private var isExpanded = true
+    let page: Page
+    let isSelected: Bool
+    let onSelect: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                if item.isFolder {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .frame(width: 12)
-                        .onTapGesture { isExpanded.toggle() }
-                } else {
-                    Spacer().frame(width: 12)
-                }
-
-                Image(systemName: item.isFolder ? "folder.fill" : fileIcon)
+        Button(action: onSelect) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.text.fill")
                     .font(.system(size: 12))
-                    .foregroundColor(item.isFolder ? .blue : iconColor)
+                    .foregroundColor(.orange)
 
-                Text(item.name)
+                Text(fileName)
                     .font(.system(size: 12))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
 
                 Spacer()
+
+                Text("\(page.html.count) chars")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
             }
-            .padding(.leading, CGFloat(depth) * 16)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 4)
-            .background(selectedFile == item.name ? Color.blue.opacity(0.2) : Color.clear)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.blue.opacity(0.2) : Color.clear)
             .cornerRadius(4)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if !item.isFolder {
-                    selectedFile = item.name
-                }
-            }
-
-            if item.isFolder && isExpanded {
-                ForEach(item.children) { child in
-                    CodeFileRow(item: child, selectedFile: $selectedFile, depth: depth + 1)
-                }
-            }
         }
+        .buttonStyle(.plain)
     }
 
-    private var fileIcon: String {
-        if item.name.hasSuffix(".html") { return "doc.text" }
-        if item.name.hasSuffix(".css") { return "paintbrush" }
-        if item.name.hasSuffix(".js") { return "curlybraces" }
-        if item.name.hasSuffix(".json") { return "doc.badge.gearshape" }
-        if item.name.hasSuffix(".md") { return "doc.richtext" }
-        return "doc"
-    }
-
-    private var iconColor: Color {
-        if item.name.hasSuffix(".html") { return .orange }
-        if item.name.hasSuffix(".css") { return .blue }
-        if item.name.hasSuffix(".js") { return .yellow }
-        return .secondary
+    private var fileName: String {
+        let name = page.name.lowercased().replacingOccurrences(of: " ", with: "-")
+        return "\(name).html"
     }
 }
 
@@ -599,46 +567,13 @@ struct WebPreviewPane: View {
     }
 }
 
-// MARK: - Sample Data
-
-private let sampleHTML = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>My App</title>
-    <style>
-        body {
-            font-family: system-ui;
-            padding: 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            margin: 0;
-            color: white;
-        }
-        h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-        p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-        }
-    </style>
-</head>
-<body>
-    <h1>Hello, World!</h1>
-    <p>Edit this code to see live changes.</p>
-</body>
-</html>
-"""
-
 #Preview {
     ChatView()
         .frame(width: 500, height: 600)
 }
 
 #Preview {
-    CodeView()
+    CodeView(client: APIClient(), selectedPageId: .constant(nil))
         .frame(width: 1000, height: 600)
 }
 
