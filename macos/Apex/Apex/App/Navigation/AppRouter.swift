@@ -430,14 +430,8 @@ struct CodeFileRow: View {
                 Text(fileName)
                     .font(.system(size: 12))
                     .foregroundColor(.primary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Text("\(page.html.count) chars")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(isSelected ? Color.blue.opacity(0.2) : Color.clear)
