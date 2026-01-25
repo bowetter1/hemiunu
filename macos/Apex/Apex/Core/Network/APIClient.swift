@@ -303,11 +303,16 @@ class APIClient: ObservableObject {
 
     // MARK: - Variants
 
-    /// Get all variants for a project
+    /// Get all variants for a project (returns empty array if none exist or endpoint not available)
     func getVariants(projectId: String) async throws -> [Variant] {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/variants")
         let request = authorizedRequest(url: url)
         let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Return empty array for 404 (no variants yet or endpoint not deployed)
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 404 {
+            return []
+        }
         return try decodeResponse([Variant].self, data: data, response: response)
     }
 

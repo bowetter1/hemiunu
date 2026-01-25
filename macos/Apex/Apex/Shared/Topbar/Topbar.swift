@@ -9,6 +9,10 @@ struct Topbar: View {
     let errorMessage: String?
     let hasProject: Bool
     let logs: [LogEntry]
+    let projects: [Project]
+    let currentProject: Project?
+    let onSelectProject: (String) -> Void
+    let onBackToProjects: () -> Void
 
     // Consistent icon size for all toolbar items
     private let iconSize: CGFloat = 16
@@ -24,6 +28,14 @@ struct Topbar: View {
 
                 // Connection status
                 statusDot
+
+                // Project selector
+                ProjectDropdown(
+                    projects: projects,
+                    currentProject: currentProject,
+                    onSelect: onSelectProject,
+                    onBack: onBackToProjects
+                )
             }
 
             Spacer()
@@ -304,6 +316,85 @@ struct ActivityDot: View {
         case "layouts": return .orange
         case "editing": return .green
         default: return .secondary
+        }
+    }
+}
+
+// MARK: - Project Dropdown
+
+struct ProjectDropdown: View {
+    let projects: [Project]
+    let currentProject: Project?
+    let onSelect: (String) -> Void
+    let onBack: () -> Void
+
+    var body: some View {
+        if let project = currentProject {
+            // Show current project with back button
+            HStack(spacing: 8) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+
+                Menu {
+                    ForEach(projects) { p in
+                        Button(action: { onSelect(p.id) }) {
+                            HStack {
+                                Text(projectTitle(p))
+                                if p.id == project.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(statusColor(for: project))
+                            .frame(width: 6, height: 6)
+
+                        Text(projectTitle(project))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(6)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+            }
+        } else {
+            // No project selected - show placeholder
+            Text("No project")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func projectTitle(_ project: Project) -> String {
+        let words = project.brief.split(separator: " ").prefix(4)
+        let title = words.joined(separator: " ")
+        return title.count < project.brief.count ? "\(title)..." : title
+    }
+
+    private func statusColor(for project: Project) -> Color {
+        switch project.status {
+        case .brief, .clarification, .moodboard, .layouts:
+            return .orange
+        case .editing, .done:
+            return .green
+        case .failed:
+            return .red
         }
     }
 }
