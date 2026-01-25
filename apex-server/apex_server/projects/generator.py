@@ -89,6 +89,46 @@ def fetch_page_content(url: str, timeout: float = 10.0) -> dict:
         return {"url": url, "error": str(e)}
 
 
+def inject_google_fonts(html: str, fonts: dict) -> str:
+    """Inject Google Fonts link into HTML head based on moodboard fonts"""
+    if not fonts:
+        return html
+
+    font_families = []
+
+    # Extract font names from moodboard fonts dict
+    heading_font = fonts.get("heading") or fonts.get("primary") or fonts.get("title")
+    body_font = fonts.get("body") or fonts.get("secondary") or fonts.get("text")
+
+    if heading_font and isinstance(heading_font, str):
+        # Clean font name and format for Google Fonts URL
+        font_name = heading_font.split(",")[0].strip().strip("'\"")
+        font_families.append(font_name.replace(" ", "+"))
+
+    if body_font and isinstance(body_font, str):
+        font_name = body_font.split(",")[0].strip().strip("'\"")
+        if font_name.replace(" ", "+") not in font_families:
+            font_families.append(font_name.replace(" ", "+"))
+
+    if not font_families:
+        return html
+
+    # Build Google Fonts link with multiple weights
+    families_param = "&family=".join([f"{f}:wght@300;400;500;600;700" for f in font_families])
+    link_tag = f'<link href="https://fonts.googleapis.com/css2?family={families_param}&display=swap" rel="stylesheet">'
+
+    # Remove any existing Google Fonts links to avoid duplicates
+    html = re.sub(r'<link[^>]*fonts\.googleapis\.com[^>]*>', '', html)
+
+    # Inject after <head> tag
+    if "<head>" in html:
+        html = html.replace("<head>", f"<head>\n    {link_tag}")
+    elif "<HEAD>" in html:
+        html = html.replace("<HEAD>", f"<HEAD>\n    {link_tag}")
+
+    return html
+
+
 class Generator:
     """Generates moodboards, layouts, and page edits using Opus"""
 
@@ -876,11 +916,15 @@ Rules:
 
         # Save layouts as pages
         for i, layout in enumerate(layouts, 1):
+            # Inject Google Fonts based on moodboard
+            html = layout["html"]
+            html = inject_google_fonts(html, moodboard.get("fonts", {}))
+
             # Try to save HTML file (optional - may fail on Railway)
             try:
                 file_path = self.project_dir / f"layout_{i}.html"
                 file_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.write_text(layout["html"])
+                file_path.write_text(html)
             except Exception:
                 pass  # File storage is optional, DB is the source of truth
 
@@ -888,7 +932,7 @@ Rules:
             page = Page(
                 project_id=self.project.id,
                 name=layout.get("name", f"Layout {i}"),
-                html=layout["html"],
+                html=html,
                 layout_variant=i
             )
             self.db.add(page)
@@ -976,8 +1020,20 @@ Respond ONLY with the updated HTML code, nothing else.""",
         elif "```" in new_html:
             new_html = new_html.split("```")[1].split("```")[0]
 
+        new_html = new_html.strip()
+
+        # Inject Google Fonts based on moodboard
+        moodboard = self.project.moodboard or {}
+        if isinstance(moodboard, dict):
+            # Get fonts from selected moodboard
+            moodboards = moodboard.get("moodboards", [])
+            if moodboards:
+                # Use first moodboard's fonts (or selected one)
+                fonts = moodboards[0].get("fonts", {})
+                new_html = inject_google_fonts(new_html, fonts)
+
         # Update page
-        page.html = new_html.strip()
+        page.html = new_html
         self.db.commit()
 
         # Try to save to file (optional)
@@ -1034,11 +1090,21 @@ Respond ONLY with complete HTML code.""",
         elif "```" in html:
             html = html.split("```")[1].split("```")[0]
 
+        html = html.strip()
+
+        # Inject Google Fonts based on moodboard
+        moodboard = self.project.moodboard or {}
+        if isinstance(moodboard, dict):
+            moodboards = moodboard.get("moodboards", [])
+            if moodboards:
+                fonts = moodboards[0].get("fonts", {})
+                html = inject_google_fonts(html, fonts)
+
         # Create page
         page = Page(
             project_id=self.project.id,
             name=name,
-            html=html.strip()
+            html=html
         )
         self.db.add(page)
         self.db.commit()
