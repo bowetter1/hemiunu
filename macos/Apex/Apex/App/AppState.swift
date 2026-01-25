@@ -5,7 +5,6 @@ import Combine
 enum AppMode: String, CaseIterable {
     case design = "Design"
     case code = "Code"
-    case chat = "Chat"
 }
 
 /// App appearance mode

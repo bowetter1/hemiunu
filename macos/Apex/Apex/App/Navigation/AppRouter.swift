@@ -11,16 +11,20 @@ struct AppRouter: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Sidebar
+            // Unified Sidebar (Files/Chat toggle)
             if appState.showSidebar {
-                ProjectsSidebar(
+                UnifiedSidebar(
                     client: client,
+                    webSocket: appState.wsClient,
                     currentMode: appState.currentMode,
                     selectedProjectId: $appState.selectedProjectId,
                     selectedVariantId: $appState.selectedVariantId,
                     selectedPageId: $appState.selectedPageId,
                     onNewProject: {
                         appState.clearCurrentProject()
+                    },
+                    onProjectCreated: { projectId in
+                        appState.selectedProjectId = projectId
                     }
                 )
 
@@ -35,31 +39,15 @@ struct AppRouter: View {
 
                 GridBackground()
 
-                // Content layer with chat panel
+                // Content layer
                 VStack(spacing: 0) {
                     // Spacer for topbar
                     Spacer()
                         .frame(height: 60)
 
-                    // Main content + chat panel
-                    HStack(spacing: 0) {
-                        // Mode content (preview)
-                        modeContent
-                            .frame(maxWidth: .infinity)
-
-                        // Chat panel (Design mode only)
-                        if appState.currentMode == .design {
-                            Divider()
-                            ChatPanel(
-                                client: client,
-                                webSocket: appState.wsClient,
-                                selectedPageId: appState.selectedPageId
-                            ) { projectId in
-                                // Set selectedProjectId to trigger WebSocket connection
-                                appState.selectedProjectId = projectId
-                            }
-                        }
-                    }
+                    // Main content (full width now, no chat panel on right)
+                    modeContent
+                        .frame(maxWidth: .infinity)
                 }
 
                 // Topbar layer (above content)
@@ -112,8 +100,6 @@ struct AppRouter: View {
             )
         case .code:
             CodeView(client: client, selectedPageId: $appState.selectedPageId)
-        case .chat:
-            ChatView()
         }
     }
 
@@ -136,178 +122,6 @@ struct AppRouter: View {
                 break
             }
         }
-    }
-}
-
-// MARK: - Chat Mode
-
-/// A chat message
-struct Message: Identifiable {
-    let id: UUID
-    let role: Role
-    let content: String
-    let timestamp: Date
-
-    enum Role {
-        case user
-        case assistant
-    }
-
-    init(role: Role, content: String) {
-        self.id = UUID()
-        self.role = role
-        self.content = content
-        self.timestamp = Date()
-    }
-}
-
-/// Chat view with message list and input
-struct ChatView: View {
-    @State private var messages: [Message] = []
-    @State private var inputText = ""
-    @State private var isLoading = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Messages
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(messages) { message in
-                            MessageBubble(message: message)
-                                .id(message.id)
-                        }
-
-                        if isLoading {
-                            HStack {
-                                TypingIndicator()
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    .padding()
-                }
-                .onChange(of: messages.count) { _, _ in
-                    if let last = messages.last {
-                        withAnimation {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
-                    }
-                }
-            }
-
-            Divider()
-
-            // Input
-            ChatInput(text: $inputText, onSend: sendMessage)
-                .padding()
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private func sendMessage() {
-        guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-
-        let userMessage = Message(role: .user, content: inputText)
-        messages.append(userMessage)
-        inputText = ""
-
-        // Simulate AI response
-        isLoading = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            let response = Message(role: .assistant, content: "This is a placeholder response. The AI integration is coming soon!")
-            messages.append(response)
-            isLoading = false
-        }
-    }
-}
-
-// MARK: - Message Bubble
-
-struct MessageBubble: View {
-    let message: Message
-
-    var body: some View {
-        HStack {
-            if message.role == .user { Spacer() }
-
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                Text(message.content)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(message.role == .user ? Color.blue : Color(nsColor: .controlBackgroundColor))
-                    .foregroundColor(message.role == .user ? .white : .primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-
-                Text(timeString)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-
-            if message.role == .assistant { Spacer() }
-        }
-    }
-
-    private var timeString: String {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: message.timestamp)
-    }
-}
-
-// MARK: - Chat Input
-
-struct ChatInput: View {
-    @Binding var text: String
-    var onSend: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            TextField("Message...", text: $text)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .onSubmit(onSend)
-
-            Button(action: onSend) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title)
-                    .foregroundColor(text.isEmpty ? .gray : .blue)
-            }
-            .buttonStyle(.plain)
-            .disabled(text.isEmpty)
-        }
-    }
-}
-
-// MARK: - Typing Indicator
-
-struct TypingIndicator: View {
-    @State private var animating = false
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<3) { i in
-                Circle()
-                    .fill(Color.secondary)
-                    .frame(width: 8, height: 8)
-                    .opacity(animating ? 0.3 : 1)
-                    .animation(
-                        .easeInOut(duration: 0.6)
-                        .repeatForever()
-                        .delay(Double(i) * 0.2),
-                        value: animating
-                    )
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .onAppear { animating = true }
     }
 }
 
@@ -480,11 +294,6 @@ struct WebPreviewPane: View {
             HTMLWebView(html: html)
         }
     }
-}
-
-#Preview {
-    ChatView()
-        .frame(width: 500, height: 600)
 }
 
 #Preview {
