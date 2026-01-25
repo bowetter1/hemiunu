@@ -105,33 +105,42 @@ struct ToolbarButton: View {
 
 // MARK: - Mode Selector
 
-struct ModeSelector<Mode: RawRepresentable & CaseIterable & Hashable>: View where Mode.RawValue == String {
-    @Binding var selectedMode: Mode
+struct ModeSelector: View {
+    @Binding var selectedMode: AppMode
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(Array(Mode.allCases), id: \.self) { mode in
+            ForEach(AppMode.allCases, id: \.self) { mode in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.easeInOut(duration: 0.15)) {
                         selectedMode = mode
                     }
                 } label: {
-                    Text(mode.rawValue)
-                        .font(.system(size: 13, weight: selectedMode == mode ? .semibold : .regular))
-                        .foregroundColor(selectedMode == mode ? .white : .secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                        .background(
-                            selectedMode == mode ? Color.blue : Color.clear
-                        )
-                        .cornerRadius(6)
+                    HStack(spacing: 6) {
+                        Image(systemName: icon(for: mode))
+                            .font(.system(size: 12))
+                        Text(mode.rawValue)
+                            .font(.system(size: 12, weight: selectedMode == mode ? .semibold : .regular))
+                    }
+                    .foregroundColor(selectedMode == mode ? .white : .secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(selectedMode == mode ? Color.blue : Color.clear)
+                    .cornerRadius(6)
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(3)
-        .background(.ultraThinMaterial)
+        .background(Color.secondary.opacity(0.1))
         .cornerRadius(9)
+    }
+
+    private func icon(for mode: AppMode) -> String {
+        switch mode {
+        case .design: return "paintbrush"
+        case .code: return "chevron.left.forwardslash.chevron.right"
+        }
     }
 }
 
