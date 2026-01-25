@@ -70,15 +70,7 @@ struct AppRouter: View {
                         isConnected: appState.isConnected,
                         errorMessage: appState.errorMessage,
                         hasProject: client.currentProject != nil,
-                        logs: client.projectLogs,
-                        projects: client.projects,
-                        currentProject: client.currentProject,
-                        onSelectProject: { projectId in
-                            appState.selectedProjectId = projectId
-                        },
-                        onBackToProjects: {
-                            appState.clearCurrentProject()
-                        }
+                        logs: client.projectLogs
                     )
                     .padding(.top, 16)
                     .padding(.horizontal)

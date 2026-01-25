@@ -9,6 +9,14 @@ struct ProjectsSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Project dropdown at top
+            projectDropdown
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+            Divider()
+
             if client.currentProject != nil {
                 // Show variants and pages for current project
                 variantsSidebar
@@ -19,6 +27,79 @@ struct ProjectsSidebar: View {
         }
         .frame(width: 220)
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    // MARK: - Project Dropdown
+
+    private var projectDropdown: some View {
+        Menu {
+            ForEach(client.projects) { project in
+                Button(action: { selectedProjectId = project.id }) {
+                    HStack {
+                        Circle()
+                            .fill(statusColor(for: project))
+                            .frame(width: 8, height: 8)
+                        Text(projectTitle(project))
+                        if project.id == client.currentProject?.id {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+
+            if client.currentProject != nil {
+                Divider()
+                Button(action: onNewProject) {
+                    Label("Back to Projects", systemImage: "arrow.left")
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                if let project = client.currentProject {
+                    Circle()
+                        .fill(statusColor(for: project))
+                        .frame(width: 8, height: 8)
+                    Text(projectTitle(project))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                } else {
+                    Image(systemName: "folder")
+                        .foregroundColor(.secondary)
+                    Text("Select Project")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(8)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+    }
+
+    private func projectTitle(_ project: Project) -> String {
+        let words = project.brief.split(separator: " ").prefix(4)
+        let title = words.joined(separator: " ")
+        return title.count < project.brief.count ? "\(title)..." : title
+    }
+
+    private func statusColor(for project: Project) -> Color {
+        switch project.status {
+        case .brief, .clarification, .moodboard, .layouts:
+            return .orange
+        case .editing, .done:
+            return .green
+        case .failed:
+            return .red
+        }
     }
 
     // MARK: - Variants Sidebar (when project is selected)
