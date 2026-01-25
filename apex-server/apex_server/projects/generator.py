@@ -5,7 +5,7 @@ import httpx
 import time
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable, TypeVar
 from bs4 import BeautifulSoup
 
 from sqlalchemy.orm import Session
@@ -15,6 +15,35 @@ from apex_server.config import get_settings
 from .models import Project, Page, ProjectLog, ProjectStatus
 
 settings = get_settings()
+
+# Model constants - easy to switch
+MODEL_OPUS = "claude-opus-4-5-20251101"
+MODEL_SONNET = "claude-sonnet-4-20250514"
+MODEL_DEFAULT = MODEL_SONNET  # Use Sonnet by default (faster, cheaper)
+MODEL_QUALITY = MODEL_OPUS    # Use Opus for quality-critical tasks
+
+T = TypeVar('T')
+
+
+def with_retry(fn: Callable[[], T], max_retries: int = 3, base_delay: float = 2.0) -> T:
+    """Execute function with exponential backoff retry on overload errors"""
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except Exception as e:
+            error_str = str(e).lower()
+            # Retry on overload (529) or rate limit errors
+            if 'overloaded' in error_str or '529' in error_str or 'rate' in error_str:
+                last_error = e
+                delay = base_delay * (2 ** attempt)  # Exponential backoff
+                print(f"[RETRY] Attempt {attempt + 1}/{max_retries} failed (overloaded), waiting {delay}s...", flush=True)
+                time.sleep(delay)
+            else:
+                # Non-retryable error, raise immediately
+                raise
+    # All retries exhausted
+    raise last_error
 
 
 def fetch_page_content(url: str, timeout: float = 10.0) -> dict:
@@ -926,16 +955,18 @@ Rules:
 
         self.log("edit", f"Editing: {instruction}")
 
-        response = self.client.messages.create(
-            model="claude-opus-4-5-20251101",
-            max_tokens=8000,
-            system="""You are a web developer. Modify the HTML code based on the instruction.
+        def make_request():
+            return self.client.messages.create(
+                model=MODEL_SONNET,  # Sonnet for fast edits
+                max_tokens=8000,
+                system="""You are a web developer. Modify the HTML code based on the instruction.
 Respond ONLY with the updated HTML code, nothing else.""",
-            messages=[
-                {"role": "user", "content": f"Current HTML:\n```html\n{page.html}\n```\n\nInstruction: {instruction}"}
-            ]
-        )
+                messages=[
+                    {"role": "user", "content": f"Current HTML:\n```html\n{page.html}\n```\n\nInstruction: {instruction}"}
+                ]
+            )
 
+        response = with_retry(make_request)
         self.track_usage(response)
 
         # Extract HTML from response
@@ -975,10 +1006,11 @@ Respond ONLY with the updated HTML code, nothing else.""",
         if description:
             prompt += f" Description: {description}"
 
-        response = self.client.messages.create(
-            model="claude-opus-4-5-20251101",
-            max_tokens=8000,
-            system=f"""You are a web developer. Create a new HTML page that matches the style.
+        def make_request():
+            return self.client.messages.create(
+                model=MODEL_SONNET,  # Sonnet for new pages
+                max_tokens=8000,
+                system=f"""You are a web developer. Create a new HTML page that matches the style.
 
 Moodboard: {json.dumps(self.project.moodboard)}
 
@@ -988,11 +1020,12 @@ Existing page for reference:
 ```
 
 Respond ONLY with complete HTML code.""",
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
 
+        response = with_retry(make_request)
         self.track_usage(response)
 
         html = response.content[0].text
