@@ -295,17 +295,14 @@ struct ToolsPanel: View {
         Task {
             do {
                 let result = try await client.generateSite(projectId: projectId)
+
+                // Refresh pages to show new ones
+                let updatedPages = try await client.getPages(projectId: projectId)
+
                 await MainActor.run {
                     isGenerating = false
                     generationResult = result
-
-                    // Refresh pages to show new ones
-                    Task {
-                        let pages = try? await client.getPages(projectId: projectId)
-                        if let pages = pages {
-                            client.pages = pages
-                        }
-                    }
+                    client.pages = updatedPages
                 }
             } catch {
                 await MainActor.run {
