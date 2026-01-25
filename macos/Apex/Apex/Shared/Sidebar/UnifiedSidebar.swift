@@ -205,12 +205,34 @@ struct FilesTabContent: View {
 
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(client.pages) { page in
+                    // Show index/hero page as root
+                    if let indexPage = indexPage {
                         SidebarFileRow(
-                            page: page,
-                            isSelected: selectedPageId == page.id,
-                            onSelect: { selectedPageId = page.id }
+                            page: indexPage,
+                            isSelected: selectedPageId == indexPage.id,
+                            onSelect: { selectedPageId = indexPage.id },
+                            isRoot: true
                         )
+
+                        // Show child pages indented
+                        ForEach(childPages) { page in
+                            SidebarFileRow(
+                                page: page,
+                                isSelected: selectedPageId == page.id,
+                                onSelect: { selectedPageId = page.id },
+                                isRoot: false
+                            )
+                        }
+                    } else {
+                        // Fallback: show all pages flat
+                        ForEach(client.pages) { page in
+                            SidebarFileRow(
+                                page: page,
+                                isSelected: selectedPageId == page.id,
+                                onSelect: { selectedPageId = page.id },
+                                isRoot: true
+                            )
+                        }
                     }
                 }
                 .padding(8)
@@ -218,6 +240,25 @@ struct FilesTabContent: View {
 
             Spacer()
         }
+    }
+
+    /// The main index/hero page (first page or one named "index"/"hero"/"home")
+    private var indexPage: Page? {
+        // Try to find by name
+        let indexNames = ["index", "hero", "home", "layout 1", "layout 2", "layout 3"]
+        for name in indexNames {
+            if let page = client.pages.first(where: { $0.name.lowercased() == name }) {
+                return page
+            }
+        }
+        // Fallback to first page
+        return client.pages.first
+    }
+
+    /// Pages that are not the index page
+    private var childPages: [Page] {
+        guard let index = indexPage else { return [] }
+        return client.pages.filter { $0.id != index.id }
     }
 
     // MARK: - Variants List (Design mode)
@@ -797,22 +838,32 @@ struct SidebarFileRow: View {
     let page: Page
     let isSelected: Bool
     let onSelect: () -> Void
+    var isRoot: Bool = true
 
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 8) {
-                Image(systemName: "doc.text.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(.orange)
+                // Tree line for child pages
+                if !isRoot {
+                    Text("└")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .frame(width: 12)
+                }
+
+                Image(systemName: isRoot ? "doc.text.fill" : "doc.text")
+                    .font(.system(size: isRoot ? 12 : 11))
+                    .foregroundColor(isRoot ? .orange : .secondary)
 
                 Text(fileName)
-                    .font(.system(size: 12))
+                    .font(.system(size: isRoot ? 12 : 11))
                     .foregroundColor(.primary)
                     .lineLimit(1)
 
                 Spacer()
             }
-            .padding(.horizontal, 10)
+            .padding(.leading, isRoot ? 10 : 16)
+            .padding(.trailing, 10)
             .padding(.vertical, 6)
             .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
             .cornerRadius(4)
