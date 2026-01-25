@@ -147,6 +147,9 @@ struct AppRouter: View {
 struct ToolsPanel: View {
     @ObservedObject var client: APIClient
     @State private var isExpanded = true
+    @State private var isGenerating = false
+    @State private var generationResult: GenerateSiteResponse?
+    @State private var errorMessage: String?
 
     private let panelWidth: CGFloat = 260
 
@@ -193,13 +196,28 @@ struct ToolsPanel: View {
             ScrollView {
                 VStack(spacing: 12) {
                     // Generate Site
-                    ToolCard(
-                        icon: "globe",
-                        title: "Generate Site",
-                        description: "Create full website from layout",
-                        color: .blue
-                    ) {
-                        // TODO: Implement generate site
+                    if isGenerating {
+                        GeneratingCard()
+                    } else if let result = generationResult {
+                        GenerationResultCard(result: result) {
+                            generationResult = nil
+                        }
+                    } else {
+                        ToolCard(
+                            icon: "globe",
+                            title: "Generate Site",
+                            description: "Create full website from layout",
+                            color: .blue,
+                            disabled: client.currentProject == nil || client.pages.isEmpty
+                        ) {
+                            generateSite()
+                        }
+                    }
+
+                    if let error = errorMessage {
+                        ErrorCard(message: error) {
+                            errorMessage = nil
+                        }
                     }
 
                     // Export
@@ -207,7 +225,8 @@ struct ToolsPanel: View {
                         icon: "square.and.arrow.up",
                         title: "Export",
                         description: "Download HTML/CSS files",
-                        color: .green
+                        color: .green,
+                        disabled: client.pages.isEmpty
                     ) {
                         // TODO: Implement export
                     }
@@ -217,7 +236,8 @@ struct ToolsPanel: View {
                         icon: "paintpalette",
                         title: "Design Tokens",
                         description: "Colors, fonts, spacing",
-                        color: .purple
+                        color: .purple,
+                        disabled: client.currentProject?.moodboard == nil
                     ) {
                         // TODO: Show design tokens
                     }
@@ -265,6 +285,142 @@ struct ToolsPanel: View {
             Spacer()
         }
     }
+
+    private func generateSite() {
+        guard let projectId = client.currentProject?.id else { return }
+
+        isGenerating = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let result = try await client.generateSite(projectId: projectId)
+                await MainActor.run {
+                    isGenerating = false
+                    generationResult = result
+
+                    // Refresh pages to show new ones
+                    Task {
+                        let pages = try? await client.getPages(projectId: projectId)
+                        if let pages = pages {
+                            client.pages = pages
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isGenerating = false
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Generation Cards
+
+struct GeneratingCard: View {
+    @State private var dots = ""
+    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .scaleEffect(0.8)
+                .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Generating Site\(dots)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
+                Text("Creating pages...")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(10)
+        .background(Color.blue.opacity(0.1))
+        .cornerRadius(8)
+        .onReceive(timer) { _ in
+            dots = dots.count >= 3 ? "" : dots + "."
+        }
+    }
+}
+
+struct GenerationResultCard: View {
+    let result: GenerateSiteResponse
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                Text("Site Generated!")
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text("\(result.totalPages) pages created")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            // List created pages
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(result.pagesCreated, id: \.self) { page in
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.text.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.orange)
+                        Text(page)
+                            .font(.system(size: 11))
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+            .padding(.top, 4)
+        }
+        .padding(10)
+        .background(Color.green.opacity(0.1))
+        .cornerRadius(8)
+    }
+}
+
+struct ErrorCard: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.red)
+
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundColor(.primary)
+                .lineLimit(2)
+
+            Spacer()
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(10)
+        .background(Color.red.opacity(0.1))
+        .cornerRadius(8)
+    }
 }
 
 // MARK: - Tool Card
@@ -274,6 +430,7 @@ struct ToolCard: View {
     let title: String
     let description: String
     let color: Color
+    var disabled: Bool = false
     let action: () -> Void
 
     @State private var isHovering = false
@@ -284,9 +441,9 @@ struct ToolCard: View {
                 // Icon
                 Image(systemName: icon)
                     .font(.system(size: 16))
-                    .foregroundColor(color)
+                    .foregroundColor(disabled ? .secondary : color)
                     .frame(width: 32, height: 32)
-                    .background(color.opacity(0.15))
+                    .background((disabled ? Color.secondary : color).opacity(0.15))
                     .cornerRadius(8)
 
                 // Text
@@ -307,10 +464,12 @@ struct ToolCard: View {
                     .foregroundColor(.secondary.opacity(0.5))
             }
             .padding(10)
-            .background(isHovering ? Color.secondary.opacity(0.1) : Color.clear)
+            .background(isHovering && !disabled ? Color.secondary.opacity(0.1) : Color.clear)
             .cornerRadius(8)
+            .opacity(disabled ? 0.5 : 1)
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
         .onHover { hovering in
             isHovering = hovering
         }

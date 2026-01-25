@@ -1386,3 +1386,157 @@ Complete the user's request using the available tools."""
 
         self.log("edit", "Agentic edit complete")
         return final_response
+
+    def generate_site(self, pages: list[str] = None) -> dict:
+        """
+        Generate a complete mini-site from the current layout.
+        Uses agentic file tools to create multiple pages with consistent styling.
+
+        Args:
+            pages: Optional list of page names to create. If None, AI decides.
+
+        Returns:
+            dict with created pages and summary
+        """
+        self.log("site", "Starting site generation...")
+
+        # Get existing pages for reference
+        existing_pages = self.db.query(Page).filter(Page.project_id == self.project.id).all()
+        if not existing_pages:
+            raise ValueError("No existing pages to use as template")
+
+        # Find the main/hero page to use as template
+        template_page = existing_pages[0]
+        template_html = template_page.html
+
+        # Get moodboard for design context
+        moodboard_context = ""
+        moodboard = self.project.moodboard or {}
+        if isinstance(moodboard, dict):
+            moodboards = moodboard.get("moodboards", [])
+            selected_idx = (self.project.selected_moodboard or 1) - 1
+            if 0 <= selected_idx < len(moodboards):
+                mb = moodboards[selected_idx]
+                moodboard_context = f"""
+Design System:
+- Colors: {', '.join(mb.get('palette', []))}
+- Fonts: Heading: {mb.get('fonts', {}).get('heading', 'Inter')}, Body: {mb.get('fonts', {}).get('body', 'Inter')}
+- Mood: {', '.join(mb.get('mood', []))}
+- Style: {mb.get('rationale', '')}
+"""
+
+        # Build the prompt
+        pages_instruction = ""
+        if pages:
+            pages_instruction = f"Create these specific pages: {', '.join(pages)}"
+        else:
+            pages_instruction = "Create a complete mini-site with: Home (index.html), About (about.html), and Contact (contact.html)"
+
+        system_prompt = f"""You are a professional web developer creating a complete website.
+
+{moodboard_context}
+
+Project Brief: {self.project.brief}
+
+EXISTING TEMPLATE (use this style):
+```html
+{template_html[:3000]}{"..." if len(template_html) > 3000 else ""}
+```
+
+You have tools to:
+- list_files: See all files in the project
+- read_file: Read a file's content
+- write_file: Create or update a file
+- delete_file: Remove a file
+
+REQUIREMENTS:
+1. Match the exact visual style of the template (colors, fonts, spacing)
+2. Each page must be complete HTML with all CSS inline in <style> tag
+3. Include Google Fonts import in <head>
+4. Add navigation bar to ALL pages linking between them
+5. Make all pages responsive
+6. Keep consistent header/footer across pages
+
+NAVIGATION FORMAT:
+<nav>
+  <a href="index.html">Home</a>
+  <a href="about.html">About</a>
+  <a href="contact.html">Contact</a>
+</nav>
+
+{pages_instruction}
+
+Start by reading the existing page to understand the full styling, then create each new page."""
+
+        messages = [
+            {"role": "user", "content": "Generate the complete website now. Create each page one by one."}
+        ]
+
+        # Agentic loop
+        max_iterations = 15  # More iterations for multi-page generation
+        created_pages = []
+        final_response = ""
+
+        for i in range(max_iterations):
+            print(f"[GENERATE_SITE] Iteration {i+1}", flush=True)
+
+            def make_request():
+                return self.client.messages.create(
+                    model=MODEL_SONNET,  # Sonnet for speed
+                    max_tokens=12000,  # More tokens for full pages
+                    system=system_prompt,
+                    tools=self.get_file_tools(),
+                    messages=messages
+                )
+
+            response = with_retry(make_request)
+            self.track_usage(response)
+
+            # Process response
+            tool_calls = []
+            text_content = ""
+
+            for block in response.content:
+                if block.type == "text":
+                    text_content += block.text
+                elif block.type == "tool_use":
+                    tool_calls.append(block)
+
+            # If no tool calls, we're done
+            if not tool_calls:
+                final_response = text_content
+                print(f"[GENERATE_SITE] Done - no more tool calls", flush=True)
+                break
+
+            # Execute tool calls
+            messages.append({"role": "assistant", "content": response.content})
+
+            tool_results = []
+            for tool_call in tool_calls:
+                result = self.execute_file_tool(tool_call.name, tool_call.input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_call.id,
+                    "content": result
+                })
+
+                # Track created pages
+                if tool_call.name == "write_file":
+                    page_name = tool_call.input.get("name", "")
+                    if page_name and page_name not in created_pages:
+                        created_pages.append(page_name)
+                        print(f"[GENERATE_SITE] Created: {page_name}", flush=True)
+
+            messages.append({"role": "user", "content": tool_results})
+
+            if response.stop_reason == "end_turn":
+                final_response = text_content
+                break
+
+        self.log("site", f"Site generation complete: {len(created_pages)} pages")
+
+        return {
+            "pages_created": created_pages,
+            "summary": final_response,
+            "total_pages": len(created_pages)
+        }

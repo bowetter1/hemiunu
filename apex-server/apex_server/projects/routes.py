@@ -976,6 +976,51 @@ def add_page(
     )
 
 
+class GenerateSiteRequest(BaseModel):
+    pages: Optional[List[str]] = None  # Optional list of pages to create
+
+
+class GenerateSiteResponse(BaseModel):
+    pages_created: List[str]
+    summary: str
+    total_pages: int
+
+
+@router.post("/{project_id}/generate-site", response_model=GenerateSiteResponse)
+def generate_site(
+    project_id: uuid.UUID,
+    request: GenerateSiteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate a complete mini-site from the current layout"""
+    print(f"[GENERATE-SITE] Starting for project {project_id}", flush=True)
+
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check that project has at least one page to use as template
+    existing_pages = db.query(Page).filter(Page.project_id == project_id).count()
+    if existing_pages == 0:
+        raise HTTPException(status_code=400, detail="Project needs at least one page as template")
+
+    gen = Generator(project, db)
+    result = gen.generate_site(request.pages)
+
+    print(f"[GENERATE-SITE] Complete: {result['total_pages']} pages created", flush=True)
+
+    return GenerateSiteResponse(
+        pages_created=result["pages_created"],
+        summary=result["summary"],
+        total_pages=result["total_pages"]
+    )
+
+
 @router.get("/{project_id}/logs", response_model=List[LogResponse])
 def get_logs(
     project_id: uuid.UUID,

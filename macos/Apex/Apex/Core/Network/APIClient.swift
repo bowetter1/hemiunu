@@ -425,6 +425,22 @@ class APIClient: ObservableObject {
         return try decodeResponse(Page.self, data: data, response: response)
     }
 
+    /// Generate a complete mini-site from current layout
+    func generateSite(projectId: String, pages: [String]? = nil) async throws -> GenerateSiteResponse {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate-site")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        struct GenerateSiteRequest: Codable {
+            let pages: [String]?
+        }
+
+        request.httpBody = try JSONEncoder().encode(GenerateSiteRequest(pages: pages))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(GenerateSiteResponse.self, data: data, response: response)
+    }
+
     /// Get project logs
     func getProjectLogs(projectId: String) async throws -> [LogEntry] {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/logs")

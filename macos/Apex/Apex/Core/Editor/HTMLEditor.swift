@@ -31,6 +31,18 @@ struct StructuredEditResponse: Codable {
     let explanation: String
 }
 
+struct GenerateSiteResponse: Codable {
+    let pagesCreated: [String]
+    let summary: String
+    let totalPages: Int
+
+    enum CodingKeys: String, CodingKey {
+        case pagesCreated = "pages_created"
+        case summary
+        case totalPages = "total_pages"
+    }
+}
+
 // MARK: - HTML Editor
 
 /// Applies structured edits to HTML locally (no server round-trip for execution)
