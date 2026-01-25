@@ -1,5 +1,6 @@
 """Application configuration"""
 import os
+from typing import Optional
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -7,7 +8,8 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # App
     app_name: str = "Apex Server"
-    debug: bool = False
+    debug: bool = True
+    allow_dev_token: Optional[bool] = None
 
     # Database (SQLite for dev, PostgreSQL for prod)
     # Railway sets DATABASE_URL automatically when you add PostgreSQL
@@ -32,6 +34,13 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
+    @property
+    def dev_token_enabled(self) -> bool:
+        """Allow dev token by default in debug mode unless explicitly overridden."""
+        if self.allow_dev_token is None:
+            return self.debug
+        return self.allow_dev_token
 
 
 @lru_cache

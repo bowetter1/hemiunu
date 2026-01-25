@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from apex_server.shared.database import get_db
+from apex_server.config import get_settings
 from apex_server.shared.dependencies import get_current_user
 from apex_server.tenants.service import TenantService
 from .service import AuthService
@@ -95,6 +96,10 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/dev-token", response_model=TokenResponse)
 def get_dev_token(db: Session = Depends(get_db)):
     """Get a dev token - creates or uses a default dev user"""
+    settings = get_settings()
+    if not settings.dev_token_enabled:
+        raise HTTPException(status_code=403, detail="Dev token disabled")
+
     auth_service = AuthService(db)
     tenant_service = TenantService(db)
 
