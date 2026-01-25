@@ -688,8 +688,8 @@ def edit_page(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Edit a page with an instruction - creates a new version"""
-    print(f"[EDIT] Editing page {page_id}: {request.instruction[:50]}...", flush=True)
+    """Edit a page with an instruction - uses agentic file tools"""
+    print(f"[EDIT] Agentic editing page {page_id}: {request.instruction[:50]}...", flush=True)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.user_id == current_user.id
@@ -718,28 +718,29 @@ def edit_page(
             instruction="Initial version"
         )
         db.add(initial_version)
+        db.commit()
 
-    # Generate new HTML
+    # Use agentic editing - Opus can read/write files as needed
     gen = Generator(project, db)
-    new_html = gen.edit_page(str(page_id), request.instruction)
+    response_text = gen.agentic_edit(request.instruction, str(page_id))
+    print(f"[EDIT] Agentic response: {response_text[:100] if response_text else 'None'}...", flush=True)
 
-    # Refresh page from db after generator commit
+    # Refresh page from db after agentic edit (it may have been updated via tools)
     db.refresh(page)
-    print(f"[EDIT] After generator, page.current_version: {page.current_version}", flush=True)
+    print(f"[EDIT] After agentic edit, page.current_version: {page.current_version}", flush=True)
 
-    # Create new version
+    # Create new version with the updated HTML
     new_version_num = page.current_version + 1
     print(f"[EDIT] Creating new version v{new_version_num}", flush=True)
     new_version = PageVersion(
         page_id=page.id,
         version=new_version_num,
-        html=new_html,
+        html=page.html,
         instruction=request.instruction
     )
     db.add(new_version)
 
-    # Update page with new HTML and version
-    page.html = new_html
+    # Update page version number
     page.current_version = new_version_num
     db.commit()
 
@@ -747,7 +748,7 @@ def edit_page(
     return PageResponse(
         id=str(page.id),
         name=page.name,
-        html=new_html,
+        html=page.html,
         layout_variant=page.layout_variant,
         current_version=page.current_version
     )

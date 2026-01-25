@@ -1119,3 +1119,270 @@ Respond ONLY with complete HTML code.""",
 
         self.log("edit", f"Page '{name}' created")
         return page
+
+    # MARK: - Agentic File Tools
+
+    def get_file_tools(self):
+        """Define file tools for agentic editing"""
+        return [
+            {
+                "name": "list_files",
+                "description": "List all files/pages in the current project",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            },
+            {
+                "name": "read_file",
+                "description": "Read the content of a file/page",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "File name (e.g., 'index.html', 'about.html')"
+                        }
+                    },
+                    "required": ["name"]
+                }
+            },
+            {
+                "name": "write_file",
+                "description": "Create or update a file/page with HTML content",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "File name (e.g., 'contact.html')"
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Complete HTML content for the file"
+                        }
+                    },
+                    "required": ["name", "content"]
+                }
+            },
+            {
+                "name": "delete_file",
+                "description": "Delete a file/page from the project",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "File name to delete"
+                        }
+                    },
+                    "required": ["name"]
+                }
+            }
+        ]
+
+    def execute_file_tool(self, tool_name: str, tool_input: dict) -> str:
+        """Execute a file tool and return result"""
+        print(f"[TOOL] Executing {tool_name} with input: {tool_input}", flush=True)
+
+        if tool_name == "list_files":
+            pages = self.db.query(Page).filter(
+                Page.project_id == self.project.id
+            ).all()
+            files = []
+            for p in pages:
+                name = p.name.lower().replace(" ", "-") + ".html"
+                files.append({"name": name, "page_name": p.name, "size": len(p.html)})
+            return json.dumps({"files": files})
+
+        elif tool_name == "read_file":
+            file_name = tool_input.get("name", "")
+            # Find page by file name
+            page = self._find_page_by_filename(file_name)
+            if page:
+                return json.dumps({
+                    "name": file_name,
+                    "content": page.html,
+                    "page_id": str(page.id)
+                })
+            else:
+                return json.dumps({"error": f"File '{file_name}' not found"})
+
+        elif tool_name == "write_file":
+            file_name = tool_input.get("name", "")
+            content = tool_input.get("content", "")
+
+            # Inject Google Fonts
+            moodboard = self.project.moodboard or {}
+            if isinstance(moodboard, dict):
+                moodboards = moodboard.get("moodboards", [])
+                if moodboards:
+                    fonts = moodboards[0].get("fonts", {})
+                    content = inject_google_fonts(content, fonts)
+
+            # Check if file exists
+            page = self._find_page_by_filename(file_name)
+            if page:
+                # Update existing
+                page.html = content
+                self.db.commit()
+                self.log("edit", f"Updated {file_name}")
+                return json.dumps({"status": "updated", "name": file_name, "page_id": str(page.id)})
+            else:
+                # Create new page
+                page_name = file_name.replace(".html", "").replace("-", " ").title()
+                new_page = Page(
+                    project_id=self.project.id,
+                    name=page_name,
+                    html=content
+                )
+                self.db.add(new_page)
+                self.db.commit()
+                self.log("edit", f"Created {file_name}")
+                return json.dumps({"status": "created", "name": file_name, "page_id": str(new_page.id)})
+
+        elif tool_name == "delete_file":
+            file_name = tool_input.get("name", "")
+            page = self._find_page_by_filename(file_name)
+            if page:
+                self.db.delete(page)
+                self.db.commit()
+                self.log("edit", f"Deleted {file_name}")
+                return json.dumps({"status": "deleted", "name": file_name})
+            else:
+                return json.dumps({"error": f"File '{file_name}' not found"})
+
+        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+
+    def _find_page_by_filename(self, filename: str) -> Page:
+        """Find a page by its filename (e.g., 'about.html' -> page named 'About')"""
+        # Remove .html extension and convert to page name format
+        name_part = filename.replace(".html", "").replace("-", " ")
+
+        pages = self.db.query(Page).filter(
+            Page.project_id == self.project.id
+        ).all()
+
+        for page in pages:
+            page_filename = page.name.lower().replace(" ", "-") + ".html"
+            if page_filename == filename.lower():
+                return page
+            # Also check direct name match
+            if page.name.lower() == name_part.lower():
+                return page
+
+        return None
+
+    def agentic_edit(self, instruction: str, page_id: str = None) -> str:
+        """
+        Agentic editing with file tools.
+        Opus can read/write/list files as needed to complete the instruction.
+        """
+        self.log("edit", f"Agentic edit: {instruction}")
+
+        # Build context about current project
+        pages = self.db.query(Page).filter(Page.project_id == self.project.id).all()
+        files_list = [p.name.lower().replace(" ", "-") + ".html" for p in pages]
+
+        # If editing a specific page, include its content
+        current_file_context = ""
+        if page_id:
+            page = self.db.query(Page).filter(Page.id == page_id).first()
+            if page:
+                filename = page.name.lower().replace(" ", "-") + ".html"
+                current_file_context = f"\n\nCurrently selected file: {filename}\n```html\n{page.html}\n```"
+
+        # Get moodboard info for context
+        moodboard_context = ""
+        moodboard = self.project.moodboard or {}
+        if isinstance(moodboard, dict):
+            moodboards = moodboard.get("moodboards", [])
+            if moodboards:
+                mb = moodboards[0]
+                moodboard_context = f"""
+Design system:
+- Colors: {', '.join(mb.get('palette', []))}
+- Fonts: {mb.get('fonts', {})}
+- Mood: {', '.join(mb.get('mood', []))}
+"""
+
+        system_prompt = f"""You are a web developer working on a website project.
+
+Project files: {', '.join(files_list) if files_list else 'No files yet'}
+{moodboard_context}
+
+You have tools to:
+- list_files: See all files in the project
+- read_file: Read a file's content
+- write_file: Create or update a file
+- delete_file: Remove a file
+
+When creating/editing HTML:
+- Use the project's color palette and fonts
+- Keep consistent styling across pages
+- Include complete HTML with inline CSS
+- Make it responsive
+
+Complete the user's request using the available tools."""
+
+        messages = [
+            {"role": "user", "content": instruction + current_file_context}
+        ]
+
+        # Agentic loop - keep going until Opus stops using tools
+        max_iterations = 10
+        final_response = ""
+
+        for i in range(max_iterations):
+            print(f"[AGENTIC] Iteration {i+1}", flush=True)
+
+            def make_request():
+                return self.client.messages.create(
+                    model=MODEL_SONNET,
+                    max_tokens=8000,
+                    system=system_prompt,
+                    tools=self.get_file_tools(),
+                    messages=messages
+                )
+
+            response = with_retry(make_request)
+            self.track_usage(response)
+
+            # Process response
+            tool_calls = []
+            text_content = ""
+
+            for block in response.content:
+                if block.type == "text":
+                    text_content += block.text
+                elif block.type == "tool_use":
+                    tool_calls.append(block)
+
+            # If no tool calls, we're done
+            if not tool_calls:
+                final_response = text_content
+                print(f"[AGENTIC] Done - no more tool calls", flush=True)
+                break
+
+            # Execute tool calls and add results to messages
+            messages.append({"role": "assistant", "content": response.content})
+
+            tool_results = []
+            for tool_call in tool_calls:
+                result = self.execute_file_tool(tool_call.name, tool_call.input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_call.id,
+                    "content": result
+                })
+
+            messages.append({"role": "user", "content": tool_results})
+
+            # Check stop reason
+            if response.stop_reason == "end_turn":
+                final_response = text_content
+                break
+
+        self.log("edit", "Agentic edit complete")
+        return final_response
