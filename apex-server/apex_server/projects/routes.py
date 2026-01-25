@@ -13,7 +13,7 @@ from apex_server.config import get_settings
 from apex_server.shared.database import get_db
 from apex_server.shared.dependencies import get_current_user
 from apex_server.auth.models import User
-from .models import Project, Page, PageVersion, ProjectLog, ProjectStatus
+from .models import Project, Variant, Page, PageVersion, ProjectLog, ProjectStatus
 from .generator import Generator
 from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error, notify_clarification_needed
 from .structured_edit import generate_structured_edit, StructuredEditResponse
@@ -94,11 +94,21 @@ class ProjectResponse(BaseModel):
         from_attributes = True
 
 
+class VariantResponse(BaseModel):
+    id: str
+    name: str
+    moodboard_index: int
+
+    class Config:
+        from_attributes = True
+
+
 class PageResponse(BaseModel):
     id: str
     name: str
     html: str
-    layout_variant: Optional[int] = None
+    variant_id: Optional[str] = None
+    layout_variant: Optional[int] = None  # Legacy, kept for compatibility
     current_version: int = 1
 
     class Config:
@@ -523,6 +533,101 @@ def select_layout(
     return project_to_response(project)
 
 
+# === Variants Endpoints ===
+
+@router.get("/{project_id}/variants", response_model=List[VariantResponse])
+def get_variants(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all variants for a project"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    variants = db.query(Variant).filter(Variant.project_id == project_id).all()
+
+    return [VariantResponse(
+        id=str(v.id),
+        name=v.name,
+        moodboard_index=v.moodboard_index
+    ) for v in variants]
+
+
+class CreateVariantRequest(BaseModel):
+    name: str
+    moodboard_index: int
+
+
+@router.post("/{project_id}/variants", response_model=VariantResponse)
+def create_variant(
+    project_id: uuid.UUID,
+    request: CreateVariantRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a new variant for a project"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    variant = Variant(
+        project_id=project.id,
+        name=request.name,
+        moodboard_index=request.moodboard_index
+    )
+    db.add(variant)
+    db.commit()
+
+    return VariantResponse(
+        id=str(variant.id),
+        name=variant.name,
+        moodboard_index=variant.moodboard_index
+    )
+
+
+@router.get("/{project_id}/variants/{variant_id}/pages", response_model=List[PageResponse])
+def get_variant_pages(
+    project_id: uuid.UUID,
+    variant_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all pages for a specific variant"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    pages = db.query(Page).filter(
+        Page.project_id == project_id,
+        Page.variant_id == variant_id
+    ).all()
+
+    return [PageResponse(
+        id=str(p.id),
+        name=p.name,
+        html=p.html,
+        variant_id=str(p.variant_id) if p.variant_id else None,
+        layout_variant=p.layout_variant,
+        current_version=p.current_version
+    ) for p in pages]
+
+
+# === Pages Endpoints ===
+
 @router.get("/{project_id}/pages", response_model=List[PageResponse])
 def get_pages(
     project_id: uuid.UUID,
@@ -544,6 +649,7 @@ def get_pages(
         id=str(p.id),
         name=p.name,
         html=p.html,
+        variant_id=str(p.variant_id) if p.variant_id else None,
         layout_variant=p.layout_variant,
         current_version=p.current_version
     ) for p in pages]

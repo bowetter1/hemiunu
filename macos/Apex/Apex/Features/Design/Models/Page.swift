@@ -1,24 +1,39 @@
 import Foundation
 
-/// A page in a project
+/// A design variant within a project
+struct Variant: Identifiable, Codable, Equatable {
+    let id: String
+    let name: String
+    let moodboardIndex: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case moodboardIndex = "moodboard_index"
+    }
+}
+
+/// A page in a variant
 struct Page: Identifiable, Codable, Equatable {
     let id: String
     let name: String
     let html: String
-    let layoutVariant: Int?
+    let variantId: String?
+    let layoutVariant: Int?  // Legacy, kept for compatibility
     let currentVersion: Int
 
     enum CodingKeys: String, CodingKey {
         case id, name, html
+        case variantId = "variant_id"
         case layoutVariant = "layout_variant"
         case currentVersion = "current_version"
     }
 
-    // Memberwise initializer (needed because custom decoder removes synthesized one)
-    init(id: String, name: String, html: String, layoutVariant: Int?, currentVersion: Int = 1) {
+    // Memberwise initializer
+    init(id: String, name: String, html: String, variantId: String? = nil, layoutVariant: Int? = nil, currentVersion: Int = 1) {
         self.id = id
         self.name = name
         self.html = html
+        self.variantId = variantId
         self.layoutVariant = layoutVariant
         self.currentVersion = currentVersion
     }
@@ -28,6 +43,7 @@ struct Page: Identifiable, Codable, Equatable {
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         html = try container.decode(String.self, forKey: .html)
+        variantId = try container.decodeIfPresent(String.self, forKey: .variantId)
         layoutVariant = try container.decodeIfPresent(Int.self, forKey: .layoutVariant)
         currentVersion = try container.decodeIfPresent(Int.self, forKey: .currentVersion) ?? 1
     }

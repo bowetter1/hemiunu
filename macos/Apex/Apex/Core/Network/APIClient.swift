@@ -9,10 +9,12 @@ class APIClient: ObservableObject {
     @Published var projects: [Project] = []
     @Published var currentProject: Project?
     @Published var projectLogs: [LogEntry] = []
+    @Published var variants: [Variant] = []
     @Published var pages: [Page] = []
 
     private var baseURL: URL
     private(set) var authToken: String?
+    private let decoder = JSONDecoder()
 
     init(baseURL: String = "https://apex-server-production-a540.up.railway.app") {
         self.baseURL = URL(string: baseURL)!
@@ -37,6 +39,59 @@ class APIClient: ObservableObject {
         return request
     }
 
+    enum APIError: LocalizedError {
+        case invalidResponse
+        case server(status: Int, message: String)
+        case decoding(message: String)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidResponse:
+                return "Invalid server response."
+            case .server(let status, let message):
+                return "Server error (\(status)): \(message)"
+            case .decoding(let message):
+                return "Failed to decode response: \(message)"
+            }
+        }
+    }
+
+    private func errorMessage(from data: Data) -> String {
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let detail = object["detail"] as? String {
+                return detail
+            }
+            if let message = object["message"] as? String {
+                return message
+            }
+        }
+        return String(data: data, encoding: .utf8) ?? "Unknown error"
+    }
+
+    private func decodeResponse<T: Decodable>(_ type: T.Type, data: Data, response: URLResponse) throws -> T {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.server(status: httpResponse.statusCode, message: errorMessage(from: data))
+        }
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            let message = errorMessage(from: data)
+            throw APIError.decoding(message: message.isEmpty ? error.localizedDescription : message)
+        }
+    }
+
+    private func assertSuccess(data: Data, response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.server(status: httpResponse.statusCode, message: errorMessage(from: data))
+        }
+    }
+
     // MARK: - Auth
 
     /// Login and get access token
@@ -57,14 +112,14 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(LoginRequest(email: email, password: password))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let response = try JSONDecoder().decode(TokenResponse.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let tokenResponse = try decodeResponse(TokenResponse.self, data: data, response: response)
 
         await MainActor.run {
-            self.authToken = response.access_token
+            self.authToken = tokenResponse.access_token
         }
 
-        return response.access_token
+        return tokenResponse.access_token
     }
 
     /// Register new user and tenant
@@ -88,14 +143,14 @@ class APIClient: ObservableObject {
 
         let body = RegisterRequest(email: email, password: password, name: name, tenant_name: tenantName)
         request.httpBody = try JSONEncoder().encode(body)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let response = try JSONDecoder().decode(TokenResponse.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let tokenResponse = try decodeResponse(TokenResponse.self, data: data, response: response)
 
         await MainActor.run {
-            self.authToken = response.access_token
+            self.authToken = tokenResponse.access_token
         }
 
-        return response.access_token
+        return tokenResponse.access_token
     }
 
     /// Check if user is logged in
@@ -123,14 +178,14 @@ class APIClient: ObservableObject {
             let token_type: String
         }
 
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let response = try JSONDecoder().decode(TokenResponse.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let tokenResponse = try decodeResponse(TokenResponse.self, data: data, response: response)
 
         await MainActor.run {
-            self.authToken = response.access_token
+            self.authToken = tokenResponse.access_token
         }
 
-        return response.access_token
+        return tokenResponse.access_token
     }
 
     // MARK: - Projects API
@@ -147,8 +202,8 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(CreateProjectRequest(brief: brief))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let project = try JSONDecoder().decode(Project.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let project = try decodeResponse(Project.self, data: data, response: response)
 
         await MainActor.run {
             self.currentProject = project
@@ -165,16 +220,16 @@ class APIClient: ObservableObject {
     func getProject(id: String) async throws -> Project {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(id)")
         let request = authorizedRequest(url: url)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Project.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Project.self, data: data, response: response)
     }
 
     /// List all user's projects
     func listProjects() async throws -> [Project] {
         let url = baseURL.appendingPathComponent("/api/v1/projects")
         let request = authorizedRequest(url: url)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let projects = try JSONDecoder().decode([Project].self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let projects = try decodeResponse([Project].self, data: data, response: response)
 
         await MainActor.run {
             self.projects = projects
@@ -195,8 +250,8 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(ClarifyRequest(answer: answer))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let project = try JSONDecoder().decode(Project.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let project = try decodeResponse(Project.self, data: data, response: response)
 
         await MainActor.run {
             self.currentProject = project
@@ -217,8 +272,8 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(SelectMoodboardRequest(variant: variant))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Project.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Project.self, data: data, response: response)
     }
 
     /// Generate 3 layout alternatives
@@ -226,8 +281,8 @@ class APIClient: ObservableObject {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate-layouts")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Project.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Project.self, data: data, response: response)
     }
 
     /// Select a layout (1, 2, or 3)
@@ -242,24 +297,61 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(SelectLayoutRequest(variant: variant))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Project.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Project.self, data: data, response: response)
     }
+
+    // MARK: - Variants
+
+    /// Get all variants for a project
+    func getVariants(projectId: String) async throws -> [Variant] {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/variants")
+        let request = authorizedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse([Variant].self, data: data, response: response)
+    }
+
+    /// Create a new variant
+    func createVariant(projectId: String, name: String, moodboardIndex: Int) async throws -> Variant {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/variants")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        struct CreateVariantRequest: Codable {
+            let name: String
+            let moodboard_index: Int
+        }
+
+        request.httpBody = try JSONEncoder().encode(CreateVariantRequest(name: name, moodboard_index: moodboardIndex))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Variant.self, data: data, response: response)
+    }
+
+    /// Get pages for a specific variant
+    func getVariantPages(projectId: String, variantId: String) async throws -> [Page] {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/variants/\(variantId)/pages")
+        let request = authorizedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse([Page].self, data: data, response: response)
+    }
+
+    // MARK: - Pages
 
     /// Get all pages for a project
     func getPages(projectId: String) async throws -> [Page] {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/pages")
         let request = authorizedRequest(url: url)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode([Page].self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse([Page].self, data: data, response: response)
     }
 
     /// Get a specific page
     func getPage(projectId: String, pageId: String) async throws -> Page {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/pages/\(pageId)")
         let request = authorizedRequest(url: url)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Page.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Page.self, data: data, response: response)
     }
 
     /// Edit a page with AI instruction (legacy - returns full HTML)
@@ -274,8 +366,8 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(EditPageRequest(instruction: instruction))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Page.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Page.self, data: data, response: response)
     }
 
     /// Get structured edit instructions (token-efficient!)
@@ -291,8 +383,8 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(StructuredEditRequest(instruction: instruction, html: currentHtml))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(StructuredEditResponse.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(StructuredEditResponse.self, data: data, response: response)
     }
 
     /// Sync updated HTML back to server after local edits
@@ -307,8 +399,8 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(SyncPageRequest(html: html))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Page.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Page.self, data: data, response: response)
     }
 
     /// Add a new page to project
@@ -324,16 +416,16 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(AddPageRequest(name: name, description: description))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Page.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Page.self, data: data, response: response)
     }
 
     /// Get project logs
     func getProjectLogs(projectId: String) async throws -> [LogEntry] {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/logs")
         let request = authorizedRequest(url: url)
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode([LogEntry].self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse([LogEntry].self, data: data, response: response)
     }
 
     /// Delete a project
@@ -341,12 +433,8 @@ class APIClient: ObservableObject {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)")
         var request = authorizedRequest(url: url)
         request.httpMethod = "DELETE"
-        let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw URLError(.badServerResponse)
-        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try assertSuccess(data: data, response: response)
 
         await MainActor.run {
             // Remove from local list
@@ -368,18 +456,19 @@ class APIClient: ObservableObject {
         let request = authorizedRequest(url: url)
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        // Handle 404 - no versions yet is normal
-        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 404 {
-            return []
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
         }
 
-        // Try to decode as array, return empty if it fails (e.g., error response)
-        do {
-            return try JSONDecoder().decode([PageVersion].self, from: data)
-        } catch {
-            print("Failed to decode versions: \(error)")
+        // Handle 404 - no versions yet is normal
+        if httpResponse.statusCode == 404 {
             return []
         }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.server(status: httpResponse.statusCode, message: errorMessage(from: data))
+        }
+
+        return try decodeResponse([PageVersion].self, data: data, response: response)
     }
 
     /// Restore a page to a specific version
@@ -394,7 +483,7 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(RestoreVersionRequest(version: version))
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(Page.self, from: data)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(Page.self, data: data, response: response)
     }
 }

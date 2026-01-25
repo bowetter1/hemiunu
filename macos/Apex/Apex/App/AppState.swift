@@ -65,6 +65,7 @@ class AppState: ObservableObject {
     // MARK: - Projects
 
     @Published var selectedProjectId: String?
+    @Published var selectedVariantId: String?
     @Published var selectedPageId: String?
 
     // MARK: - Services
@@ -109,12 +110,23 @@ class AppState: ObservableObject {
             let project = try await client.getProject(id: id)
             client.currentProject = project
 
+            // Load variants
+            let variants = try await client.getVariants(projectId: id)
+            client.variants = variants
+
             // Load pages
             let pages = try await client.getPages(projectId: id)
             client.pages = pages
 
-            // Auto-select first page (layout 1 or main page)
-            if let firstPage = pages.first {
+            // Auto-select first variant and its first page
+            if let firstVariant = variants.first {
+                selectedVariantId = firstVariant.id
+                // Find first page in this variant
+                if let firstPage = pages.first(where: { $0.variantId == firstVariant.id }) {
+                    selectedPageId = firstPage.id
+                }
+            } else if let firstPage = pages.first {
+                // Fallback: legacy pages without variants
                 selectedPageId = firstPage.id
             }
 
@@ -134,9 +146,11 @@ class AppState: ObservableObject {
 
     func clearCurrentProject() {
         client.currentProject = nil
+        client.variants = []
         client.pages = []
         client.projectLogs = []
         selectedProjectId = nil
+        selectedVariantId = nil
         selectedPageId = nil
         connectedProjectId = nil
         wsClient.disconnect()

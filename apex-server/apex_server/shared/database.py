@@ -66,7 +66,7 @@ def init_db():
     """Create all tables"""
     # Import all models so they register with Base
     from apex_server.auth.models import User
-    from apex_server.projects.models import Project, Page, PageVersion, ProjectLog
+    from apex_server.projects.models import Project, Variant, Page, PageVersion, ProjectLog
 
     Base.metadata.create_all(bind=engine)
 
@@ -97,6 +97,19 @@ def _run_migrations():
     ALTER TABLE page_versions ADD CONSTRAINT page_versions_page_id_fkey
         FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE;
     """
+
+    # Create variants table
+    create_variants = """
+    CREATE TABLE IF NOT EXISTS variants (
+        id VARCHAR(36) PRIMARY KEY,
+        project_id VARCHAR(36) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        moodboard_index INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """
+
     with engine.connect() as conn:
         try:
             conn.execute(text(create_page_versions))
@@ -114,6 +127,15 @@ def _run_migrations():
         except Exception as e:
             print(f"FK fix migration: {e}", flush=True)
 
+    # Create variants table
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(create_variants))
+            conn.commit()
+            print("Migration: Ensured variants table exists", flush=True)
+        except Exception as e:
+            print(f"variants table migration: {e}", flush=True)
+
     migrations = [
         # Add selected_moodboard to projects table
         ("projects", "selected_moodboard", "ALTER TABLE projects ADD COLUMN selected_moodboard INTEGER"),
@@ -121,6 +143,8 @@ def _run_migrations():
         ("projects", "clarification", "ALTER TABLE projects ADD COLUMN clarification JSON"),
         # Add current_version to pages table for version history
         ("pages", "current_version", "ALTER TABLE pages ADD COLUMN current_version INTEGER DEFAULT 1"),
+        # Add variant_id to pages table for multi-variant support
+        ("pages", "variant_id", "ALTER TABLE pages ADD COLUMN variant_id VARCHAR(36) REFERENCES variants(id) ON DELETE CASCADE"),
     ]
 
     # Add new enum values (PostgreSQL specific)

@@ -60,27 +60,44 @@ class Project(Base, TimestampMixin):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
+    variants: Mapped[List["Variant"]] = relationship("Variant", back_populates="project", cascade="all, delete-orphan")
     pages: Mapped[List["Page"]] = relationship("Page", back_populates="project", cascade="all, delete-orphan")
     logs: Mapped[List["ProjectLog"]] = relationship("ProjectLog", back_populates="project", cascade="all, delete-orphan")
 
 
-class Page(Base, TimestampMixin):
-    """A page in a project"""
-    __tablename__ = "pages"
+class Variant(Base, TimestampMixin):
+    """A design variant within a project - each can have multiple pages"""
+    __tablename__ = "variants"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("projects.id"))
 
-    name: Mapped[str] = mapped_column(String(100))  # "Hem", "Om oss", etc.
+    name: Mapped[str] = mapped_column(String(100))  # "Minimalist", "Bold", etc.
+    moodboard_index: Mapped[int] = mapped_column(Integer)  # Which moodboard (1, 2, 3)
+
+    project: Mapped["Project"] = relationship("Project", back_populates="variants")
+    pages: Mapped[List["Page"]] = relationship("Page", back_populates="variant", cascade="all, delete-orphan")
+
+
+class Page(Base, TimestampMixin):
+    """A page in a variant"""
+    __tablename__ = "pages"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("projects.id"))
+    variant_id: Mapped[Optional[uuid.UUID]] = mapped_column(GUID, ForeignKey("variants.id"), nullable=True)
+
+    name: Mapped[str] = mapped_column(String(100))  # "Home", "About", etc.
     html: Mapped[str] = mapped_column(Text)
 
-    # For layout alternatives (1, 2, 3) - null for final pages
+    # Legacy: For layout alternatives (1, 2, 3) - kept for migration compatibility
     layout_variant: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # Current version number
     current_version: Mapped[int] = mapped_column(Integer, default=1)
 
     project: Mapped["Project"] = relationship("Project", back_populates="pages")
+    variant: Mapped[Optional["Variant"]] = relationship("Variant", back_populates="pages")
     versions: Mapped[List["PageVersion"]] = relationship("PageVersion", back_populates="page", cascade="all, delete-orphan")
 
 

@@ -3,10 +3,124 @@ import SwiftUI
 struct ProjectsSidebar: View {
     @ObservedObject var client: APIClient
     @Binding var selectedProjectId: String?
+    @Binding var selectedVariantId: String?
     @Binding var selectedPageId: String?
     let onNewProject: () -> Void
 
     var body: some View {
+        VStack(spacing: 0) {
+            if client.currentProject != nil {
+                // Show variants and pages for current project
+                variantsSidebar
+            } else {
+                // Show project list when no project is selected
+                projectsSidebar
+            }
+        }
+        .frame(width: 220)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    // MARK: - Variants Sidebar (when project is selected)
+
+    private var variantsSidebar: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Variants")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Button(action: { /* TODO: Add variant */ }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("New Variant")
+            }
+            .frame(height: 32)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
+            // Variants list
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    // Show variants if they exist
+                    if !client.variants.isEmpty {
+                        ForEach(client.variants) { variant in
+                            VariantRowExpandable(
+                                variant: variant,
+                                pages: pagesForVariant(variant.id),
+                                isSelected: selectedVariantId == variant.id,
+                                selectedPageId: $selectedPageId,
+                                onSelectVariant: {
+                                    selectedVariantId = variant.id
+                                    // Select first page in variant
+                                    if let firstPage = pagesForVariant(variant.id).first {
+                                        selectedPageId = firstPage.id
+                                    }
+                                },
+                                onSelectPage: { pageId in
+                                    selectedVariantId = variant.id
+                                    selectedPageId = pageId
+                                },
+                                onAddPage: {
+                                    // TODO: Add page to variant
+                                }
+                            )
+                        }
+                    } else {
+                        // Legacy: show pages without variants (layout_variant based)
+                        ForEach(legacyLayoutPages) { page in
+                            LegacyPageRow(
+                                page: page,
+                                isSelected: selectedPageId == page.id,
+                                onSelect: { selectedPageId = page.id }
+                            )
+                        }
+                    }
+                }
+                .padding(8)
+            }
+
+            Spacer()
+
+            // New variant button
+            if !client.variants.isEmpty {
+                Button(action: { /* TODO: Add variant */ }) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                        Text("New Variant")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                }
+                .buttonStyle(.plain)
+                .background(Color.blue.opacity(0.1))
+            }
+        }
+    }
+
+    private func pagesForVariant(_ variantId: String) -> [Page] {
+        client.pages.filter { $0.variantId == variantId }
+    }
+
+    private var legacyLayoutPages: [Page] {
+        client.pages.filter { $0.layoutVariant != nil }
+            .sorted { ($0.layoutVariant ?? 0) < ($1.layoutVariant ?? 0) }
+    }
+
+    // MARK: - Projects Sidebar (when no project is selected)
+
+    private var projectsSidebar: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
@@ -34,25 +148,15 @@ struct ProjectsSidebar: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(client.projects) { project in
-                        ProjectRowExpandable(
+                        ProjectRow(
                             project: project,
-                            pages: client.pages,
                             isSelected: selectedProjectId == project.id,
-                            selectedPageId: $selectedPageId,
-                            onSelectProject: {
-                                selectedProjectId = project.id
-                                selectedPageId = nil
-                            },
-                            onSelectPage: { pageId in
-                                selectedProjectId = project.id
-                                selectedPageId = pageId
-                            },
+                            onSelect: { selectedProjectId = project.id },
                             onDelete: {
                                 Task {
                                     try? await client.deleteProject(projectId: project.id)
                                     if selectedProjectId == project.id {
                                         selectedProjectId = nil
-                                        selectedPageId = nil
                                     }
                                 }
                             }
@@ -64,7 +168,7 @@ struct ProjectsSidebar: View {
 
             Spacer()
 
-            // New project button at bottom
+            // New project button
             Button(action: onNewProject) {
                 HStack {
                     Image(systemName: "plus.circle.fill")
@@ -79,85 +183,60 @@ struct ProjectsSidebar: View {
             .buttonStyle(.plain)
             .background(Color.blue.opacity(0.1))
         }
-        .frame(width: 220)
-        .background(Color(nsColor: .controlBackgroundColor))
     }
 }
 
-struct ProjectRowExpandable: View {
-    let project: Project
+// MARK: - Variant Row
+
+struct VariantRowExpandable: View {
+    let variant: Variant
     let pages: [Page]
     let isSelected: Bool
     @Binding var selectedPageId: String?
-    let onSelectProject: () -> Void
+    let onSelectVariant: () -> Void
     let onSelectPage: (String) -> Void
-    let onDelete: () -> Void
+    let onAddPage: () -> Void
 
+    @State private var isExpanded = true
     @State private var isHovering = false
-
-    // Get layout pages for this project (only when selected)
-    var layoutPages: [Page] {
-        guard isSelected else { return [] }
-        return pages.filter { $0.layoutVariant != nil }
-            .sorted { ($0.layoutVariant ?? 0) < ($1.layoutVariant ?? 0) }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Project row
-            Button(action: onSelectProject) {
+            // Variant row
+            Button(action: {
+                onSelectVariant()
+                isExpanded = true
+            }) {
                 HStack(spacing: 10) {
                     // Expand indicator
-                    Image(systemName: isSelected && !layoutPages.isEmpty ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .frame(width: 10)
-
-                    // Status indicator
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(projectTitle)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-
-                        HStack(spacing: 4) {
-                            Text(formattedDate)
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary)
-
-                            Text("•")
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary)
-
-                            Text(statusText)
-                                .font(.system(size: 10))
-                                .foregroundColor(statusColor)
-                        }
+                    Button(action: { isExpanded.toggle() }) {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .frame(width: 10)
                     }
+                    .buttonStyle(.plain)
+
+                    // Variant icon
+                    Image(systemName: "paintpalette")
+                        .font(.system(size: 12))
+                        .foregroundColor(isSelected ? .blue : .secondary)
+
+                    Text(variant.name)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
 
                     Spacer()
 
-                    // Three-dot menu
-                    if isHovering || isSelected {
-                        Menu {
-                            Button(role: .destructive) {
-                                onDelete()
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                                .frame(width: 20, height: 20)
-                        }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
-                    }
+                    // Page count badge
+                    Text("\(pages.count)")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.2))
+                        .cornerRadius(4)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
@@ -169,65 +248,82 @@ struct ProjectRowExpandable: View {
                 isHovering = hovering
             }
 
-            // Page list (expanded when selected)
-            if isSelected && !layoutPages.isEmpty {
+            // Pages list (expanded)
+            if isExpanded {
                 VStack(spacing: 2) {
-                    ForEach(layoutPages) { page in
+                    ForEach(pages) { page in
                         PageRow(
                             page: page,
                             isSelected: selectedPageId == page.id,
                             onSelect: { onSelectPage(page.id) }
                         )
                     }
+
+                    // Add page button
+                    Button(action: onAddPage) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+
+                            Text("Add Page")
+                                .font(.system(size: 11))
+                                .foregroundColor(.blue)
+
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.leading, 28)
                 .padding(.top, 4)
             }
         }
     }
+}
 
-    var projectTitle: String {
-        let words = project.brief.split(separator: " ").prefix(4)
-        let title = words.joined(separator: " ")
-        return title.count < project.brief.count ? "\(title)..." : title
-    }
+// MARK: - Page Row
 
-    var formattedDate: String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: project.createdAt) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateFormat = "MMM d"
-            return displayFormatter.string(from: date)
+struct PageRow: View {
+    let page: Page
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+
+                Text(page.name)
+                    .font(.system(size: 11))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                // Version indicator
+                if page.currentVersion > 1 {
+                    Text("v\(page.currentVersion)")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+            .cornerRadius(4)
         }
-        return ""
-    }
-
-    var statusColor: Color {
-        switch project.status {
-        case .brief, .clarification, .moodboard, .layouts:
-            return .orange
-        case .editing, .done:
-            return .green
-        case .failed:
-            return .red
-        }
-    }
-
-    var statusText: String {
-        switch project.status {
-        case .brief: return "Starting"
-        case .clarification: return "Need info"
-        case .moodboard: return "Moodboard"
-        case .layouts: return "Layouts"
-        case .editing: return "Editing"
-        case .done: return "Done"
-        case .failed: return "Failed"
-        }
+        .buttonStyle(.plain)
     }
 }
 
-struct PageRow: View {
+// MARK: - Legacy Page Row (for layout_variant based pages)
+
+struct LegacyPageRow: View {
     let page: Page
     let isSelected: Bool
     let onSelect: () -> Void
@@ -262,10 +358,98 @@ struct PageRow: View {
     }
 }
 
+// MARK: - Project Row (for project list)
+
+struct ProjectRow: View {
+    let project: Project
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onDelete: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 10) {
+                // Status indicator
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(projectTitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    Text(formattedDate)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                // Delete button on hover
+                if isHovering {
+                    Menu {
+                        Button(role: .destructive, action: onDelete) {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .frame(width: 20, height: 20)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+
+    var projectTitle: String {
+        let words = project.brief.split(separator: " ").prefix(4)
+        let title = words.joined(separator: " ")
+        return title.count < project.brief.count ? "\(title)..." : title
+    }
+
+    var formattedDate: String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: project.createdAt) {
+            let displayFormatter = DateFormatter()
+            displayFormatter.dateFormat = "MMM d"
+            return displayFormatter.string(from: date)
+        }
+        return ""
+    }
+
+    var statusColor: Color {
+        switch project.status {
+        case .brief, .clarification, .moodboard, .layouts:
+            return .orange
+        case .editing, .done:
+            return .green
+        case .failed:
+            return .red
+        }
+    }
+}
+
 #Preview {
     ProjectsSidebar(
         client: APIClient(),
         selectedProjectId: .constant(nil),
+        selectedVariantId: .constant(nil),
         selectedPageId: .constant(nil),
         onNewProject: {}
     )

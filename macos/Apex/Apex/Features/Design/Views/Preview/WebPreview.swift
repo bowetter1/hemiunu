@@ -128,12 +128,16 @@ struct HTMLWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        // Disable caching
+        config.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        webView.loadHTMLString(html, baseURL: nil)
+        // Use unique baseURL to prevent caching
+        let uniqueURL = URL(string: "about:blank?t=\(Date().timeIntervalSince1970)")
+        webView.loadHTMLString(html, baseURL: uniqueURL)
     }
 }

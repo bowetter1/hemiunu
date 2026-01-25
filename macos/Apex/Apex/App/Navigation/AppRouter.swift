@@ -16,6 +16,7 @@ struct AppRouter: View {
                 ProjectsSidebar(
                     client: client,
                     selectedProjectId: $appState.selectedProjectId,
+                    selectedVariantId: $appState.selectedVariantId,
                     selectedPageId: $appState.selectedPageId,
                     onNewProject: {
                         appState.clearCurrentProject()
