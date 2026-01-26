@@ -91,17 +91,40 @@ Key elements to borrow: {', '.join(site.get('key_elements', []))}
 """
 
         opus_start = time.time()
-        print(f"[GENERATE_LAYOUTS] Calling Opus...", flush=True)
+        print(f"[GENERATE_LAYOUTS] Calling Opus with web search to study inspiration sites...", flush=True)
 
-        # Give Opus both layout tool AND image generation tool
+        # Give Opus web search, layout tool, AND image generation tool
         image_tool = self.get_image_tools()[0]
+        web_search_tool = {
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": 6  # Allow searching each inspiration site
+        }
 
-        response = self.client.messages.create(
-            model=MODEL_OPUS,
-            max_tokens=20000,
-            tools=[layout_tool, image_tool],
-            messages=[
-                {"role": "user", "content": f"""Create THREE world-class hero section designs, each inspired by a different reference website.
+        # Build the initial prompt (save for conversation continuations)
+        initial_prompt = f"""Create THREE world-class hero section designs, each inspired by a different reference website.
+
+═══════════════════════════════════════════════════════════════
+STEP 1: FIRST, USE WEB SEARCH TO STUDY THE INSPIRATION SITES
+═══════════════════════════════════════════════════════════════
+Before creating any layouts, you MUST use web_search to visit and study each inspiration site.
+Search for each site to see their actual design, layout, colors, typography, and structure.
+
+DO THIS FIRST:
+1. Search for "{inspiration_sites[0].get('url', '')}" - study the design
+2. Search for "{inspiration_sites[1].get('url', '')}" - study the design
+3. Search for "{inspiration_sites[2].get('url', '')}" - study the design
+
+Look at:
+- Hero section layout and structure
+- Navigation style
+- Typography choices
+- Image usage and placement
+- Overall visual feel
+
+═══════════════════════════════════════════════════════════════
+STEP 2: THEN CREATE 3 LAYOUTS BASED ON WHAT YOU SAW
+═══════════════════════════════════════════════════════════════
 
 Brief: {self.project.brief}
 
@@ -166,8 +189,14 @@ IMPORTANT: Each layout must:
 4. Be a COMPLETE HTML file with all CSS in <style> tag
 5. Be unique and different from the other layouts
 
-The layouts should look like they came from a professional design agency."""}
-            ]
+The layouts should look like they came from a professional design agency."""
+
+        response = self.client.beta.messages.create(
+            model=MODEL_OPUS,
+            max_tokens=20000,
+            betas=["web-search-2025-03-05"],
+            tools=[web_search_tool, layout_tool, image_tool],
+            messages=[{"role": "user", "content": initial_prompt}]
         )
 
         self.track_usage(response)
@@ -177,15 +206,28 @@ The layouts should look like they came from a professional design agency."""}
 
         # Agentic loop - process tool calls until we get save_layouts
         layouts = []
-        max_iterations = 10
-        original_prompt = response.model_dump()  # Save for potential continuation
+        max_iterations = 15  # More iterations since web search takes extra turns
+        # Start with the initial user message for context in continuations
+        conversation_messages = [{"role": "user", "content": initial_prompt}]
 
         for iteration in range(max_iterations):
             print(f"[GENERATE_LAYOUTS] Iteration {iteration + 1}, stop_reason: {response.stop_reason}", flush=True)
 
-            # Check for tool use
+            # Check for tool use and web search results
             tool_results = []
+            has_web_search = False
+
             for block in response.content:
+                # Log web search activity
+                if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
+                    query = getattr(block, 'input', {}).get('query', '')
+                    print(f"[GENERATE_LAYOUTS] Web search: {query}", flush=True)
+                    has_web_search = True
+
+                if block.type == "web_search_tool_result":
+                    print(f"[GENERATE_LAYOUTS] Got web search results", flush=True)
+                    has_web_search = True
+
                 if block.type == "tool_use":
                     if block.name == "save_layouts":
                         # Done! Extract layouts
@@ -206,24 +248,42 @@ The layouts should look like they came from a professional design agency."""}
             if layouts:
                 break
 
-            # If no tool results, something went wrong
-            if not tool_results:
-                print("[GENERATE_LAYOUTS] No tool calls found, breaking", flush=True)
+            # If stop_reason is "end_turn" and no tool calls, Opus is done (web search complete)
+            if response.stop_reason == "end_turn" and not tool_results and not has_web_search:
+                print("[GENERATE_LAYOUTS] End turn without layouts - prompting to continue", flush=True)
+                # Prompt Opus to now create the layouts
+                conversation_messages.append({"role": "assistant", "content": [b.model_dump() for b in response.content]})
+                conversation_messages.append({"role": "user", "content": "Great! Now that you've studied the inspiration sites, please create the 3 layouts using the save_layouts tool."})
+
+                response = self.client.beta.messages.create(
+                    model=MODEL_OPUS,
+                    max_tokens=20000,
+                    betas=["web-search-2025-03-05"],
+                    tools=[web_search_tool, layout_tool, image_tool],
+                    messages=conversation_messages
+                )
+                self.track_usage(response)
+                continue
+
+            # If we have tool results to send back (image generation)
+            if tool_results:
+                conversation_messages.append({"role": "assistant", "content": [b.model_dump() for b in response.content]})
+                conversation_messages.append({"role": "user", "content": tool_results})
+
+                response = self.client.beta.messages.create(
+                    model=MODEL_OPUS,
+                    max_tokens=20000,
+                    betas=["web-search-2025-03-05"],
+                    tools=[web_search_tool, layout_tool, image_tool],
+                    messages=conversation_messages
+                )
+                self.track_usage(response)
+                continue
+
+            # If stop_reason is "tool_use" but we didn't find any tools we handle, break
+            if response.stop_reason == "tool_use" and not tool_results and not has_web_search:
+                print("[GENERATE_LAYOUTS] Unknown tool use, breaking", flush=True)
                 break
-
-            # Continue conversation with tool results
-            messages = [
-                {"role": "assistant", "content": [b.model_dump() for b in response.content]},
-                {"role": "user", "content": tool_results}
-            ]
-
-            response = self.client.messages.create(
-                model=MODEL_OPUS,
-                max_tokens=20000,
-                tools=[layout_tool, image_tool],
-                messages=messages
-            )
-            self.track_usage(response)
 
         print(f"[TIMING] Opus layout generation: {time.time() - opus_start:.1f}s", flush=True)
 

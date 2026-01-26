@@ -90,41 +90,92 @@ Do 1-2 searches to find the official company website."""
         print(f"[TIMING] Step 1 (find company site): {time.time() - step1_start:.1f}s", flush=True)
 
         # ============================================
-        # STEP 2: Fetch company website and extract colors
+        # STEP 2: Have Opus analyze the website and identify brand colors
         # ============================================
         step2_start = time.time()
-        print("[STEP 2] Extracting colors from company website...", flush=True)
+        print("[STEP 2] Having Opus analyze website for brand colors...", flush=True)
 
         brand_colors = []
         company_content = None
 
         if company_urls:
-            # Fetch the first (most likely official) URL
             main_url = company_urls[0]["url"]
             print(f"[STEP 2] Fetching: {main_url}", flush=True)
 
             try:
                 company_content = fetch_page_content(main_url)
-                brand_colors = company_content.get("brand_colors", []) or company_content.get("colors_found", [])
-                print(f"[STEP 2] Colors from {main_url}: {brand_colors}", flush=True)
-            except Exception as e:
-                print(f"[STEP 2] Error fetching: {e}", flush=True)
+                raw_colors = company_content.get("colors_found", [])
+                print(f"[STEP 2] Raw colors found on page: {raw_colors[:10]}", flush=True)
 
-        # If no colors found, try additional URLs
-        if not brand_colors and len(company_urls) > 1:
-            for url_info in company_urls[1:3]:
-                try:
-                    content = fetch_page_content(url_info["url"])
-                    colors = content.get("brand_colors", []) or content.get("colors_found", [])
-                    if colors:
-                        brand_colors = colors
-                        company_content = content
-                        print(f"[STEP 2] Colors from {url_info['url']}: {brand_colors}", flush=True)
+                # Have Opus analyze and pick the REAL brand colors
+                color_tool = {
+                    "name": "identify_brand_colors",
+                    "description": "Identify the real brand colors from the website",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "primary": {"type": "string", "description": "Primary brand color hex (usually from logo or headers)"},
+                            "secondary": {"type": "string", "description": "Secondary color hex (backgrounds, cards)"},
+                            "accent": {"type": "string", "description": "Accent color hex (CTAs, buttons, links)"}
+                        },
+                        "required": ["primary", "secondary", "accent"]
+                    }
+                }
+
+                color_analysis = self.client.messages.create(
+                    model=MODEL_OPUS,
+                    max_tokens=500,
+                    tools=[color_tool],
+                    tool_choice={"type": "tool", "name": "identify_brand_colors"},
+                    messages=[{
+                        "role": "user",
+                        "content": f"""Analyze this website and identify its REAL brand colors.
+
+WEBSITE: {main_url}
+TITLE: {company_content.get('title', 'Unknown')}
+
+COLORS FOUND ON PAGE: {raw_colors[:15]}
+
+YOUR TASK: Pick the 3 colors that are the ACTUAL BRAND colors.
+
+⚠️ IGNORE THESE (they are from social media widgets, NOT the brand):
+- #1877F2, #4267B2, #3b5998 = Facebook blue
+- #1DA1F2, #1D9BF0 = Twitter/X blue
+- #FF0000, #CC0000, #c4302b = YouTube red
+- #E1306C, #C13584, #833AB4, #F77737 = Instagram colors
+- #0077B5, #0A66C2 = LinkedIn blue
+- #25D366, #128C7E = WhatsApp green
+- #000000 = Pure black (too generic)
+- #ffffff = Pure white (too generic)
+- Very light grays (#f5f5f5, #fafafa, #eeeeee, #e5e5e5)
+
+✅ LOOK FOR COLORS FROM:
+- The company LOGO (most important!)
+- Navigation bar / header background
+- CTA buttons ("Book now", "Contact us", etc.)
+- Section backgrounds with brand personality
+- Footer with brand colors
+
+Pick colors that feel like THIS SPECIFIC BRAND, not generic web colors."""
+                    }]
+                )
+                self.track_usage(color_analysis)
+
+                for block in color_analysis.content:
+                    if block.type == "tool_use" and block.name == "identify_brand_colors":
+                        colors = block.input
+                        brand_colors = [
+                            colors.get("primary", "#1a1a1a"),
+                            colors.get("secondary", "#ffffff"),
+                            colors.get("accent", "#0066cc")
+                        ]
+                        print(f"[STEP 2] Opus identified brand colors: {brand_colors}", flush=True)
                         break
-                except Exception as e:
-                    continue
 
-        print(f"[TIMING] Step 2 (extract colors): {time.time() - step2_start:.1f}s", flush=True)
+            except Exception as e:
+                print(f"[STEP 2] Error: {e}", flush=True)
+
+        print(f"[TIMING] Step 2 (analyze colors): {time.time() - step2_start:.1f}s", flush=True)
 
         # ============================================
         # STEP 3: Search for 6 beautiful inspiration websites
