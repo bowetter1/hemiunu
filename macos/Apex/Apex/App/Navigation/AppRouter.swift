@@ -523,7 +523,7 @@ struct ToolsPanel: View {
 
                 CollapsedToolButton(icon: "globe", color: .blue)
                 CollapsedToolButton(icon: "paintbrush", color: .purple)
-                CollapsedToolButton(icon: "rocket", color: .green)
+                CollapsedToolButton(icon: "paperplane", color: .green)
                 CollapsedToolButton(icon: "arrow.triangle.branch", color: .orange)
                 CollapsedToolButton(icon: "cylinder", color: .cyan)
                 CollapsedToolButton(icon: "gearshape", color: .gray)
@@ -1182,7 +1182,7 @@ struct DeployToolCard: View {
             // Header
             Button(action: { withAnimation(.spring(response: 0.3)) { isExpanded.toggle() } }) {
                 HStack(spacing: 12) {
-                    Image(systemName: "rocket")
+                    Image(systemName: "paperplane")
                         .font(.system(size: 14))
                         .foregroundColor(.green)
                         .frame(width: 28, height: 28)

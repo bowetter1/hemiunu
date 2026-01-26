@@ -93,11 +93,13 @@ Key elements to borrow: {', '.join(site.get('key_elements', []))}
         opus_start = time.time()
         print(f"[GENERATE_LAYOUTS] Calling Opus...", flush=True)
 
+        # Give Opus both layout tool AND image generation tool
+        image_tool = self.get_image_tools()[0]
+
         response = self.client.messages.create(
             model=MODEL_OPUS,
             max_tokens=20000,
-            tools=[layout_tool],
-            tool_choice={"type": "tool", "name": "save_layouts"},
+            tools=[layout_tool, image_tool],
             messages=[
                 {"role": "user", "content": f"""Create THREE world-class hero section designs, each inspired by a different reference website.
 
@@ -148,18 +150,12 @@ DESIGN PRINCIPLES:
 5. RESPONSIVE: Use clamp() for fluid typography, mobile-first approach
 
 ═══════════════════════════════════════════════════════════════
-IMAGE USAGE:
+IMAGES - USE generate_image TOOL:
 ═══════════════════════════════════════════════════════════════
-For placeholder images, use Unsplash Source with relevant keywords:
-https://source.unsplash.com/1600x900/?[keyword]
-
-Examples based on industry:
-- Golf: https://source.unsplash.com/1600x900/?golf,green
-- Restaurant: https://source.unsplash.com/1600x900/?restaurant,food
-- Tech/SaaS: https://source.unsplash.com/1600x900/?technology,minimal
-- Business: https://source.unsplash.com/1600x900/?office,professional
-
-Choose keywords that match the brand!
+Generate real images using the generate_image tool.
+For each layout that needs a hero image, call generate_image first.
+Use size "1536x1024" for hero/landscape images.
+The tool returns a path like "images/hero1.png" - use that in your HTML.
 
 ═══════════════════════════════════════════════════════════════
 IMPORTANT: Each layout must:
@@ -175,19 +171,61 @@ The layouts should look like they came from a professional design agency."""}
         )
 
         self.track_usage(response)
-        print(f"[TIMING] Opus layout generation: {time.time() - opus_start:.1f}s", flush=True)
-        print(f"[GENERATE_LAYOUTS] Opus response received, stop_reason: {response.stop_reason}", flush=True)
 
-        # Extract structured data from tool use
-        layouts = []
-        for block in response.content:
-            if block.type == "tool_use" and block.name == "save_layouts":
-                layouts = block.input.get("layouts", [])
-
-        print(f"[GENERATE_LAYOUTS] Extracted {len(layouts)} layouts", flush=True)
-
-        # Initialize filesystem for project
+        # Initialize filesystem early (needed for image generation)
         self.fs.init_project()
+
+        # Agentic loop - process tool calls until we get save_layouts
+        layouts = []
+        max_iterations = 10
+        original_prompt = response.model_dump()  # Save for potential continuation
+
+        for iteration in range(max_iterations):
+            print(f"[GENERATE_LAYOUTS] Iteration {iteration + 1}, stop_reason: {response.stop_reason}", flush=True)
+
+            # Check for tool use
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    if block.name == "save_layouts":
+                        # Done! Extract layouts
+                        layouts = block.input.get("layouts", [])
+                        print(f"[GENERATE_LAYOUTS] Got {len(layouts)} layouts", flush=True)
+                        break
+                    elif block.name == "generate_image":
+                        # Execute image generation
+                        print(f"[GENERATE_LAYOUTS] Generating image: {block.input.get('filename')}", flush=True)
+                        result = self.execute_image_tool(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": result
+                        })
+
+            # If we got layouts, we're done
+            if layouts:
+                break
+
+            # If no tool results, something went wrong
+            if not tool_results:
+                print("[GENERATE_LAYOUTS] No tool calls found, breaking", flush=True)
+                break
+
+            # Continue conversation with tool results
+            messages = [
+                {"role": "assistant", "content": [b.model_dump() for b in response.content]},
+                {"role": "user", "content": tool_results}
+            ]
+
+            response = self.client.messages.create(
+                model=MODEL_OPUS,
+                max_tokens=20000,
+                tools=[layout_tool, image_tool],
+                messages=messages
+            )
+            self.track_usage(response)
+
+        print(f"[TIMING] Opus layout generation: {time.time() - opus_start:.1f}s", flush=True)
 
         # Save layouts as pages
         for i, layout in enumerate(layouts, 1):
