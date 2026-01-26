@@ -145,6 +145,8 @@ def _run_migrations():
         ("pages", "current_version", "ALTER TABLE pages ADD COLUMN current_version INTEGER DEFAULT 1"),
         # Add variant_id to pages table for multi-variant support
         ("pages", "variant_id", "ALTER TABLE pages ADD COLUMN variant_id VARCHAR(36) REFERENCES variants(id) ON DELETE CASCADE"),
+        # Add parent_page_id to pages table for grouping generated pages under their parent layout
+        ("pages", "parent_page_id", "ALTER TABLE pages ADD COLUMN parent_page_id VARCHAR(36) REFERENCES pages(id) ON DELETE CASCADE"),
     ]
 
     # Add new enum values (PostgreSQL specific)

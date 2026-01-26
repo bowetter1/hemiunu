@@ -4,7 +4,9 @@ import WebKit
 /// Live preview of HTML content - expands when sidebar hidden
 struct WebPreview: View {
     let html: String
+    var projectId: String? = nil
     var sidebarVisible: Bool = true
+    var toolsPanelVisible: Bool = true
 
     // Version info (optional)
     var versions: [PageVersion] = []
@@ -13,9 +15,17 @@ struct WebPreview: View {
 
     private let baseWidth: CGFloat = 800
     private let sidebarWidth: CGFloat = 220
+    private let toolsPanelWidth: CGFloat = 220
 
     private var previewWidth: CGFloat {
-        sidebarVisible ? baseWidth : baseWidth + sidebarWidth
+        var width = baseWidth
+        if !sidebarVisible {
+            width += sidebarWidth
+        }
+        if !toolsPanelVisible {
+            width += toolsPanelWidth
+        }
+        return width
     }
 
     var body: some View {
@@ -25,15 +35,14 @@ struct WebPreview: View {
                 .padding(.bottom, 12)
 
             // Preview - centered, expands when sidebar hidden
-            ScrollView {
-                HTMLWebView(html: html)
-                    .frame(width: previewWidth, height: 800)
-                    .background(Color.white)
-                    .cornerRadius(8)
-                    .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
-                    .animation(.easeInOut(duration: 0.2), value: previewWidth)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HTMLWebView(html: html, projectId: projectId)
+                .frame(width: previewWidth)
+                .frame(maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
+                .animation(.easeInOut(duration: 0.2), value: previewWidth)
         }
         .padding(20)
     }
@@ -90,7 +99,7 @@ struct WebPreview: View {
             try html.write(to: fileURL, atomically: true, encoding: .utf8)
             NSWorkspace.shared.open(fileURL)
         } catch {
-            print("Failed to open in browser: \(error)")
+            // Failed to open in browser
         }
     }
 }
@@ -125,6 +134,23 @@ struct VersionDots: View {
 /// Reusable WebKit view for rendering HTML content
 struct HTMLWebView: NSViewRepresentable {
     let html: String
+    var projectId: String? = nil
+
+    // API base URL for loading assets
+    private var assetsBaseURL: URL? {
+        guard let projectId = projectId else { return nil }
+        // Point to the assets endpoint so relative image URLs resolve correctly
+        let baseURLString = "https://apex-server-production-a540.up.railway.app/api/v1/projects/\(projectId)/assets/"
+        return URL(string: baseURLString)
+    }
+
+    final class Coordinator {
+        var lastHTML: String?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -136,8 +162,10 @@ struct HTMLWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        // Use unique baseURL to prevent caching
-        let uniqueURL = URL(string: "about:blank?t=\(Date().timeIntervalSince1970)")
-        webView.loadHTMLString(html, baseURL: uniqueURL)
+        guard context.coordinator.lastHTML != html else { return }
+        context.coordinator.lastHTML = html
+        // Use assets base URL if available, otherwise fall back to about:blank
+        let baseURL = assetsBaseURL ?? URL(string: "about:blank?t=\(Date().timeIntervalSince1970)")
+        webView.loadHTMLString(html, baseURL: baseURL)
     }
 }

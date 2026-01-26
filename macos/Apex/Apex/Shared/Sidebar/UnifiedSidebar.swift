@@ -1,12 +1,6 @@
 import SwiftUI
 
-/// Sidebar tab selection
-enum SidebarTab: String, CaseIterable {
-    case files = "Files"
-    case chat = "Chat"
-}
-
-/// Unified sidebar with Files/Chat toggle (like Claude Code)
+/// Unified sidebar showing files, components and assets
 struct UnifiedSidebar: View {
     @ObservedObject var client: APIClient
     @ObservedObject var webSocket: WebSocketManager
@@ -15,70 +9,202 @@ struct UnifiedSidebar: View {
     @Binding var selectedVariantId: String?
     @Binding var selectedPageId: String?
     let onNewProject: () -> Void
+    let onClose: () -> Void
     var onProjectCreated: ((String) -> Void)? = nil
 
-    @State private var selectedTab: SidebarTab = .chat
+    @State private var componentsExpanded = false
+    @State private var assetsExpanded = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Tab selector
-            tabSelector
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-
-            Divider()
-
-            // Content based on selected tab
-            switch selectedTab {
-            case .files:
-                FilesTabContent(
-                    client: client,
-                    currentMode: currentMode,
-                    selectedProjectId: $selectedProjectId,
-                    selectedVariantId: $selectedVariantId,
-                    selectedPageId: $selectedPageId,
-                    onNewProject: onNewProject
-                )
-            case .chat:
-                ChatTabContent(
-                    client: client,
-                    webSocket: webSocket,
-                    selectedPageId: selectedPageId,
-                    onProjectCreated: onProjectCreated
-                )
-            }
-        }
-        .frame(width: 280)
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-
-    private var tabSelector: some View {
-        HStack(spacing: 0) {
-            ForEach(SidebarTab.allCases, id: \.self) { tab in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        selectedTab = tab
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: tab == .files ? "folder" : "bubble.left.and.bubble.right")
-                            .font(.system(size: 12))
-                        Text(tab.rawValue)
-                            .font(.system(size: 12, weight: selectedTab == tab ? .semibold : .regular))
-                    }
-                    .foregroundColor(selectedTab == tab ? .white : .secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(selectedTab == tab ? Color.blue : Color.clear)
-                    .cornerRadius(6)
+            // Header
+            HStack {
+                Image(systemName: "folder")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                Text("Explorer")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { onClose() } }) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Files section
+                    SidebarSection(title: "Pages", icon: "doc.text", isExpanded: .constant(true)) {
+                        FilesTabContent(
+                            client: client,
+                            currentMode: currentMode,
+                            selectedProjectId: $selectedProjectId,
+                            selectedVariantId: $selectedVariantId,
+                            selectedPageId: $selectedPageId,
+                            onNewProject: onNewProject
+                        )
+                    }
+
+                    // Components section (mockup)
+                    SidebarSection(title: "Components", icon: "square.on.square", isExpanded: $componentsExpanded) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ComponentRow(name: "Navbar", icon: "rectangle.split.3x1")
+                            ComponentRow(name: "Hero", icon: "rectangle")
+                            ComponentRow(name: "Footer", icon: "rectangle.bottomhalf.filled")
+
+                            Button(action: {}) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 10))
+                                    Text("Add component")
+                                        .font(.system(size: 11))
+                                }
+                                .foregroundColor(.secondary)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 8)
+                    }
+
+                    // Assets section (mockup)
+                    SidebarSection(title: "Assets", icon: "photo.on.rectangle", isExpanded: $assetsExpanded) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            AssetRow(name: "logo.svg", icon: "doc.richtext")
+                            AssetRow(name: "hero-bg.jpg", icon: "photo")
+                            AssetRow(name: "icon-check.svg", icon: "doc.richtext")
+
+                            Button(action: {}) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 10))
+                                    Text("Upload")
+                                        .font(.system(size: 11))
+                                }
+                                .foregroundColor(.secondary)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 8)
+                    }
+                }
+            }
         }
-        .padding(3)
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(9)
+        .frame(width: 240)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+    }
+}
+
+// MARK: - Sidebar Section
+
+struct SidebarSection<Content: View>: View {
+    let title: String
+    let icon: String
+    @Binding var isExpanded: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button(action: { withAnimation(.spring(response: 0.3)) { isExpanded.toggle() } }) {
+                HStack(spacing: 8) {
+                    Image(systemName: icon)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
+
+                    Text(title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                content()
+            }
+        }
+    }
+}
+
+// MARK: - Component Row (Mockup)
+
+struct ComponentRow: View {
+    let name: String
+    let icon: String
+
+    var body: some View {
+        Button(action: {}) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundColor(.purple)
+                    .frame(width: 16)
+
+                Text(name)
+                    .font(.system(size: 11))
+                    .foregroundColor(.primary)
+
+                Spacer()
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Asset Row (Mockup)
+
+struct AssetRow: View {
+    let name: String
+    let icon: String
+
+    var body: some View {
+        Button(action: {}) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundColor(.orange)
+                    .frame(width: 16)
+
+                Text(name)
+                    .font(.system(size: 11))
+                    .foregroundColor(.primary)
+
+                Spacer()
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -94,7 +220,7 @@ struct FilesTabContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Project dropdown
+            // Project dropdown for navigation
             projectDropdown
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -205,32 +331,22 @@ struct FilesTabContent: View {
 
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    // Show index/hero page as root
-                    if let indexPage = indexPage {
+                    // Show root pages (no parent) with their children
+                    ForEach(rootPages) { rootPage in
                         SidebarFileRow(
-                            page: indexPage,
-                            isSelected: selectedPageId == indexPage.id,
-                            onSelect: { selectedPageId = indexPage.id },
+                            page: rootPage,
+                            isSelected: selectedPageId == rootPage.id,
+                            onSelect: { selectedPageId = rootPage.id },
                             isRoot: true
                         )
 
-                        // Show child pages indented
-                        ForEach(childPages) { page in
+                        // Show child pages indented under this root
+                        ForEach(childPages(for: rootPage.id)) { childPage in
                             SidebarFileRow(
-                                page: page,
-                                isSelected: selectedPageId == page.id,
-                                onSelect: { selectedPageId = page.id },
+                                page: childPage,
+                                isSelected: selectedPageId == childPage.id,
+                                onSelect: { selectedPageId = childPage.id },
                                 isRoot: false
-                            )
-                        }
-                    } else {
-                        // Fallback: show all pages flat
-                        ForEach(client.pages) { page in
-                            SidebarFileRow(
-                                page: page,
-                                isSelected: selectedPageId == page.id,
-                                onSelect: { selectedPageId = page.id },
-                                isRoot: true
                             )
                         }
                     }
@@ -242,23 +358,14 @@ struct FilesTabContent: View {
         }
     }
 
-    /// The main index/hero page (first page or one named "index"/"hero"/"home")
-    private var indexPage: Page? {
-        // Try to find by name
-        let indexNames = ["index", "hero", "home", "layout 1", "layout 2", "layout 3"]
-        for name in indexNames {
-            if let page = client.pages.first(where: { $0.name.lowercased() == name }) {
-                return page
-            }
-        }
-        // Fallback to first page
-        return client.pages.first
+    /// Root pages (pages without a parent - these are the layout/hero pages)
+    private var rootPages: [Page] {
+        client.pages.filter { $0.parentPageId == nil }
     }
 
-    /// Pages that are not the index page
-    private var childPages: [Page] {
-        guard let index = indexPage else { return [] }
-        return client.pages.filter { $0.id != index.id }
+    /// Child pages for a given parent page
+    private func childPages(for parentId: String) -> [Page] {
+        client.pages.filter { $0.parentPageId == parentId }
     }
 
     // MARK: - Variants List (Design mode)
@@ -298,26 +405,35 @@ struct FilesTabContent: View {
                             )
                         }
 
-                        // Show pages without variant (generated pages)
+                        // Show pages without variant (layout pages and their children)
                         if !pagesWithoutVariant.isEmpty {
                             Divider()
                                 .padding(.vertical, 8)
 
-                            ForEach(pagesWithoutVariant) { page in
-                                SidebarPageRow(
-                                    page: page,
-                                    isSelected: selectedPageId == page.id,
-                                    onSelect: { selectedPageId = page.id }
+                            // Group by parent: show root pages first, then children under them
+                            ForEach(rootLayoutPages) { layoutPage in
+                                SidebarLayoutPageRow(
+                                    page: layoutPage,
+                                    childPages: childPagesFor(layoutPage.id),
+                                    isSelected: selectedPageId == layoutPage.id,
+                                    selectedPageId: $selectedPageId,
+                                    onSelectPage: { pageId in
+                                        selectedPageId = pageId
+                                    }
                                 )
                             }
                         }
                     } else {
-                        // No variants - show all pages
-                        ForEach(client.pages) { page in
-                            SidebarPageRow(
-                                page: page,
-                                isSelected: selectedPageId == page.id,
-                                onSelect: { selectedPageId = page.id }
+                        // No variants - show pages grouped by parent
+                        ForEach(rootLayoutPages) { layoutPage in
+                            SidebarLayoutPageRow(
+                                page: layoutPage,
+                                childPages: childPagesFor(layoutPage.id),
+                                isSelected: selectedPageId == layoutPage.id,
+                                selectedPageId: $selectedPageId,
+                                onSelectPage: { pageId in
+                                    selectedPageId = pageId
+                                }
                             )
                         }
                     }
@@ -335,6 +451,16 @@ struct FilesTabContent: View {
 
     private var pagesWithoutVariant: [Page] {
         client.pages.filter { $0.variantId == nil }
+    }
+
+    /// Root layout pages (pages without a parent - these are layout/hero pages)
+    private var rootLayoutPages: [Page] {
+        client.pages.filter { $0.variantId == nil && $0.parentPageId == nil }
+    }
+
+    /// Child pages for a given parent layout page
+    private func childPagesFor(_ parentId: String) -> [Page] {
+        client.pages.filter { $0.parentPageId == parentId }
     }
 
     // MARK: - Projects List
@@ -371,23 +497,6 @@ struct FilesTabContent: View {
                 }
                 .padding(8)
             }
-
-            Spacer()
-
-            // New project button
-            Button(action: onNewProject) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 16))
-                    Text("New Project")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(.blue)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .background(Color.blue.opacity(0.1))
         }
     }
 }
@@ -434,11 +543,6 @@ struct ChatTabContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Status header
-            statusHeader
-
-            Divider()
-
             // Messages
             messagesView
 
@@ -471,38 +575,6 @@ struct ChatTabContent: View {
         clarificationOptions = options
     }
 
-    private var statusHeader: some View {
-        HStack {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14))
-                .foregroundColor(.blue)
-
-            Text("AI Assistant")
-                .font(.system(size: 13, weight: .semibold))
-
-            Spacer()
-
-            if let project = client.currentProject {
-                Text(statusText(for: project.status))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 40)
-    }
-
-    private func statusText(for status: ProjectStatus) -> String {
-        switch status {
-        case .brief: return "Starting..."
-        case .clarification: return "Need info"
-        case .moodboard: return "Moodboard ready"
-        case .layouts: return "Layouts ready"
-        case .editing: return "Ready"
-        case .done: return "Done"
-        case .failed: return "Error"
-        }
-    }
 
     private var messagesView: some View {
         ScrollViewReader { proxy in
@@ -538,18 +610,19 @@ struct ChatTabContent: View {
     }
 
     private var welcomeMessage: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "sparkles")
+        VStack(spacing: 12) {
+            Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 28))
-                .foregroundColor(.blue.opacity(0.5))
+                .foregroundColor(.secondary.opacity(0.4))
 
-            Text("Describe your website")
+            Text("Chat with AI")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
 
-            Text("I'll design and build it")
+            Text("Describe edits or ask questions")
                 .font(.system(size: 11))
-                .foregroundColor(.secondary.opacity(0.8))
+                .foregroundColor(.secondary.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
@@ -597,11 +670,11 @@ struct ChatTabContent: View {
     }
 
     private var chatInput: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .bottom, spacing: 8) {
             TextField(placeholderText, text: $inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
-                .lineLimit(1...3)
+                .lineLimit(2...6)
                 .onSubmit { sendMessage() }
 
             Button(action: sendMessage) {
@@ -612,7 +685,8 @@ struct ChatTabContent: View {
             .buttonStyle(.plain)
             .disabled(inputText.isEmpty)
         }
-        .padding(10)
+        .padding(12)
+        .frame(minHeight: 60)
     }
 
     private var placeholderText: String {
@@ -834,6 +908,7 @@ struct SidebarChatBubble: View {
     }
 }
 
+
 struct SidebarFileRow: View {
     let page: Page
     let isSelected: Bool
@@ -842,29 +917,34 @@ struct SidebarFileRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 8) {
-                // Tree line for child pages
+            HStack(spacing: 6) {
+                // Tree connector for child pages
                 if !isRoot {
-                    Text("└")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.secondary.opacity(0.5))
-                        .frame(width: 12)
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(width: 1)
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(width: 8, height: 1)
+                    }
+                    .frame(width: 16, height: 20)
                 }
 
-                Image(systemName: isRoot ? "doc.text.fill" : "doc.text")
-                    .font(.system(size: isRoot ? 12 : 11))
-                    .foregroundColor(isRoot ? .orange : .secondary)
+                Image(systemName: isRoot ? "rectangle.3.group" : "doc.fill")
+                    .font(.system(size: isRoot ? 11 : 10))
+                    .foregroundColor(isRoot ? .orange : .blue.opacity(0.7))
 
                 Text(fileName)
-                    .font(.system(size: isRoot ? 12 : 11))
+                    .font(.system(size: isRoot ? 12 : 11, weight: isRoot ? .semibold : .regular))
                     .foregroundColor(.primary)
                     .lineLimit(1)
 
                 Spacer()
             }
-            .padding(.leading, isRoot ? 10 : 16)
+            .padding(.leading, isRoot ? 10 : 18)
             .padding(.trailing, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, 5)
             .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
             .cornerRadius(4)
         }
@@ -985,56 +1065,165 @@ struct SidebarPageRow: View {
     }
 }
 
+/// Layout page with expandable children (for Design mode)
+struct SidebarLayoutPageRow: View {
+    let page: Page
+    let childPages: [Page]
+    let isSelected: Bool
+    @Binding var selectedPageId: String?
+    let onSelectPage: (String) -> Void
+
+    @State private var isExpanded = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Layout/Hero page row
+            Button(action: { onSelectPage(page.id) }) {
+                HStack(spacing: 8) {
+                    // Expand/collapse button (only if has children)
+                    if !childPages.isEmpty {
+                        Button(action: { isExpanded.toggle() }) {
+                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.secondary)
+                                .frame(width: 10)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Spacer()
+                            .frame(width: 10)
+                    }
+
+                    Image(systemName: "rectangle.3.group")
+                        .font(.system(size: 11))
+                        .foregroundColor(.orange)
+
+                    Text(pageName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    if !childPages.isEmpty {
+                        Text("\(childPages.count)")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.2))
+                            .cornerRadius(4)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+                .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+
+            // Child pages (indented)
+            if isExpanded && !childPages.isEmpty {
+                VStack(spacing: 1) {
+                    ForEach(Array(childPages.enumerated()), id: \.element.id) { index, child in
+                        Button(action: { onSelectPage(child.id) }) {
+                            HStack(spacing: 6) {
+                                // Tree connector line
+                                HStack(spacing: 0) {
+                                    Rectangle()
+                                        .fill(Color.secondary.opacity(0.3))
+                                        .frame(width: 1)
+
+                                    Rectangle()
+                                        .fill(Color.secondary.opacity(0.3))
+                                        .frame(width: 8, height: 1)
+                                }
+                                .frame(width: 16, height: 20)
+
+                                Image(systemName: "doc.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.blue.opacity(0.7))
+
+                                Text(child.name)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+
+                                Spacer()
+                            }
+                            .padding(.leading, 24)
+                            .padding(.trailing, 10)
+                            .padding(.vertical, 4)
+                            .background(selectedPageId == child.id ? Color.blue.opacity(0.15) : Color.clear)
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    var pageName: String {
+        if let variant = page.layoutVariant {
+            return "Layout \(variant)"
+        }
+        return page.name
+    }
+}
+
 struct SidebarProjectRow: View {
     let project: Project
     let isSelected: Bool
     let onSelect: () -> Void
     let onDelete: () -> Void
 
-    @State private var isHovering = false
-
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
+        HStack(spacing: 8) {
+            Button(action: onSelect) {
+                HStack(alignment: .top, spacing: 8) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 4)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(projectTitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(projectTitle)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
 
-                    Text(formattedDate)
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                if isHovering {
-                    Menu {
-                        Button(role: .destructive, action: onDelete) {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 12))
+                        Text(formattedDate)
+                            .font(.system(size: 10))
                             .foregroundColor(.secondary)
-                            .frame(width: 20, height: 20)
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
+
+                    Spacer()
                 }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
-            .cornerRadius(6)
+            .buttonStyle(.plain)
+
+            // Always visible 3-dot menu
+            Menu {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
         }
-        .buttonStyle(.plain)
-        .onHover { hovering in isHovering = hovering }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+        .cornerRadius(6)
     }
 
     var projectTitle: String {
@@ -1074,7 +1263,8 @@ struct SidebarProjectRow: View {
         selectedProjectId: .constant(nil),
         selectedVariantId: .constant(nil),
         selectedPageId: .constant(nil),
-        onNewProject: {}
+        onNewProject: {},
+        onClose: {}
     )
     .frame(height: 600)
 }

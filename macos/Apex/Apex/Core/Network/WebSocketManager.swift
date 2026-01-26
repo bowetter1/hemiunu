@@ -11,14 +11,23 @@ enum WebSocketEvent: Equatable {
     case error(message: String)
     case connected
     case disconnected
+    case reconnecting(attempt: Int)
 }
 
-/// WebSocket manager for real-time project updates
+/// WebSocket manager for real-time project updates with automatic reconnection
 class WebSocketManager: ObservableObject {
     private var webSocketTask: URLSessionWebSocketTask?
     private var pingTimer: Timer?
+    private var reconnectTask: Task<Void, Never>?
     private let baseURL: String
     private var currentProjectId: String?
+    private var currentToken: String?
+
+    // Reconnection settings
+    private var reconnectAttempt = 0
+    private let maxReconnectAttempts = 10
+    private let baseReconnectDelay: TimeInterval = 1.0
+    private let maxReconnectDelay: TimeInterval = 30.0
 
     @Published var isConnected = false
     @Published var lastEvent: WebSocketEvent?
@@ -34,8 +43,22 @@ class WebSocketManager: ObservableObject {
             return
         }
 
-        disconnect()
+        // Cancel any pending reconnect
+        reconnectTask?.cancel()
+        reconnectTask = nil
+
+        disconnect(clearCredentials: false)
         currentProjectId = projectId
+        currentToken = token
+        reconnectAttempt = 0
+
+        performConnect()
+    }
+
+    private func performConnect() {
+        guard let projectId = currentProjectId, let token = currentToken else {
+            return
+        }
 
         // Convert https to wss
         let wsURL = baseURL
@@ -43,7 +66,6 @@ class WebSocketManager: ObservableObject {
             .replacingOccurrences(of: "http://", with: "ws://")
 
         guard let url = URL(string: "\(wsURL)/api/v1/projects/\(projectId)/ws") else {
-            print("Invalid WebSocket URL")
             return
         }
 
@@ -54,9 +76,11 @@ class WebSocketManager: ObservableObject {
         webSocketTask = session.webSocketTask(with: request)
         webSocketTask?.resume()
 
-        isConnected = true
-        lastEvent = .connected
-        print("WebSocket connecting to \(url)")
+        DispatchQueue.main.async {
+            self.isConnected = true
+            self.lastEvent = .connected
+            self.reconnectAttempt = 0
+        }
 
         // Start receiving messages
         receiveMessage(forProject: projectId)
@@ -66,13 +90,59 @@ class WebSocketManager: ObservableObject {
     }
 
     /// Disconnect from WebSocket
-    func disconnect() {
+    func disconnect(clearCredentials: Bool = true) {
         pingTimer?.invalidate()
         pingTimer = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
-        currentProjectId = nil
-        isConnected = false
+
+        if clearCredentials {
+            currentProjectId = nil
+            currentToken = nil
+            reconnectAttempt = 0
+        }
+
+        DispatchQueue.main.async {
+            self.isConnected = false
+        }
+    }
+
+    // MARK: - Reconnection
+
+    private func scheduleReconnect() {
+        guard currentProjectId != nil, currentToken != nil else {
+            return
+        }
+
+        guard reconnectAttempt < maxReconnectAttempts else {
+            DispatchQueue.main.async {
+                self.lastEvent = .error(message: "Connection lost. Please refresh.")
+            }
+            return
+        }
+
+        reconnectAttempt += 1
+
+        // Exponential backoff with jitter
+        let delay = min(baseReconnectDelay * pow(2, Double(reconnectAttempt - 1)), maxReconnectDelay)
+        let jitter = Double.random(in: 0...0.5)
+        let totalDelay = delay + jitter
+
+        DispatchQueue.main.async {
+            self.lastEvent = .reconnecting(attempt: self.reconnectAttempt)
+        }
+
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(totalDelay * 1_000_000_000))
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                self?.performConnect()
+            }
+        }
     }
 
     // MARK: - Private
@@ -102,11 +172,14 @@ class WebSocketManager: ObservableObject {
                 }
 
             case .failure:
-                // Only log if we're still supposed to be connected to this project
+                // Only handle if we're still supposed to be connected to this project
                 if self.currentProjectId == projectId {
                     DispatchQueue.main.async {
                         self.isConnected = false
+                        self.lastEvent = .disconnected
                     }
+                    // Try to reconnect
+                    self.scheduleReconnect()
                 }
             }
         }
@@ -121,7 +194,6 @@ class WebSocketManager: ObservableObject {
         guard let data = text.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let event = json["event"] as? String else {
-            print("Invalid WebSocket message: \(text)")
             return
         }
 
@@ -154,22 +226,29 @@ class WebSocketManager: ObservableObject {
                 self?.lastEvent = .clarificationNeeded(question: question, options: options)
 
             default:
-                print("Unknown WebSocket event: \(event)")
+                break
             }
         }
     }
 
     private func startPingTimer() {
+        pingTimer?.invalidate()
         pingTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.sendPing()
         }
     }
 
     private func sendPing() {
+        guard isConnected else { return }
+
         let message = URLSessionWebSocketTask.Message.string("ping")
-        webSocketTask?.send(message) { error in
-            if let error = error {
-                print("Ping error: \(error)")
+        webSocketTask?.send(message) { [weak self] error in
+            if error != nil {
+                DispatchQueue.main.async {
+                    self?.isConnected = false
+                    self?.lastEvent = .disconnected
+                }
+                self?.scheduleReconnect()
             }
         }
     }

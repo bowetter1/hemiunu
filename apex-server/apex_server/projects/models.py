@@ -87,6 +87,9 @@ class Page(Base, TimestampMixin):
     project_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("projects.id"))
     variant_id: Mapped[Optional[uuid.UUID]] = mapped_column(GUID, ForeignKey("variants.id"), nullable=True)
 
+    # Parent page ID - for grouping generated pages under their layout/hero page
+    parent_page_id: Mapped[Optional[uuid.UUID]] = mapped_column(GUID, ForeignKey("pages.id"), nullable=True)
+
     name: Mapped[str] = mapped_column(String(100))  # "Home", "About", etc.
     html: Mapped[str] = mapped_column(Text)
 
@@ -99,6 +102,10 @@ class Page(Base, TimestampMixin):
     project: Mapped["Project"] = relationship("Project", back_populates="pages")
     variant: Mapped[Optional["Variant"]] = relationship("Variant", back_populates="pages")
     versions: Mapped[List["PageVersion"]] = relationship("PageVersion", back_populates="page", cascade="all, delete-orphan")
+
+    # Self-referential relationship for parent/child pages
+    children: Mapped[List["Page"]] = relationship("Page", back_populates="parent", cascade="all, delete-orphan")
+    parent: Mapped[Optional["Page"]] = relationship("Page", back_populates="children", remote_side=[id])
 
 
 class PageVersion(Base):

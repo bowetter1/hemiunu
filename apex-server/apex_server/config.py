@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Railway sets DATABASE_URL automatically when you add PostgreSQL
     database_url: str = "sqlite:///./apex.db"
 
+    # File storage (Railway Volume)
+    # Railway: Mount volume at /data
+    data_dir: str = "/data"
+
     # Auth
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"

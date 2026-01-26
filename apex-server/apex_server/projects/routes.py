@@ -5,9 +5,12 @@ import threading
 from typing import List, Optional
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import mimetypes
+import re
 
 from apex_server.config import get_settings
 from apex_server.shared.database import get_db
@@ -17,6 +20,7 @@ from .models import Project, Variant, Page, PageVersion, ProjectLog, ProjectStat
 from .generator import Generator
 from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error, notify_clarification_needed
 from .structured_edit import generate_structured_edit, StructuredEditResponse
+from .filesystem import FileSystemService
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 settings = get_settings()
@@ -48,6 +52,24 @@ def notify_from_thread(coro):
         # Fallback: create new loop (won't have connections, but won't crash)
         print("[WS] Warning: No main loop, using asyncio.run()", flush=True)
         asyncio.run(coro)
+
+
+# === Helper Functions ===
+
+def rewrite_asset_urls(html: str, project_id: str, base_url: str) -> str:
+    """
+    Normalize image URLs for WebView compatibility.
+
+    The macOS WebView sets baseURL to the assets endpoint, so relative URLs
+    like 'images/hero.png' resolve correctly. We just ensure URLs are clean.
+    """
+    if not html:
+        return html
+
+    # Normalize ./images/ to images/ (WebView baseURL handles the rest)
+    html = re.sub(r'src=(["\'])\.\/images\/', r'src=\1images/', html)
+
+    return html
 
 
 # === WebSocket Endpoint ===
@@ -238,9 +260,14 @@ def create_project(
                         result.get("options", [])
                     ))
                 else:
-                    # No clarification needed - continue to Phase 2
-                    moodboards = gen.generate_moodboard()
-                    notify_from_thread(notify_moodboard_ready(str(project_id), moodboards))
+                    # No clarification needed - continue to Phase 2 (brand research)
+                    research_data = gen.research_brand()
+                    notify_from_thread(notify_moodboard_ready(str(project_id), research_data))
+
+                    # AUTO-CONTINUE to Phase 3 (layouts) - AI already selected best moodboard
+                    print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
+                    layouts = gen.generate_layouts()
+                    notify_from_thread(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
             print(f"[ERROR] Phase 1 failed: {e}", flush=True)
             import traceback
@@ -290,7 +317,7 @@ def clarify_project(
     print(f"[CLARIFY] Received answer for {project_id}: {request.answer}", flush=True)
 
     # Continue to Phase 2 in background
-    def phase2_moodboard_bg(project_id: uuid.UUID):
+    def phase2_research_bg(project_id: uuid.UUID):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         db_url = str(settings.database_url)
@@ -303,10 +330,15 @@ def clarify_project(
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
                 gen = Generator(project, db)
-                moodboards = gen.generate_moodboard()
-                notify_from_thread(notify_moodboard_ready(str(project_id), moodboards))
+                research_data = gen.research_brand()
+                notify_from_thread(notify_moodboard_ready(str(project_id), research_data))
+
+                # AUTO-CONTINUE to Phase 3 (layouts)
+                print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
+                layouts = gen.generate_layouts()
+                notify_from_thread(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
-            print(f"[ERROR] Phase 2 failed: {e}", flush=True)
+            print(f"[ERROR] Phase 2/3 failed: {e}", flush=True)
             import traceback
             traceback.print_exc()
             project = db.query(Project).filter_by(id=project_id).first()
@@ -318,7 +350,7 @@ def clarify_project(
         finally:
             db.close()
 
-    run_in_background(phase2_moodboard_bg, project.id)
+    run_in_background(phase2_research_bg, project.id)
 
     return project_to_response(project)
 
@@ -631,6 +663,7 @@ def get_variant_pages(
 @router.get("/{project_id}/pages", response_model=List[PageResponse])
 def get_pages(
     project_id: uuid.UUID,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -645,10 +678,13 @@ def get_pages(
 
     pages = db.query(Page).filter(Page.project_id == project_id).all()
 
+    # Rewrite image URLs to use assets endpoint
+    base_url = str(request.base_url).rstrip('/')
+
     return [PageResponse(
         id=str(p.id),
         name=p.name,
-        html=p.html,
+        html=rewrite_asset_urls(p.html, str(project_id), base_url),
         variant_id=str(p.variant_id) if p.variant_id else None,
         layout_variant=p.layout_variant,
         current_version=p.current_version
@@ -659,6 +695,7 @@ def get_pages(
 def get_page(
     project_id: uuid.UUID,
     page_id: uuid.UUID,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -671,10 +708,14 @@ def get_page(
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
 
+    # Rewrite image URLs to use assets endpoint
+    base_url = str(request.base_url).rstrip('/')
+    html = rewrite_asset_urls(page.html, str(project_id), base_url)
+
     return PageResponse(
         id=str(page.id),
         name=page.name,
-        html=page.html,
+        html=html,
         layout_variant=page.layout_variant,
         current_version=page.current_version
     )
@@ -685,6 +726,7 @@ def edit_page(
     project_id: uuid.UUID,
     page_id: uuid.UUID,
     request: EditPageRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -704,6 +746,7 @@ def edit_page(
         raise HTTPException(status_code=404, detail="Page not found")
 
     print(f"[EDIT] Page found, current version: {page.current_version}", flush=True)
+    version_before = page.current_version
 
     # Save current state as version before edit (if not already saved)
     existing_versions = db.query(PageVersion).filter(PageVersion.page_id == page_id).count()
@@ -729,26 +772,33 @@ def edit_page(
     db.refresh(page)
     print(f"[EDIT] After agentic edit, page.current_version: {page.current_version}", flush=True)
 
-    # Create new version with the updated HTML
-    new_version_num = page.current_version + 1
-    print(f"[EDIT] Creating new version v{new_version_num}", flush=True)
-    new_version = PageVersion(
-        page_id=page.id,
-        version=new_version_num,
-        html=page.html,
-        instruction=request.instruction
-    )
-    db.add(new_version)
-
-    # Update page version number
-    page.current_version = new_version_num
-    db.commit()
+    # Only create new version if agentic edit didn't already create one
+    if page.current_version == version_before:
+        # Agentic edit didn't change anything, but we still log the instruction
+        new_version_num = page.current_version + 1
+        print(f"[EDIT] No file changes, creating version v{new_version_num} for instruction log", flush=True)
+        new_version = PageVersion(
+            page_id=page.id,
+            version=new_version_num,
+            html=page.html,
+            instruction=request.instruction
+        )
+        db.add(new_version)
+        page.current_version = new_version_num
+        db.commit()
+    else:
+        print(f"[EDIT] Agentic edit already created version, skipping duplicate", flush=True)
 
     print(f"[EDIT] Returning page with version: {page.current_version}", flush=True)
+
+    # Rewrite image URLs to use assets endpoint
+    base_url = str(http_request.base_url).rstrip('/')
+    html = rewrite_asset_urls(page.html, str(project_id), base_url)
+
     return PageResponse(
         id=str(page.id),
         name=page.name,
-        html=page.html,
+        html=html,
         layout_variant=page.layout_variant,
         current_version=page.current_version
     )
@@ -815,23 +865,33 @@ def restore_page_version(
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
 
-    version = db.query(PageVersion).filter(
-        PageVersion.page_id == page_id,
-        PageVersion.version == request.version
-    ).first()
+    # Try to get version from filesystem first
+    fs = FileSystemService(str(project_id))
+    html = fs.get_version(str(page_id), request.version)
 
-    if not version:
-        raise HTTPException(status_code=404, detail="Version not found")
+    if not html:
+        # Fallback to PostgreSQL
+        version = db.query(PageVersion).filter(
+            PageVersion.page_id == page_id,
+            PageVersion.version == request.version
+        ).first()
+        if not version:
+            raise HTTPException(status_code=404, detail="Version not found")
+        html = version.html
 
-    # Update page to this version's HTML
-    page.html = version.html
-    page.current_version = version.version
+    # Update page in PostgreSQL
+    page.html = html
+    page.current_version = request.version
     db.commit()
+
+    # Update file in filesystem
+    file_name = page.name.lower().replace(" ", "-") + ".html"
+    fs.write_file(f"public/{file_name}", html)
 
     return PageResponse(
         id=str(page.id),
         name=page.name,
-        html=page.html,
+        html=html,
         layout_variant=page.layout_variant,
         current_version=page.current_version
     )
@@ -1047,3 +1107,172 @@ def get_logs(
         data=l.data,
         timestamp=l.timestamp.isoformat()
     ) for l in logs]
+
+
+# === GitHub Clone Endpoint ===
+
+class CloneRepoRequest(BaseModel):
+    github_url: str
+
+
+class CloneRepoResponse(BaseModel):
+    project_id: str
+    path: str
+    files_count: int
+    success: bool
+    error: Optional[str] = None
+
+
+@router.post("/clone", response_model=CloneRepoResponse)
+def clone_github_repo(
+    request: CloneRepoRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Clone a GitHub repository as a new project"""
+    import re
+
+    print(f"[CLONE] Cloning {request.github_url}", flush=True)
+
+    # Extract repo name from URL
+    match = re.search(r'github\.com[/:]([^/]+)/([^/\.]+)', request.github_url)
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid GitHub URL")
+
+    repo_name = match.group(2)
+
+    # Create project in database
+    project = Project(
+        brief=f"Cloned from {request.github_url}",
+        status=ProjectStatus.EDITING,
+        user_id=current_user.id,
+        project_dir=""  # Will be set by filesystem
+    )
+    db.add(project)
+    db.flush()
+
+    # Clone repository
+    fs = FileSystemService(str(project.id))
+    result = fs.clone_repo(request.github_url)
+
+    if not result["success"]:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=result.get("error", "Clone failed"))
+
+    # Update project with path
+    project.project_dir = str(fs.base_dir)
+    db.commit()
+
+    # Scan for HTML files and create pages
+    html_files = list(fs.base_dir.rglob("*.html"))
+    for html_file in html_files[:10]:  # Limit to 10 files
+        try:
+            content = html_file.read_text(encoding="utf-8")
+            name = html_file.stem.replace("-", " ").replace("_", " ").title()
+            page = Page(
+                project_id=project.id,
+                name=name,
+                html=content
+            )
+            db.add(page)
+        except Exception as e:
+            print(f"[CLONE] Could not read {html_file}: {e}", flush=True)
+
+    db.commit()
+    print(f"[CLONE] Done! {result['files']} files cloned", flush=True)
+
+    return CloneRepoResponse(
+        project_id=str(project.id),
+        path=str(fs.base_dir),
+        files_count=result.get("files", 0),
+        success=True
+    )
+
+
+# ==========================================
+# Debug Endpoints
+# ==========================================
+
+@router.get("/{project_id}/files")
+def list_project_files(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Debug: List all files on disk for a project"""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    fs = FileSystemService(project_id)
+
+    # Check if base directory exists
+    if not fs.base_dir.exists():
+        return {
+            "project_id": project_id,
+            "base_dir": str(fs.base_dir),
+            "exists": False,
+            "files": []
+        }
+
+    # Recursively list all files
+    all_files = []
+    for path in fs.base_dir.rglob("*"):
+        if path.is_file():
+            all_files.append({
+                "path": str(path.relative_to(fs.base_dir)),
+                "size": path.stat().st_size
+            })
+
+    return {
+        "project_id": project_id,
+        "base_dir": str(fs.base_dir),
+        "exists": True,
+        "files": sorted(all_files, key=lambda x: x["path"]),
+        "total_files": len(all_files)
+    }
+
+
+@router.get("/{project_id}/assets/{file_path:path}")
+def serve_project_asset(
+    project_id: str,
+    file_path: str
+):
+    """Serve static files (images, etc) from project's public directory.
+
+    Note: No auth required - project_id is a UUID (hard to guess) and
+    files are only served from the public directory. Can add signed URLs later.
+    """
+
+    fs = FileSystemService(project_id)
+
+    # Only serve files from public directory for security
+    full_path = fs.public_dir / file_path
+
+    # Security: ensure path doesn't escape public directory
+    try:
+        full_path = full_path.resolve()
+        if not str(full_path).startswith(str(fs.public_dir.resolve())):
+            raise HTTPException(status_code=403, detail="Access denied")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    if not full_path.exists() or not full_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(str(full_path))
+    if not content_type:
+        content_type = "application/octet-stream"
+
+    print(f"[ASSETS] Serving {file_path} ({content_type})", flush=True)
+
+    return FileResponse(
+        path=full_path,
+        media_type=content_type,
+        filename=full_path.name
+    )

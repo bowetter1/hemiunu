@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Unified topbar with consistent icon sizing and alignment
+/// Unified topbar with consistent alignment
 struct Topbar: View {
     @Binding var showSidebar: Bool
     @Binding var selectedMode: AppMode
@@ -9,60 +9,81 @@ struct Topbar: View {
     let errorMessage: String?
     let hasProject: Bool
     let logs: [LogEntry]
+    var onNewProject: (() -> Void)? = nil
+    var showModeSelector: Bool = true
+    var inlineTrafficLights: Bool = false
 
-    // Consistent icon size for all toolbar items
-    private let iconSize: CGFloat = 16
+    private let height: CGFloat = 44
+    private let itemHeight: CGFloat = 28
+    private let topInset: CGFloat = 4
+    private let iconSize: CGFloat = 14
+    private let trafficLightsWidth: CGFloat = 78
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            // Left group
-            HStack(spacing: 12) {
-                // Sidebar toggle
-                ToolbarButton(icon: "sidebar.left", size: iconSize) {
-                    withAnimation { showSidebar.toggle() }
-                }
-
-                // Connection status
-                statusDot
+        HStack(alignment: .top, spacing: 0) {
+            // Space for traffic lights when inline
+            if inlineTrafficLights {
+                Color.clear
+                    .frame(width: trafficLightsWidth)
             }
+
+            // Left group
+            leftGroup
 
             Spacer()
 
             // Center - Mode selector
-            ModeSelector(selectedMode: $selectedMode)
+            if showModeSelector {
+                ModeSelector(selectedMode: $selectedMode)
+                    .frame(height: itemHeight)
+            }
 
             Spacer()
 
             // Right group
-            HStack(spacing: 12) {
-                // Live activity indicator
-                if hasProject {
-                    ActivityIndicator(logs: logs)
-                }
+            rightGroup
+        }
+        .frame(height: height, alignment: .top)
+        .padding(.top, topInset)
+        .padding(.horizontal, 12)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
 
-                // Logs
-                LogsButton(logs: logs, iconSize: iconSize, hasProject: hasProject)
-
-                // Appearance toggle
-                ToolbarButton(icon: appearanceIcon, size: iconSize) {
-                    cycleAppearance()
+    private var leftGroup: some View {
+        HStack(spacing: 10) {
+            // Sidebar toggle - only show when sidebar is hidden
+            if !showSidebar {
+                IconButton(icon: "sidebar.left", size: iconSize) {
+                    withAnimation(.easeInOut(duration: 0.2)) { showSidebar = true }
                 }
-                .help("Appearance: \(appearanceMode.displayName)")
             }
         }
-        .frame(height: 32)
+        .frame(height: itemHeight)
     }
 
-    private var statusDot: some View {
-        Circle()
-            .fill(statusColor)
-            .frame(width: 8, height: 8)
-    }
+    private var rightGroup: some View {
+        HStack(spacing: 8) {
+            // Activity indicator
+            if hasProject && !logs.isEmpty {
+                ActivityPill(logs: logs)
+                    .frame(height: itemHeight)
+            }
 
-    private var statusColor: Color {
-        if !isConnected { return .orange }
-        if errorMessage != nil { return .red }
-        return .green
+            // Logs button
+            LogsButton(logs: logs, iconSize: iconSize, hasProject: hasProject)
+
+            // Divider
+            Capsule()
+                .fill(Color.primary.opacity(0.1))
+                .frame(width: 1, height: 16)
+
+            // Appearance toggle
+            IconButton(icon: appearanceIcon, size: iconSize) {
+                cycleAppearance()
+            }
+            .help(appearanceMode.displayName)
+        }
+        .frame(height: itemHeight)
     }
 
     private var appearanceIcon: String {
@@ -84,9 +105,9 @@ struct Topbar: View {
     }
 }
 
-// MARK: - Toolbar Button
+// MARK: - Icon Button
 
-struct ToolbarButton: View {
+struct IconButton: View {
     let icon: String
     let size: CGFloat
     let action: () -> Void
@@ -94,12 +115,13 @@ struct ToolbarButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: size, weight: .regular))
+                .font(.system(size: size, weight: .medium))
                 .foregroundColor(.secondary)
-                .frame(width: 24, height: 24)
+                .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
     }
 }
 
@@ -107,40 +129,95 @@ struct ToolbarButton: View {
 
 struct ModeSelector: View {
     @Binding var selectedMode: AppMode
+    private let itemHeight: CGFloat = 28
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(AppMode.allCases, id: \.self) { mode in
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         selectedMode = mode
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: icon(for: mode))
-                            .font(.system(size: 12))
+                            .font(.system(size: 10, weight: .medium))
                         Text(mode.rawValue)
-                            .font(.system(size: 12, weight: selectedMode == mode ? .semibold : .regular))
+                            .font(.system(size: 11, weight: selectedMode == mode ? .semibold : .regular))
                     }
                     .foregroundColor(selectedMode == mode ? .white : .secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(selectedMode == mode ? Color.blue : Color.clear)
-                    .cornerRadius(6)
+                    .padding(.horizontal, 12)
+                    .frame(height: itemHeight)
+                    .background(selectedMode == mode ? Color.orange : Color.clear)
+                    .cornerRadius(5)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(3)
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(9)
+        .padding(.horizontal, 3)
+        .background(Color.primary.opacity(0.05))
+        .cornerRadius(8)
     }
 
     private func icon(for mode: AppMode) -> String {
         switch mode {
-        case .design: return "paintbrush"
+        case .design: return "paintbrush.fill"
         case .code: return "chevron.left.forwardslash.chevron.right"
         }
+    }
+}
+
+// MARK: - Activity Pill
+
+struct ActivityPill: View {
+    let logs: [LogEntry]
+
+    var body: some View {
+        HStack(spacing: 6) {
+            // Pulsing dot
+            Circle()
+                .fill(phaseColor)
+                .frame(width: 6, height: 6)
+                .modifier(PulseModifier())
+
+            // Latest message
+            if let latest = logs.last {
+                Text(truncate(latest.message, to: 20))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.05))
+        .cornerRadius(10)
+    }
+
+    private var phaseColor: Color {
+        guard let phase = logs.last?.phase else { return .secondary }
+        switch phase {
+        case "brief": return .blue
+        case "moodboard": return .purple
+        case "layouts": return .orange
+        case "editing": return .green
+        default: return .secondary
+        }
+    }
+
+    private func truncate(_ text: String, to length: Int) -> String {
+        text.count > length ? String(text.prefix(length - 1)) + "…" : text
+    }
+}
+
+struct PulseModifier: ViewModifier {
+    @State private var isPulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isPulsing ? 1.4 : 1.0)
+            .opacity(isPulsing ? 0.7 : 1.0)
+            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+            .onAppear { isPulsing = true }
     }
 }
 
@@ -154,19 +231,20 @@ struct LogsButton: View {
 
     var body: some View {
         Button {
-            withAnimation { isExpanded.toggle() }
+            isExpanded.toggle()
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "list.bullet.rectangle")
-                    .font(.system(size: iconSize, weight: .regular))
+            HStack(spacing: 3) {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: iconSize, weight: .medium))
                 if hasProject && !logs.isEmpty {
                     Text("\(logs.count)")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 9, weight: .semibold))
                         .monospacedDigit()
                 }
             }
             .foregroundColor(.secondary)
-            .frame(height: 24)
+            .frame(height: 28)
+            .padding(.horizontal, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -183,34 +261,32 @@ struct LogsPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             Text("Activity")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.secondary)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
 
             Divider()
 
-            // Content
             if logs.isEmpty {
                 Text("No activity yet")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
                     .frame(maxWidth: .infinity)
-                    .padding(20)
+                    .padding(16)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 6) {
+                    LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(logs) { log in
                             LogRow(log: log)
                         }
                     }
-                    .padding(10)
+                    .padding(8)
                 }
             }
         }
-        .frame(width: 280, height: 220)
+        .frame(width: 260, height: 200)
     }
 }
 
@@ -218,22 +294,23 @@ struct LogRow: View {
     let log: LogEntry
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 11))
-                .foregroundColor(phaseColor)
+        HStack(spacing: 6) {
+            Circle()
+                .fill(phaseColor)
+                .frame(width: 5, height: 5)
 
             Text(log.message)
-                .font(.system(size: 11))
+                .font(.system(size: 10))
                 .foregroundColor(.primary)
-                .lineLimit(2)
+                .lineLimit(1)
 
             Spacer()
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 3)
+        .padding(.horizontal, 4)
     }
 
-    var phaseColor: Color {
+    private var phaseColor: Color {
         switch log.phase {
         case "brief": return .blue
         case "moodboard": return .purple
@@ -244,76 +321,6 @@ struct LogRow: View {
     }
 }
 
-// MARK: - Activity Indicator
+// MARK: - Legacy Support
 
-struct ActivityIndicator: View {
-    let logs: [LogEntry]
-    @State private var animating = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            // Show last 3 activities as dots
-            ForEach(Array(recentLogs.enumerated()), id: \.offset) { index, log in
-                ActivityDot(phase: log.phase, isLatest: index == recentLogs.count - 1)
-            }
-
-            // Current activity text
-            if let latest = logs.last {
-                Text(shortMessage(latest.message))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: 150, alignment: .leading)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(6)
-    }
-
-    private var recentLogs: [LogEntry] {
-        Array(logs.suffix(4))
-    }
-
-    private func shortMessage(_ message: String) -> String {
-        // Truncate long messages
-        if message.count > 25 {
-            return String(message.prefix(22)) + "..."
-        }
-        return message
-    }
-}
-
-struct ActivityDot: View {
-    let phase: String
-    let isLatest: Bool
-    @State private var pulsing = false
-
-    var body: some View {
-        Circle()
-            .fill(phaseColor)
-            .frame(width: 6, height: 6)
-            .scaleEffect(isLatest && pulsing ? 1.3 : 1.0)
-            .opacity(isLatest ? 1.0 : 0.5)
-            .animation(
-                isLatest ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .default,
-                value: pulsing
-            )
-            .onAppear {
-                if isLatest { pulsing = true }
-            }
-    }
-
-    var phaseColor: Color {
-        switch phase {
-        case "brief": return .blue
-        case "clarification": return .orange
-        case "moodboard": return .purple
-        case "layouts": return .orange
-        case "editing": return .green
-        default: return .secondary
-        }
-    }
-}
-
+typealias ToolbarButton = IconButton

@@ -66,6 +66,14 @@ struct ChatPanel: View {
 
             Divider()
 
+            // Brand & Inspiration panel (if project has research data)
+            if let project = client.currentProject, project.moodboard != nil {
+                MoodboardSelector(moodboard: project.moodboard)
+                    .padding(12)
+
+                Divider()
+            }
+
             // Messages
             messagesView
 
@@ -219,19 +227,10 @@ struct ChatPanel: View {
             clarificationOptions = []
             let response = ChatMessage(
                 role: .assistant,
-                content: "Great! I've created 3 moodboard options for you. Select one to continue.",
+                content: "I've analyzed the brand and selected the best color palette. Now generating layouts...",
                 timestamp: Date()
             )
             addMessage(response)
-            // Refresh project
-            Task {
-                if let projectId = client.currentProject?.id {
-                    let project = try? await client.getProject(id: projectId)
-                    await MainActor.run {
-                        client.currentProject = project
-                    }
-                }
-            }
 
         case .error(let message):
             isLoading = false
@@ -366,21 +365,12 @@ struct ChatPanel: View {
 
         isLoading = true
 
-        print("[CHAT] Sending message: \(text.prefix(50))...")
-        print("[CHAT] Current project: \(client.currentProject?.id ?? "nil")")
-        print("[CHAT] Project status: \(client.currentProject?.status.rawValue ?? "nil")")
-        print("[CHAT] Selected page: \(selectedPageId ?? "nil")")
-
         if let project = client.currentProject {
             if project.status == .clarification {
-                print("[CHAT] -> Sending clarification")
                 selectClarificationOption(text)
             } else if !client.pages.isEmpty {
-                // If we have pages, allow editing
-                print("[CHAT] -> Editing page (have \(client.pages.count) pages)")
                 editPage(instruction: text)
             } else {
-                print("[CHAT] -> No pages yet (status: \(project.status)), showing wait message")
                 isLoading = false
                 let response = ChatMessage(
                     role: .assistant,
@@ -390,18 +380,14 @@ struct ChatPanel: View {
                 addMessage(response)
             }
         } else {
-            print("[CHAT] -> Creating new project")
             createProject(brief: text)
         }
     }
 
     private func createProject(brief: String) {
-        print("[CHAT] createProject called with: \(brief.prefix(50))...")
         Task {
             do {
-                print("[CHAT] Calling API createProject...")
                 let project = try await client.createProject(brief: brief)
-                print("[CHAT] Project created: \(project.id)")
                 await MainActor.run {
                     isLoading = false
                     // Notify parent to set selectedProjectId and connect WebSocket
@@ -414,7 +400,6 @@ struct ChatPanel: View {
                     addMessage(response)
                 }
             } catch {
-                print("[CHAT] createProject error: \(error)")
                 await MainActor.run {
                     isLoading = false
                     let response = ChatMessage(
@@ -429,14 +414,8 @@ struct ChatPanel: View {
     }
 
     private func editPage(instruction: String) {
-        print("[CHAT] editPage called with: \(instruction.prefix(50))...")
         guard let project = client.currentProject,
               let page = selectedPage else {
-            print("[CHAT] editPage - no project or page selected")
-            print("[CHAT]   project: \(client.currentProject?.id ?? "nil")")
-            print("[CHAT]   selectedPage: \(selectedPage?.id ?? "nil")")
-            print("[CHAT]   selectedPageId: \(selectedPageId ?? "nil")")
-            print("[CHAT]   pages count: \(client.pages.count)")
             isLoading = false
             let response = ChatMessage(
                 role: .assistant,
@@ -446,26 +425,18 @@ struct ChatPanel: View {
             addMessage(response)
             return
         }
-        print("[CHAT] editPage - editing page: \(page.id) (\(page.name))")
 
         Task {
             do {
-                // Use editPage which creates versions automatically
-                print("[CHAT] Calling editPage API...")
                 let updated = try await client.editPage(
                     projectId: project.id,
                     pageId: page.id,
                     instruction: instruction
                 )
-                print("[CHAT] Edit succeeded, new version: \(updated.currentVersion)")
 
                 await MainActor.run {
-                    // Update page in local array
-                    print("[CHAT] Got updated page with version: \(updated.currentVersion)")
                     if let index = client.pages.firstIndex(where: { $0.id == page.id }) {
-                        let oldVersion = client.pages[index].currentVersion
                         client.pages[index] = updated
-                        print("[CHAT] Updated page in array: v\(oldVersion) -> v\(updated.currentVersion)")
                     }
                     isLoading = false
                     let response = ChatMessage(
@@ -476,7 +447,6 @@ struct ChatPanel: View {
                     addMessage(response)
                 }
             } catch {
-                print("[CHAT] Edit failed: \(error)")
                 await MainActor.run {
                     isLoading = false
                     let response = ChatMessage(
@@ -492,15 +462,12 @@ struct ChatPanel: View {
 
     /// Fallback to full HTML edit if structured edit fails
     private func fallbackLegacyEdit(project: Project, page: Page, instruction: String) async {
-        print("[CHAT] fallbackLegacyEdit called")
         do {
-            print("[CHAT] Calling legacy editPage API...")
             let updated = try await client.editPage(
                 projectId: project.id,
                 pageId: page.id,
                 instruction: instruction
             )
-            print("[CHAT] Legacy edit succeeded")
             await MainActor.run {
                 if let index = client.pages.firstIndex(where: { $0.id == page.id }) {
                     client.pages[index] = updated
@@ -514,7 +481,6 @@ struct ChatPanel: View {
                 addMessage(response)
             }
         } catch {
-            print("[CHAT] Legacy edit failed: \(error)")
             await MainActor.run {
                 isLoading = false
                 let response = ChatMessage(

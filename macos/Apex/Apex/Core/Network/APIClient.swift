@@ -17,13 +17,15 @@ class APIClient: ObservableObject {
     private let decoder = JSONDecoder()
 
     init(baseURL: String = "https://apex-server-production-a540.up.railway.app") {
-        self.baseURL = URL(string: baseURL)!
+        self.baseURL = URL(string: baseURL) ?? URL(string: "https://localhost:8000")!
     }
 
     // MARK: - Configuration
 
     func configure(baseURL: String, token: String? = nil) {
-        self.baseURL = URL(string: baseURL)!
+        if let url = URL(string: baseURL) {
+            self.baseURL = url
+        }
         self.authToken = token
     }
 
@@ -191,18 +193,26 @@ class APIClient: ObservableObject {
     // MARK: - Projects API
 
     /// Create a new project
+    /// Uses extended timeout since this triggers AI moodboard generation
     func createProject(brief: String) async throws -> Project {
         let url = baseURL.appendingPathComponent("/api/v1/projects")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300 // 5 minutes for AI generation
 
         struct CreateProjectRequest: Codable {
             let brief: String
         }
 
         request.httpBody = try JSONEncoder().encode(CreateProjectRequest(brief: brief))
-        let (data, response) = try await URLSession.shared.data(for: request)
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 300
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
         let project = try decodeResponse(Project.self, data: data, response: response)
 
         await MainActor.run {
@@ -239,18 +249,26 @@ class APIClient: ObservableObject {
     }
 
     /// Send clarification answer and continue moodboard generation
+    /// Uses extended timeout since this triggers AI moodboard generation
     func clarifyProject(projectId: String, answer: String) async throws -> Project {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/clarify")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300 // 5 minutes for AI generation
 
         struct ClarifyRequest: Codable {
             let answer: String
         }
 
         request.httpBody = try JSONEncoder().encode(ClarifyRequest(answer: answer))
-        let (data, response) = try await URLSession.shared.data(for: request)
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 300
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
         let project = try decodeResponse(Project.self, data: data, response: response)
 
         await MainActor.run {
@@ -277,11 +295,19 @@ class APIClient: ObservableObject {
     }
 
     /// Generate 3 layout alternatives
+    /// Uses extended timeout since AI generation can take 2-3 minutes
     func generateLayouts(projectId: String) async throws -> Project {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate-layouts")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
-        let (data, response) = try await URLSession.shared.data(for: request)
+        request.timeoutInterval = 300 // 5 minutes for AI generation
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 300
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
         return try decodeResponse(Project.self, data: data, response: response)
     }
 
@@ -360,27 +386,38 @@ class APIClient: ObservableObject {
     }
 
     /// Edit a page with AI instruction (legacy - returns full HTML)
+    /// Uses extended timeout since AI generation can take time
     func editPage(projectId: String, pageId: String, instruction: String) async throws -> Page {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/pages/\(pageId)/edit")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 180 // 3 minutes for AI editing
 
         struct EditPageRequest: Codable {
             let instruction: String
         }
 
         request.httpBody = try JSONEncoder().encode(EditPageRequest(instruction: instruction))
-        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Extended timeout session
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 180
+        config.timeoutIntervalForResource = 180
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
         return try decodeResponse(Page.self, data: data, response: response)
     }
 
     /// Get structured edit instructions (token-efficient!)
+    /// Uses extended timeout since AI generation can take time
     func getStructuredEdit(projectId: String, pageId: String, instruction: String, currentHtml: String) async throws -> StructuredEditResponse {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/pages/\(pageId)/structured-edit")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 180 // 3 minutes for AI editing
 
         struct StructuredEditRequest: Codable {
             let instruction: String
@@ -388,7 +425,14 @@ class APIClient: ObservableObject {
         }
 
         request.httpBody = try JSONEncoder().encode(StructuredEditRequest(instruction: instruction, html: currentHtml))
-        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // Extended timeout session
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 180
+        config.timeoutIntervalForResource = 180
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
         return try decodeResponse(StructuredEditResponse.self, data: data, response: response)
     }
 
@@ -425,9 +469,9 @@ class APIClient: ObservableObject {
         return try decodeResponse(Page.self, data: data, response: response)
     }
 
-    /// Generate a complete mini-site from current layout
+    /// Generate a complete mini-site from a specific layout/hero page
     /// Uses extended timeout since AI generation can take 2-3 minutes
-    func generateSite(projectId: String, pages: [String]? = nil) async throws -> GenerateSiteResponse {
+    func generateSite(projectId: String, parentPageId: String, pages: [String]? = nil) async throws -> GenerateSiteResponse {
         let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate-site")
         var request = authorizedRequest(url: url)
         request.httpMethod = "POST"
@@ -435,10 +479,16 @@ class APIClient: ObservableObject {
         request.timeoutInterval = 300 // 5 minutes for AI generation
 
         struct GenerateSiteRequest: Codable {
+            let parentPageId: String
             let pages: [String]?
+
+            enum CodingKeys: String, CodingKey {
+                case parentPageId = "parent_page_id"
+                case pages
+            }
         }
 
-        request.httpBody = try JSONEncoder().encode(GenerateSiteRequest(pages: pages))
+        request.httpBody = try JSONEncoder().encode(GenerateSiteRequest(parentPageId: parentPageId, pages: pages))
 
         // Use custom session with extended timeout
         let config = URLSessionConfiguration.default
@@ -515,5 +565,133 @@ class APIClient: ObservableObject {
         request.httpBody = try JSONEncoder().encode(RestoreVersionRequest(version: version))
         let (data, response) = try await URLSession.shared.data(for: request)
         return try decodeResponse(Page.self, data: data, response: response)
+    }
+
+    // MARK: - Project Files (MongoDB)
+
+    /// List all files in the project
+    func listProjectFiles(projectId: String) async throws -> FileListResponse {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/files")
+        let request = authorizedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(FileListResponse.self, data: data, response: response)
+    }
+
+    /// Read a file from the project
+    func readProjectFile(projectId: String, path: String) async throws -> ProjectFile {
+        let encodedPath = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/files/\(encodedPath)")
+        let request = authorizedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(ProjectFile.self, data: data, response: response)
+    }
+
+    /// Write a file to the project
+    func writeProjectFile(projectId: String, path: String, content: String) async throws -> ProjectFile {
+        let encodedPath = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/files/\(encodedPath)")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        struct WriteFileRequest: Codable {
+            let content: String
+        }
+
+        request.httpBody = try JSONEncoder().encode(WriteFileRequest(content: content))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try decodeResponse(ProjectFile.self, data: data, response: response)
+    }
+
+    /// Delete a file from the project
+    func deleteProjectFile(projectId: String, path: String) async throws {
+        let encodedPath = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/files/\(encodedPath)")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+    }
+
+    /// Generate a code project using AI
+    func generateCodeProject(projectId: String, projectType: String) async throws -> GenerateCodeResponse {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate-code")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 600  // 10 minutes for code generation
+
+        struct GenerateCodeRequest: Codable {
+            let projectType: String
+
+            enum CodingKeys: String, CodingKey {
+                case projectType = "project_type"
+            }
+        }
+
+        request.httpBody = try JSONEncoder().encode(GenerateCodeRequest(projectType: projectType))
+
+        // Extended timeout session
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 600
+        config.timeoutIntervalForResource = 600
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
+        return try decodeResponse(GenerateCodeResponse.self, data: data, response: response)
+    }
+
+    /// Edit code project with AI
+    func editCodeProject(projectId: String, instruction: String) async throws -> String {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/edit-code")
+        var request = authorizedRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300  // 5 minutes
+
+        struct EditCodeRequest: Codable {
+            let instruction: String
+        }
+
+        request.httpBody = try JSONEncoder().encode(EditCodeRequest(instruction: instruction))
+
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 300
+        let session = URLSession(configuration: config)
+
+        let (data, response) = try await session.data(for: request)
+
+        struct EditCodeResponse: Codable {
+            let response: String
+        }
+
+        let result = try decodeResponse(EditCodeResponse.self, data: data, response: response)
+        return result.response
+    }
+
+    /// Download project as ZIP
+    func downloadProject(projectId: String) async throws -> URL {
+        let url = baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/download")
+        let request = authorizedRequest(url: url)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        // Save to temp file
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileName = "project_\(projectId).zip"
+        let fileURL = tempDir.appendingPathComponent(fileName)
+
+        try data.write(to: fileURL)
+        return fileURL
     }
 }

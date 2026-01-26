@@ -55,6 +55,7 @@ class AppState: ObservableObject {
 
     @Published var currentMode: AppMode = .design
     @Published var showSidebar: Bool = true
+    @Published var showFloatingChat: Bool = false
 
     // MARK: - Auth
 
@@ -83,13 +84,10 @@ class AppState: ObservableObject {
             _ = try await client.getDevToken()
             isConnected = true
             errorMessage = nil
-            print("Connected to server!")
 
             // Fetch existing projects
             _ = try await client.listProjects()
-            print("Loaded \(client.projects.count) projects")
         } catch {
-            print("Failed to connect: \(error)")
             errorMessage = "Cannot connect"
         }
     }
@@ -103,6 +101,7 @@ class AppState: ObservableObject {
     // MARK: - Projects
 
     private var connectedProjectId: String?
+    private var loadProjectTask: Task<Void, Never>?
 
     func loadProject(id: String) async {
         do {
@@ -124,9 +123,13 @@ class AppState: ObservableObject {
                 if let firstPage = pages.first(where: { $0.variantId == firstVariant.id }) {
                     selectedPageId = firstPage.id
                 }
-            } else if let firstPage = pages.first {
-                // Fallback: legacy pages without variants
-                selectedPageId = firstPage.id
+            } else if !pages.isEmpty {
+                // Fallback: layouts without variants - select first layout
+                if let firstLayout = pages.first(where: { $0.layoutVariant != nil }) {
+                    selectedPageId = firstLayout.id
+                } else if let firstPage = pages.first {
+                    selectedPageId = firstPage.id
+                }
             }
 
             // Load logs
@@ -139,7 +142,16 @@ class AppState: ObservableObject {
                 wsClient.connect(projectId: id, token: token)
             }
         } catch {
-            print("Failed to load project: \(error)")
+            // Project load failed
+        }
+    }
+
+    func scheduleLoadProject(id: String, delayMilliseconds: UInt64 = 300) {
+        loadProjectTask?.cancel()
+        loadProjectTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delayMilliseconds * 1_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.loadProject(id: id)
         }
     }
 

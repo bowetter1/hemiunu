@@ -3,6 +3,7 @@ import SwiftUI
 /// View for displaying and selecting layout alternatives - one at a time with dot navigation
 struct LayoutCarousel: View {
     let pages: [Page]
+    var projectId: String? = nil
     @Binding var selectedVariant: Int?
     let onSelect: () -> Void
 
@@ -17,7 +18,7 @@ struct LayoutCarousel: View {
         ZStack(alignment: .top) {
             // Full-size preview of current layout
             if !layoutVariants.isEmpty && currentIndex < layoutVariants.count {
-                HTMLWebView(html: layoutVariants[currentIndex].html)
+                HTMLWebView(html: layoutVariants[currentIndex].html, projectId: projectId)
                     .ignoresSafeArea()
             }
 

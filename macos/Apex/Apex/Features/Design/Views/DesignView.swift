@@ -5,8 +5,9 @@ struct DesignView: View {
     @ObservedObject var client: APIClient
     @ObservedObject var wsClient: WebSocketManager
     var sidebarVisible: Bool = true
+    var toolsPanelVisible: Bool = true
     var selectedPageId: String?
-    @State private var selectedMoodboardVariant: Int? = nil
+    var onProjectCreated: ((String) -> Void)? = nil
     @State private var pageVersions: [PageVersion] = []
     @State private var lastKnownVersion: Int = 0
 
@@ -20,8 +21,10 @@ struct DesignView: View {
         if let project = client.currentProject {
             projectContent(project)
                 .onChange(of: selectedPageId) { _, newPageId in
-                    print("[DESIGN] selectedPageId changed to: \(newPageId ?? "nil")")
                     if let pageId = newPageId {
+                        if let page = client.pages.first(where: { $0.id == pageId }) {
+                            lastKnownVersion = page.currentVersion
+                        }
                         loadVersions(projectId: project.id, pageId: pageId)
                     } else {
                         pageVersions = []
@@ -32,10 +35,7 @@ struct DesignView: View {
                     guard let pageId = selectedPageId,
                           let page = newPages.first(where: { $0.id == pageId }) else { return }
 
-                    print("[DESIGN] Pages changed, selected page version: \(page.currentVersion), lastKnown: \(lastKnownVersion)")
-
                     if page.currentVersion != lastKnownVersion {
-                        print("[DESIGN] Version changed! Reloading versions...")
                         lastKnownVersion = page.currentVersion
                         loadVersions(projectId: project.id, pageId: pageId)
                     }
@@ -47,35 +47,27 @@ struct DesignView: View {
                         // Track initial version
                         if let page = client.pages.first(where: { $0.id == pageId }) {
                             lastKnownVersion = page.currentVersion
-                            print("[DESIGN] Initial version: \(lastKnownVersion)")
                         }
                     }
                 }
         } else {
-            WelcomeView()
+            BriefBuilderView(client: client) { projectId in
+                onProjectCreated?(projectId)
+            }
         }
     }
 
     private func loadVersions(projectId: String, pageId: String) {
-        print("[VERSIONS] Loading versions for page: \(pageId)")
         Task {
             do {
                 let versions = try await client.getPageVersions(projectId: projectId, pageId: pageId)
-                print("[VERSIONS] Got \(versions.count) versions")
-                for v in versions {
-                    print("[VERSIONS]   v\(v.version): \(v.instruction ?? "no instruction")")
-                }
                 await MainActor.run {
                     pageVersions = versions
-                    // Update lastKnownVersion from the page
                     if let page = client.pages.first(where: { $0.id == pageId }) {
                         lastKnownVersion = page.currentVersion
-                        print("[VERSIONS] Updated lastKnownVersion to \(lastKnownVersion)")
                     }
-                    print("[VERSIONS] Set pageVersions, count: \(pageVersions.count)")
                 }
             } catch {
-                print("[VERSIONS] Failed to load: \(error)")
                 await MainActor.run {
                     pageVersions = []
                 }
@@ -98,7 +90,7 @@ struct DesignView: View {
                     }
                 }
             } catch {
-                print("Failed to restore version: \(error)")
+                // Version restore failed
             }
         }
     }
@@ -109,7 +101,9 @@ struct DesignView: View {
         if let page = selectedPage {
             WebPreview(
                 html: page.html,
+                projectId: project.id,
                 sidebarVisible: sidebarVisible,
+                toolsPanelVisible: toolsPanelVisible,
                 versions: pageVersions,
                 currentVersion: page.currentVersion,
                 onRestoreVersion: { version in
@@ -126,30 +120,23 @@ struct DesignView: View {
                 GeneratingView(message: "Waiting for your input...")
 
             case .moodboard:
-                if !project.moodboards.isEmpty {
-                    MoodboardPicker(
-                        moodboards: project.moodboards,
-                        selectedVariant: $selectedMoodboardVariant
-                    ) {
-                        selectMoodboard(project: project)
-                    }
-                } else {
-                    GeneratingView(message: "Loading moodboards...")
-                }
+                // Moodboard is auto-selected, layouts are being generated
+                // User can change moodboard from the right panel if needed
+                GeneratingView(message: "Creating layouts...")
 
             case .layouts:
                 // Show first layout by default, user can select others from sidebar
                 if let firstLayout = client.pages.first(where: { $0.layoutVariant != nil }) {
-                    WebPreview(html: firstLayout.html, sidebarVisible: sidebarVisible)
+                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
                 } else {
                     GeneratingView(message: "Loading layouts...")
                 }
 
             case .editing, .done:
                 if let mainPage = client.pages.first(where: { $0.layoutVariant == nil }) {
-                    WebPreview(html: mainPage.html, sidebarVisible: sidebarVisible)
+                    WebPreview(html: mainPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
                 } else if let firstLayout = client.pages.first(where: { $0.layoutVariant != nil }) {
-                    WebPreview(html: firstLayout.html, sidebarVisible: sidebarVisible)
+                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
                 } else {
                     GeneratingView(message: "Loading...")
                 }
@@ -160,20 +147,6 @@ struct DesignView: View {
         }
     }
 
-    private func selectMoodboard(project: Project) {
-        guard let variant = selectedMoodboardVariant else { return }
-        Task {
-            do {
-                // Server expects 1-based index (1, 2, 3), UI uses 0-based (0, 1, 2)
-                let updated = try await client.selectMoodboard(projectId: project.id, variant: variant + 1)
-                await MainActor.run {
-                    client.currentProject = updated
-                }
-            } catch {
-                print("Failed to select moodboard: \(error)")
-            }
-        }
-    }
 }
 
 // MARK: - Design Command Bar
@@ -221,7 +194,7 @@ struct DesignCommandBar: View {
             do {
                 _ = try await client.createProject(brief: brief)
             } catch {
-                print("Failed to create project: \(error)")
+                // Project creation failed
             }
         }
     }
@@ -243,7 +216,7 @@ struct DesignCommandBar: View {
                     }
                 }
             } catch {
-                print("Failed to edit page: \(error)")
+                // Page edit failed
             }
         }
     }
