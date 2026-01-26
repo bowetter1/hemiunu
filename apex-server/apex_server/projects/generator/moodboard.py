@@ -37,12 +37,82 @@ class MoodboardMixin:
         self.log("moodboard", "Starting targeted search with clarification...")
 
         # ============================================
-        # STEP 1: Targeted search with clarification
+        # STEP 1A: Search for brand colors from company's site
         # ============================================
         step1_start = time.time()
-        print("[STEP 1] Targeted search...", flush=True)
+        print("[STEP 1A] Searching for brand colors...", flush=True)
 
         web_search_tool = {
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": 3
+        }
+
+        # First search: Find the company's actual website for brand colors
+        brand_search_response = self.client.beta.messages.create(
+            model=MODEL_OPUS,
+            max_tokens=800,
+            betas=["web-search-2025-03-05"],
+            tools=[web_search_tool],
+            messages=[{
+                "role": "user",
+                "content": f"""Find the official website for this company to extract their brand colors.
+
+Project: {search_context}
+
+Search for:
+1. The company's official website (e.g., their domain directly)
+2. Their brand colors if available (e.g., "company name brand colors" or "company brandfetch")
+
+We need to find their ACTUAL logo colors and brand identity."""
+            }]
+        )
+        self.track_usage(brand_search_response)
+
+        # Extract brand URLs
+        brand_urls = []
+        search_queries = []
+
+        for block in brand_search_response.content:
+            if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
+                query = getattr(block, 'input', {}).get('query', '')
+                if query:
+                    search_queries.append(query)
+                    print(f"[STEP 1A] Search: {query}", flush=True)
+
+            if block.type == "web_search_tool_result":
+                content = getattr(block, 'content', [])
+                if isinstance(content, list):
+                    for item in content[:3]:
+                        url = getattr(item, 'url', '')
+                        if url and url not in brand_urls:
+                            brand_urls.append(url)
+                            print(f"[STEP 1A] Brand URL: {url[:60]}...", flush=True)
+
+        # ============================================
+        # STEP 1B: DEDICATED search for award-winning inspiration sites
+        # ============================================
+        print("[STEP 1B] Searching for award-winning design inspiration...", flush=True)
+
+        # Determine industry from brief
+        industry_response = self.client.messages.create(
+            model=MODEL_OPUS,
+            max_tokens=100,
+            messages=[{
+                "role": "user",
+                "content": f"""What industry/category is this? Reply with just 2-3 words.
+
+Brief: {self.project.brief}
+
+Examples: "golf club", "restaurant", "bakery", "law firm", "tech startup", "hotel", "fitness studio" """
+            }]
+        )
+        self.track_usage(industry_response)
+        industry = industry_response.content[0].text.strip().lower()
+        print(f"[STEP 1B] Industry identified: {industry}", flush=True)
+
+        # Search specifically for award-winning websites in this industry
+        inspiration_search_tool = {
             "type": "web_search_20250305",
             "name": "web_search",
             "max_uses": 5
@@ -50,52 +120,73 @@ class MoodboardMixin:
 
         search_response = self.client.beta.messages.create(
             model=MODEL_OPUS,
-            max_tokens=1000,
+            max_tokens=1200,
             betas=["web-search-2025-03-05"],
-            tools=[web_search_tool],
+            tools=[inspiration_search_tool],
             messages=[{
                 "role": "user",
-                "content": f"""Find brand colors, visual identity, AND design inspiration for this web design project.
+                "content": f"""Find BEAUTIFUL, AWARD-WINNING websites in the {industry} industry.
 
-Project: {search_context}
+DO THESE EXACT SEARCHES:
+1. "awwwards {industry} website" - Find award-winning {industry} sites on Awwwards
+2. "best {industry} website design 2024" - Find recent best-of lists
+3. "siteinspire {industry}" - Find curated {industry} designs
+4. "beautiful {industry} website examples" - Find showcased designs
 
-IMPORTANT: Do these searches IN ORDER:
-1. FIRST search for the company's official website directly (e.g. "site:forex.se" or just the domain)
-2. THEN search for brand colors (e.g. "forex.se colors" or "company brandfetch")
-3. THEN search for DESIGN INSPIRATION - beautiful websites in the same industry!
-   Examples:
-   - For a bakery: "best bakery website design 2024" or "beautiful cafe website examples"
-   - For a restaurant: "best restaurant website design inspiration"
-   - For a tech company: "best SaaS landing page design"
-   - For a law firm: "best law firm website design modern"
+We need REAL URLs to actual {industry} websites with stunning design.
+NOT directories, NOT color palette sites, NOT the client's own site.
+We want sites like: stripe.com, linear.app, vercel.com - beautiful modern designs.
 
-The design inspiration search is CRITICAL - we want to see what the best websites in this industry look like so we can create something equally beautiful."""
+For {industry}, we want the BEST designed websites in that category."""
             }]
         )
         self.track_usage(search_response)
 
-        # Extract URLs from search results
-        urls_to_fetch = []
-        search_queries = []
+        # Extract inspiration URLs
+        inspiration_urls = []
+        inspiration_titles = []
+
+        # Sites to EXCLUDE (garbage sites that aren't actual designs)
+        garbage_domains = [
+            "brandcolors.net", "brandfetch.com", "colorhunt.co", "coolors.co",
+            "pinterest.com", "dribbble.com", "behance.net",  # Portfolios, not real sites
+            "facebook.com", "twitter.com", "instagram.com", "linkedin.com",
+            "youtube.com", "tiktok.com",
+            "wikipedia.org", "yelp.com", "tripadvisor.com",
+            "yellowpages", "hitta.se", "eniro.se",  # Directories
+            "google.com", "bing.com",
+        ]
 
         for block in search_response.content:
             if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
                 query = getattr(block, 'input', {}).get('query', '')
                 if query:
                     search_queries.append(query)
-                    print(f"[STEP 1] Search: {query}", flush=True)
+                    print(f"[STEP 1B] Search: {query}", flush=True)
 
             if block.type == "web_search_tool_result":
                 content = getattr(block, 'content', [])
                 if isinstance(content, list):
-                    for item in content[:3]:
+                    for item in content[:5]:
                         url = getattr(item, 'url', '')
-                        if url and url not in urls_to_fetch:
-                            urls_to_fetch.append(url)
-                            print(f"[STEP 1] Found: {url[:60]}...", flush=True)
+                        title = getattr(item, 'title', '')
 
-        self.log("moodboard", f"Found {len(urls_to_fetch)} URLs to analyze")
-        print(f"[TIMING] Step 1 (web search): {time.time() - step1_start:.1f}s", flush=True)
+                        # Skip garbage domains
+                        is_garbage = any(domain in url.lower() for domain in garbage_domains)
+                        if is_garbage:
+                            print(f"[STEP 1B] SKIPPED (garbage): {url[:50]}...", flush=True)
+                            continue
+
+                        if url and url not in inspiration_urls and url not in brand_urls:
+                            inspiration_urls.append(url)
+                            inspiration_titles.append(title)
+                            print(f"[STEP 1B] Inspiration: {title[:40]} - {url[:50]}...", flush=True)
+
+        # Combine URLs for fetching
+        urls_to_fetch = brand_urls[:3] + inspiration_urls[:5]  # Brand URLs first, then inspiration
+
+        self.log("moodboard", f"Found {len(brand_urls)} brand URLs + {len(inspiration_urls)} inspiration URLs")
+        print(f"[TIMING] Step 1 (web searches): {time.time() - step1_start:.1f}s", flush=True)
 
         # ============================================
         # STEP 2: Fetch actual content from URLs (PARALLEL)
@@ -195,17 +286,23 @@ Focus on actionable insights that will help create a beautiful, modern website."
                     "inspiration_sites": {
                         "type": "array",
                         "minItems": 3,
-                        "maxItems": 5,
+                        "maxItems": 3,
                         "items": {
                             "type": "object",
                             "properties": {
                                 "url": {"type": "string", "description": "Full URL to the inspiration website"},
                                 "name": {"type": "string", "description": "Website/company name"},
-                                "why": {"type": "string", "description": "Why this site is inspiring (1 sentence)"}
+                                "design_style": {"type": "string", "description": "Design style: e.g., 'Minimalist dark mode with bold typography', 'Light and airy with large photography'"},
+                                "why": {"type": "string", "description": "Why this site is inspiring for OUR project (1-2 sentences)"},
+                                "key_elements": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "3-5 specific design elements to borrow: e.g., 'full-width hero image', 'floating navigation', 'card-based layout'"
+                                }
                             },
-                            "required": ["url", "name", "why"]
+                            "required": ["url", "name", "design_style", "why", "key_elements"]
                         },
-                        "description": "3-5 beautiful websites that inspire this design"
+                        "description": "EXACTLY 3 award-winning websites to inspire our 3 layout designs"
                     },
                     "recommended": {
                         "type": "integer",
@@ -251,7 +348,10 @@ RAW COLORS FOUND ON PAGE: {unique_colors}
 - Buttons and CTAs on THEIR site
 - Footer or accent elements
 
-URLS WE FOUND: {[c.get('url', '') for c in fetched_content]}
+BRAND URLs (for colors): {brand_urls}
+
+INSPIRATION URLs WE FOUND (award-winning designs): {inspiration_urls}
+INSPIRATION TITLES: {inspiration_titles}
 
 ══════════════════════════════════════════════════════════════
 TASK 1: Create 3 moodboards
@@ -259,25 +359,40 @@ TASK 1: Create 3 moodboards
 - Each moodboard has EXACTLY 3 colors (primary, secondary, accent)
 - Short punchy names (2-3 words max)
 - One sentence rationale
-- USE THE REAL BRAND COLORS, not social media widget colors!
+- USE THE REAL BRAND COLORS from the company's logo/website!
 
 1. Brand Faithful - uses the ACTUAL brand colors from their logo/website
 2. Modern Evolution - refines and modernizes the brand palette
 3. Bold Reimagining - fresh, daring new direction
 
 ══════════════════════════════════════════════════════════════
-TASK 2: List 3-5 INSPIRATION WEBSITES
+TASK 2: Select EXACTLY 3 INSPIRATION WEBSITES
 ══════════════════════════════════════════════════════════════
-From the research, identify 3-5 beautiful websites that should inspire this design.
-These should be REAL websites you found that have great design in this industry.
-Include the full URL, site name, and WHY it's inspiring.
+From the INSPIRATION URLs above, select the 3 BEST websites to inspire our design.
+Each inspiration site will be used to create ONE layout variation.
 
-Examples of what to look for:
-- Stunning hero sections
-- Beautiful typography
-- Great use of imagery
-- Modern, clean layouts
-- Sites that match the mood we're going for
+For EACH of the 3 sites, provide:
+- url: The full URL
+- name: The website/company name
+- design_style: Describe their design approach (e.g., "Minimalist with bold typography and dark mode")
+- why: Why this site is a good reference for OUR project
+- key_elements: List 3-5 SPECIFIC design elements we should borrow:
+  - Hero section style (full-bleed image, split layout, video background, etc.)
+  - Navigation style (sticky, transparent, hamburger, etc.)
+  - Typography approach (large headlines, elegant serifs, etc.)
+  - Color usage (dark mode, light and airy, accent colors, etc.)
+  - Special features (animations, scroll effects, card layouts, etc.)
+
+⚠️ DO NOT include:
+- The client's own website (we're redesigning it!)
+- Directory sites (yellowpages, hitta.se, etc.)
+- Color palette sites (brandcolors.net, coolors.co)
+- Social media platforms
+
+✅ DO include:
+- Award-winning websites (awwwards winners)
+- Beautiful, modern designs in similar industries
+- Sites with stunning hero sections and typography
 
 ══════════════════════════════════════════════════════════════
 TASK 3: RECOMMEND one moodboard
