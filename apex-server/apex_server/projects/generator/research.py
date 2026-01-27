@@ -399,6 +399,7 @@ Build a hero section and landing page with these specifics:
 [2-3 sentences: overall direction combining brand identity with the best elements]
 
 CRITICAL RULES:
+- The 3 inspiration sites MUST be from 3 DIFFERENT domains (e.g. oanda.com + bloomberg.com + wise.com — NEVER 3 pages from the same site)
 - Each blueprint must describe a DIFFERENT layout approach (e.g. one image-heavy, one minimal/typographic, one bold/dark)
 - Be specific enough that a developer could build the HTML without guessing
 - Include real section names relevant to THIS company (e.g. for a golf club: "Tee Times", "Course Overview", "Membership"; for a bank: "Services", "Rates", "Download App")
