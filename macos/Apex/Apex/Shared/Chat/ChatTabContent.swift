@@ -59,7 +59,16 @@ struct ChatTabContent: View {
             Divider()
             chatInput
         }
-        .onChange(of: client.currentProject?.id) { _, _ in
+        .onChange(of: client.currentProject?.id) { oldId, newId in
+            if oldId != newId {
+                // Reset chat when switching projects
+                globalMessages = []
+                messagesByPage = [:]
+                clarificationQuestions = []
+                clarificationAnswers = []
+                inputText = ""
+                isLoading = false
+            }
             checkForClarification()
         }
         .onChange(of: webSocket.lastEvent) { _, event in
