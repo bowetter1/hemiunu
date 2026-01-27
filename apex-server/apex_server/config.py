@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     google_api_key: str = ""  # For Gemini
     openai_api_key: str = ""  # For Mem0 embeddings
+    pexels_api_key: str = ""  # For stock photos
 
     # Storage
     storage_path: str = "/app/storage"

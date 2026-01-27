@@ -9,6 +9,7 @@ from .utils import (
     MODEL_QUALITY,
     with_retry,
     fetch_page_content,
+    scrape_images,
     inject_google_fonts,
 )
 from .code_project import CodeProjectMixin
@@ -23,5 +24,6 @@ __all__ = [
     "MODEL_QUALITY",
     "with_retry",
     "fetch_page_content",
+    "scrape_images",
     "inject_google_fonts",
 ]

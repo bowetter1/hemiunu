@@ -4,7 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
-from .utils import MODEL_OPUS, MODEL_HAIKU, fetch_page_content
+from .utils import MODEL_OPUS, MODEL_HAIKU, fetch_page_content, scrape_images
 
 if TYPE_CHECKING:
     from .base import Generator
@@ -30,6 +30,9 @@ class ResearchMixin:
 
         phase_start = time.time()
         print(f"[RESEARCH] Starting brand research for project {self.project.id}", flush=True)
+
+        # Initialize filesystem early (needed for saving scraped images)
+        self.fs.init_project()
 
         # Get clarification data if available
         clarification = self.project.clarification or {}
@@ -101,6 +104,7 @@ Do 1-2 searches to find the official company website."""
 
         brand_colors = []
         company_content = None
+        company_images = []
 
         if company_urls:
             main_url = company_urls[0]["url"]
@@ -177,9 +181,99 @@ Pick colors that feel like THIS SPECIFIC BRAND, not generic web colors."""
                         break
 
             except Exception as e:
-                print(f"[STEP 2] Error: {e}", flush=True)
+                print(f"[STEP 2] Error analyzing colors: {e}", flush=True)
 
-        print(f"[TIMING] Step 2 (analyze colors): {time.time() - step2_start:.1f}s", flush=True)
+            # ── Scrape company images ──────────────────────────────────
+            company_images = []
+            try:
+                print(f"[STEP 2] Scraping images from {main_url}...", flush=True)
+                scraped = scrape_images(main_url, max_images=8)
+                print(f"[STEP 2] Scraped {len(scraped)} candidate images", flush=True)
+
+                if scraped:
+                    # Use Haiku vision to filter for relevance
+                    import base64 as _b64
+                    kept = []
+                    for idx, (img_url, img_bytes) in enumerate(scraped):
+                        if len(kept) >= 5:
+                            break
+                        try:
+                            # Determine media type from URL
+                            lower_url = img_url.lower()
+                            if lower_url.endswith(".png"):
+                                media_type = "image/png"
+                            elif lower_url.endswith(".webp"):
+                                media_type = "image/webp"
+                            else:
+                                media_type = "image/jpeg"
+
+                            vision_response = self.client.messages.create(
+                                model=MODEL_HAIKU,
+                                max_tokens=200,
+                                messages=[{
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "image",
+                                            "source": {
+                                                "type": "base64",
+                                                "media_type": media_type,
+                                                "data": _b64.b64encode(img_bytes).decode(),
+                                            }
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": f"""Is this image relevant and useful for a website about: "{self.project.brief}"?
+
+Answer in this exact format (two lines only):
+KEEP or SKIP
+Description of what the image shows (e.g., "conference room with ocean view", "outdoor terrace at sunset")
+
+Rules:
+- KEEP: real photos of the place, venue, products, team, or environment
+- SKIP: stock icons, generic graphics, social media badges, decorative patterns, ads, unrelated content"""
+                                        }
+                                    ]
+                                }]
+                            )
+                            self.track_usage(vision_response)
+
+                            answer = vision_response.content[0].text.strip()
+                            lines = answer.split("\n", 1)
+                            verdict = lines[0].strip().upper()
+                            description = lines[1].strip() if len(lines) > 1 else "Company image"
+
+                            if "KEEP" in verdict:
+                                # Save image to filesystem
+                                ext = ".jpg"
+                                if "png" in media_type:
+                                    ext = ".png"
+                                elif "webp" in media_type:
+                                    ext = ".webp"
+                                filename = f"img_{len(kept) + 1}{ext}"
+                                save_path = f"public/images/company/{filename}"
+                                self.fs.write_binary(save_path, img_bytes)
+                                kept.append({
+                                    "path": f"images/company/{filename}",
+                                    "description": description,
+                                    "source_url": img_url,
+                                    "size_kb": len(img_bytes) // 1024
+                                })
+                                print(f"[STEP 2] KEPT image {len(kept)}: {description[:60]} ({len(img_bytes) // 1024}KB)", flush=True)
+                            else:
+                                print(f"[STEP 2] SKIPPED image: {description[:60]}", flush=True)
+
+                        except Exception as e:
+                            print(f"[STEP 2] Vision filter error for image {idx}: {e}", flush=True)
+
+                    company_images = kept
+                    print(f"[STEP 2] Scraped {len(scraped)} images, kept {len(kept)} relevant", flush=True)
+                    self.log("research", f"Scraped {len(scraped)} images from {main_url}, kept {len(kept)} relevant")
+
+            except Exception as e:
+                print(f"[STEP 2] Image scraping error: {e}", flush=True)
+
+        print(f"[TIMING] Step 2 (analyze colors + scrape images): {time.time() - step2_start:.1f}s", flush=True)
 
         # ============================================
         # STEP 3: Search for REAL inspiration websites (not template galleries)
@@ -517,7 +611,8 @@ Create colors that:
             "research": research_data,
             "brand_colors": brand_colors,
             "fonts": recommended_fonts,
-            "inspiration_sites": selected_sites
+            "inspiration_sites": selected_sites,
+            "company_images": company_images if company_urls else []
         }
         self.project.selected_moodboard = 1  # Not used anymore, but keep for compatibility
         self.project.status = ProjectStatus.MOODBOARD

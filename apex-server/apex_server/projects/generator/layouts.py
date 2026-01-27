@@ -1,4 +1,5 @@
 """Layout generation mixin - creates 3 layouts inspired by 3 different sites"""
+import json
 import re
 import time
 from typing import TYPE_CHECKING
@@ -49,10 +50,14 @@ class LayoutsMixin:
         # Get inspiration site names (for layout naming)
         inspiration_sites = research_data.get("inspiration_sites", [])
 
+        # Get company images scraped from their website (for img2img)
+        company_images = research_data.get("company_images", [])
+
         print(f"[GENERATE_LAYOUTS] Research markdown: {len(research_md)} chars", flush=True)
         print(f"[GENERATE_LAYOUTS] Brand colors: {brand_colors}", flush=True)
         print(f"[GENERATE_LAYOUTS] Fonts: {fonts}", flush=True)
         print(f"[GENERATE_LAYOUTS] Inspiration sites: {[s.get('name') for s in inspiration_sites]}", flush=True)
+        print(f"[GENERATE_LAYOUTS] Company images: {len(company_images)} available", flush=True)
 
         # Define tool for structured output
         layout_tool = {
@@ -84,6 +89,20 @@ class LayoutsMixin:
 
         # Give Opus web search (reduced - backup only), layout tool, AND image generation tool
         image_tool = self.get_image_tools()[0]
+        # Extend image tool with optional reference_image parameter when company images are available
+        if company_images:
+            image_tool = dict(image_tool)  # shallow copy
+            schema = dict(image_tool["input_schema"])
+            props = dict(schema["properties"])
+            props["reference_image"] = {
+                "type": "string",
+                "description": "Path to a company reference image to use as img2img input (e.g., 'images/company/img_1.jpg'). When provided, the image generation will use the reference as a starting point, producing a result that retains the feel of the original photo."
+            }
+            schema["properties"] = props
+            image_tool["input_schema"] = schema
+
+        stock_photo_tool = self.get_stock_photo_tool()
+
         web_search_tool = {
             "type": "web_search_20250305",
             "name": "web_search",
@@ -163,11 +182,11 @@ DESIGN PRINCIPLES:
 5. RESPONSIVE: Use clamp() for fluid typography, mobile-first approach
 
 ═══════════════════════════════════════════════════════════════
-IMAGES - USE generate_image TOOL:
+IMAGES — YOU ARE THE ART DIRECTOR:
 ═══════════════════════════════════════════════════════════════
-Generate a hero image using the generate_image tool.
-Use size "1536x1024" for the hero image.
-The tool returns a path like "images/hero1.png" - use that in your HTML.
+{self._format_image_tools_prompt(company_images)}
+
+Each tool returns a path like "images/hero1.png" — use that path in your HTML.
 IMPORTANT: Generate only 1 image (the hero). We will add more images later.
 
 ═══════════════════════════════════════════════════════════════
@@ -186,7 +205,7 @@ The layouts should look like they came from a professional design agency."""
             model=MODEL_OPUS,
             max_tokens=20000,
             betas=["web-search-2025-03-05"],
-            tools=[web_search_tool, layout_tool, image_tool],
+            tools=[web_search_tool, layout_tool, image_tool, stock_photo_tool],
             messages=[{"role": "user", "content": initial_prompt}]
         )
 
@@ -240,9 +259,39 @@ The layouts should look like they came from a professional design agency."""
                         print(f"[GENERATE_LAYOUTS] Got {len(layouts)} layouts", flush=True)
                         break
                     elif block.name == "generate_image":
-                        # Execute image generation
-                        print(f"[GENERATE_LAYOUTS] Generating image: {block.input.get('filename')}", flush=True)
-                        result = self.execute_image_tool(block.name, block.input)
+                        # Execute image generation — use img2img if reference_image provided
+                        ref_path = block.input.get("reference_image")
+                        print(f"[GENERATE_LAYOUTS] Generating image: {block.input.get('filename')} (ref={ref_path})", flush=True)
+
+                        if ref_path and company_images:
+                            # img2img: read reference bytes from filesystem and use edit endpoint
+                            ref_full = f"public/{ref_path}"
+                            ref_file = self.fs.base_dir / ref_full
+                            if ref_file.exists():
+                                ref_bytes = ref_file.read_bytes()
+                                edit_result = self.edit_image_from_reference(
+                                    reference_bytes=ref_bytes,
+                                    prompt=block.input.get("prompt", ""),
+                                    filename=block.input.get("filename", "hero.png"),
+                                    size=block.input.get("size", "1536x1024"),
+                                    quality=block.input.get("quality", "medium"),
+                                )
+                                result = json.dumps(edit_result)
+                            else:
+                                print(f"[GENERATE_LAYOUTS] Reference image not found: {ref_full}, falling back to generate", flush=True)
+                                result = self.execute_image_tool(block.name, block.input)
+                        else:
+                            result = self.execute_image_tool(block.name, block.input)
+
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": result
+                        })
+                    elif block.name == "stock_photo":
+                        # Execute stock photo search
+                        print(f"[GENERATE_LAYOUTS] Stock photo: {block.input.get('query')} → {block.input.get('filename')}", flush=True)
+                        result = self.execute_stock_photo(block.input)
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
@@ -266,7 +315,7 @@ The layouts should look like they came from a professional design agency."""
                     model=MODEL_OPUS,
                     max_tokens=20000,
                     betas=["web-search-2025-03-05"],
-                    tools=[web_search_tool, layout_tool, image_tool],
+                    tools=[web_search_tool, layout_tool, image_tool, stock_photo_tool],
                     messages=conversation_messages
                 )
                 self.track_usage(response)
@@ -281,7 +330,7 @@ The layouts should look like they came from a professional design agency."""
                     model=MODEL_OPUS,
                     max_tokens=20000,
                     betas=["web-search-2025-03-05"],
-                    tools=[web_search_tool, layout_tool, image_tool],
+                    tools=[web_search_tool, layout_tool, image_tool, stock_photo_tool],
                     messages=conversation_messages
                 )
                 self.track_usage(response)
@@ -337,6 +386,52 @@ The layouts should look like they came from a professional design agency."""
         print(f"[TIMING] TOTAL layout generation: {time.time() - layouts_start:.1f}s", flush=True)
         self.log("layouts", f"Created {len(layouts)} layouts", {"count": len(layouts)})
         return layouts
+
+    def _format_image_tools_prompt(self: "Generator", company_images: list[dict]) -> str:
+        """Build the image tools section of the prompt, adapting to available resources."""
+        if company_images:
+            # Three strategies available
+            img_list = "\n".join(f"  - {img['path']}: {img.get('description', 'Company image')}" for img in company_images)
+            return f"""You have THREE image strategies. Pick the best one for the hero:
+
+STRATEGY A: "generate_image" with reference_image (img2img)
+  Uses a real photo from the company's website as starting point.
+  The result KEEPS the feel of the original but is restyled.
+  → Best for: hero images that should look like the company's real venue/environment.
+  Parameters: prompt, filename, size ("1536x1024" landscape, "1024x1536" portrait, "1024x1024" square), reference_image (path from list below)
+
+STRATEGY B: "stock_photo" (real photography from Pexels)
+  Downloads a real, high-quality photograph.
+  → Best for: people, portraits, lifestyle, nature, food — anything where photorealism matters.
+  → AI-generated faces look uncanny — always use stock_photo for people.
+  Parameters: query, filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
+
+STRATEGY C: "generate_image" without reference_image (pure AI generation)
+  Generates an image from scratch using GPT-Image.
+  → Best for: abstract backgrounds, artistic illustrations, brand-specific graphics.
+  → Use as last resort — stock photos look more professional, img2img looks more authentic.
+  Parameters: prompt, filename, size, quality ("low", "medium", "high")
+
+AVAILABLE COMPANY IMAGES (scraped from their real website):
+{img_list}
+
+DECISION: Pick the strategy that produces the most authentic result for this company's hero section."""
+        else:
+            # Two strategies — no company images available
+            return """You have TWO image tools. Pick the best one for the hero:
+
+TOOL 1: "stock_photo" (real photography from Pexels)
+  Downloads a real, high-quality photograph.
+  → Best for: people, venues, nature, food, professional environments — anything where photorealism matters.
+  → AI-generated faces look uncanny — always use stock_photo for people.
+  Parameters: query, filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
+
+TOOL 2: "generate_image" (AI-generated image via GPT-Image)
+  Generates an image from scratch.
+  → Best for: abstract backgrounds, artistic illustrations, stylized brand visuals.
+  Parameters: prompt, filename, size ("1536x1024" landscape, "1024x1536" portrait, "1024x1024" square), quality ("low", "medium", "high")
+
+DECISION: Prefer stock_photo for realistic scenes and people. Use generate_image for abstract/artistic visuals."""
 
     def _extract_layouts_fallback(self: "Generator", text: str) -> list[dict]:
         """Fallback: extract HTML blocks when JSON parsing fails"""
