@@ -12,7 +12,7 @@ settings = get_settings()
 # Model constants - easy to switch
 MODEL_OPUS = "claude-opus-4-5-20251101"
 MODEL_SONNET = "claude-sonnet-4-20250514"
-MODEL_HAIKU = "claude-haiku-4-5-20251101"
+MODEL_HAIKU = "claude-haiku-4-5-20251001"
 MODEL_DEFAULT = MODEL_SONNET  # Use Sonnet by default (faster, cheaper)
 MODEL_QUALITY = MODEL_OPUS    # Use Opus for quality-critical tasks
 
