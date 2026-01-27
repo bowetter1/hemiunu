@@ -93,7 +93,9 @@ class LayoutsMixin:
         # Build the initial prompt using research markdown as primary context
         # TODO: Restore to THREE layouts when ready
         # initial_prompt = f"""Create THREE world-class hero section designs, each inspired by a different reference website.
-        initial_prompt = f"""Create ONE world-class hero section design, inspired by the BEST reference website from the research report.
+        initial_prompt = f"""Create ONE world-class landing page with a hero section, inspired by the BEST reference website from the research report.
+
+SCOPE: Build ONLY a single hero/start page. This is a ONE-PAGE design — just the hero section and navigation. Keep it focused. We will add more sections later.
 
 ═══════════════════════════════════════════════════════════════
 RESEARCH REPORT (from our brand researcher):
@@ -163,10 +165,10 @@ DESIGN PRINCIPLES:
 ═══════════════════════════════════════════════════════════════
 IMAGES - USE generate_image TOOL:
 ═══════════════════════════════════════════════════════════════
-Generate real images using the generate_image tool.
-For each layout that needs a hero image, call generate_image first.
-Use size "1536x1024" for hero/landscape images.
+Generate a hero image using the generate_image tool.
+Use size "1536x1024" for the hero image.
 The tool returns a path like "images/hero1.png" - use that in your HTML.
+IMPORTANT: Generate only 1 image (the hero). We will add more images later.
 
 ═══════════════════════════════════════════════════════════════
 IMPORTANT: Each layout must:
