@@ -590,49 +590,48 @@ Search now."""
 
         print(f"[TIMING] Phase 1 search: {time.time() - search_start:.1f}s", flush=True)
 
-        # Now ask Opus to analyze if clarification is needed
+        # Now ask Opus to formulate a clarification question.
+        # ALWAYS ask — either about brand ambiguity OR about project scope.
         analysis_start = time.time()
         clarify_tool = {
-            "name": "clarification_decision",
-            "description": "Decide if user clarification is needed",
+            "name": "clarification_question",
+            "description": "Formulate a question to ask the user before we start designing",
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "needs_clarification": {
-                        "type": "boolean",
-                        "description": "True if the brand/company is ambiguous and we need to ask the user"
+                    "question_type": {
+                        "type": "string",
+                        "enum": ["brand", "project"],
+                        "description": "'brand' if the company is ambiguous, 'project' if the brand is clear but we need to understand what to build"
+                    },
+                    "identified_brand": {
+                        "type": "string",
+                        "description": "The brand/company identified from search results"
                     },
                     "question": {
                         "type": "string",
-                        "description": "Question to ask the user (if needs_clarification is true)"
+                        "description": "The question to ask the user"
                     },
                     "options": {
                         "type": "array",
                         "items": {"type": "string"},
+                        "minItems": 2,
+                        "maxItems": 4,
                         "description": "2-4 options for the user to choose from"
-                    },
-                    "identified_brand": {
-                        "type": "string",
-                        "description": "The brand/company identified (if clear)"
-                    },
-                    "confidence": {
-                        "type": "string",
-                        "enum": ["high", "medium", "low"],
-                        "description": "Confidence in the identification"
                     }
                 },
-                "required": ["needs_clarification", "confidence"]
+                "required": ["question_type", "identified_brand", "question", "options"]
             }
         }
 
         analysis_response = self.client.messages.create(
             model=MODEL_OPUS,
-            max_tokens=500,
+            max_tokens=600,
             tools=[clarify_tool],
-            tool_choice={"type": "tool", "name": "clarification_decision"},
+            tool_choice={"type": "tool", "name": "clarification_question"},
             messages=[{
                 "role": "user",
-                "content": f"""Analyze these search results and decide if we need to ask the user for clarification.
+                "content": f"""Analyze these search results and formulate ONE question for the user.
 
 PROJECT BRIEF: "{self.project.brief}"
 
@@ -642,59 +641,70 @@ SEARCH RESULTS FOUND:
 ANALYSIS:
 {chr(10).join(search_results_text)}
 
-DECIDE:
-- If the company/brand is CLEAR (e.g., search found their official website), set needs_clarification=false
-- If AMBIGUOUS (e.g., "Forex" could be forex.se OR forex trading sites), set needs_clarification=true and provide a question with options
+YOU MUST ALWAYS ASK A QUESTION. Pick the most important one:
 
-Examples of when to ask:
-- "Forex" → Could be Forex Bank Sweden (forex.se) or general forex trading
-- "Apple" → Could be Apple Inc or a local business
-- Generic terms that match multiple companies"""
+OPTION A — Brand is AMBIGUOUS (e.g., "Forex" could be forex.se or forex trading):
+→ Ask which company they mean. Provide 2-4 specific options.
+
+OPTION B — Brand is CLEAR (e.g., search found their official website):
+→ Ask about the PROJECT SCOPE. What kind of website do they want?
+→ Think about what matters most for THIS specific company/industry.
+
+Examples of good project-scope questions:
+- Golf club → "What should the website focus on?" → "Tee time booking & green fees", "Membership recruitment", "Tournament & events calendar", "Full club experience (all of the above)"
+- Restaurant → "What's the primary goal?" → "Online reservations", "Showcase menu & atmosphere", "Catering & events", "Full restaurant site"
+- SaaS company → "What type of page?" → "Product landing page", "Full marketing site with pricing", "Documentation & developer portal"
+- Bank → "What's the main purpose?" → "Personal banking services", "Business/corporate banking", "Currency exchange & travel money", "All services overview"
+
+The question should help us understand what to prioritize in the design.
+Keep options short (max 6 words each) and specific to this company."""
             }]
         )
         self.track_usage(analysis_response)
 
         print(f"[TIMING] Phase 1 analysis: {time.time() - analysis_start:.1f}s", flush=True)
 
-        # Extract decision
+        # Extract decision — always ask
         for block in analysis_response.content:
-            if block.type == "tool_use" and block.name == "clarification_decision":
+            if block.type == "tool_use" and block.name == "clarification_question":
                 decision = block.input
-                print(f"[PHASE 1] Decision: {decision}", flush=True)
+                print(f"[PHASE 1] Question: {decision}", flush=True)
                 print(f"[TIMING] TOTAL Phase 1: {time.time() - phase1_start:.1f}s", flush=True)
 
-                if decision.get("needs_clarification"):
-                    # Save initial research and return question
-                    self.project.clarification = {
-                        "question": decision.get("question", "Which company do you mean?"),
-                        "options": decision.get("options", []),
-                        "initial_research": {
-                            "urls_found": urls_found,
-                            "analysis": search_results_text
-                        }
+                self.project.clarification = {
+                    "question": decision.get("question", "What kind of website do you want?"),
+                    "options": decision.get("options", []),
+                    "question_type": decision.get("question_type", "project"),
+                    "identified_brand": decision.get("identified_brand", ""),
+                    "initial_research": {
+                        "urls_found": urls_found,
+                        "analysis": search_results_text
                     }
-                    self.project.status = ProjectStatus.CLARIFICATION
-                    self.db.commit()
+                }
+                self.project.status = ProjectStatus.CLARIFICATION
+                self.db.commit()
 
-                    self.log("research", f"Needs clarification: {decision.get('question')}")
-                    return {
-                        "needs_clarification": True,
-                        "question": decision.get("question"),
-                        "options": decision.get("options", [])
-                    }
-                else:
-                    # Clear to proceed
-                    self.project.clarification = {
-                        "identified_brand": decision.get("identified_brand", ""),
-                        "confidence": decision.get("confidence", "high"),
-                        "initial_research": {
-                            "urls_found": urls_found
-                        }
-                    }
-                    self.db.commit()
+                self.log("research", f"Asking user: {decision.get('question')}")
+                return {
+                    "needs_clarification": True,
+                    "question": decision.get("question"),
+                    "options": decision.get("options", [])
+                }
 
-                    self.log("research", f"Brand identified: {decision.get('identified_brand')}")
-                    return {"needs_clarification": False}
-
-        # Fallback - proceed without clarification
-        return {"needs_clarification": False}
+        # Fallback — ask a generic question
+        self.project.clarification = {
+            "question": "What type of website do you want?",
+            "options": ["Landing page", "Full marketing site", "Web application", "Portfolio / showcase"],
+            "question_type": "project",
+            "initial_research": {
+                "urls_found": urls_found,
+                "analysis": search_results_text
+            }
+        }
+        self.project.status = ProjectStatus.CLARIFICATION
+        self.db.commit()
+        return {
+            "needs_clarification": True,
+            "question": "What type of website do you want?",
+            "options": ["Landing page", "Full marketing site", "Web application", "Portfolio / showcase"]
+        }

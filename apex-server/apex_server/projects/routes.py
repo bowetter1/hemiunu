@@ -254,22 +254,12 @@ def create_project(
                 result = gen.search_and_clarify()
                 print(f"[PHASE1] search_and_clarify result: {result}", flush=True)
 
-                if result.get("needs_clarification"):
-                    # Send WebSocket notification with question
-                    notify_from_thread(notify_clarification_needed(
-                        str(project_id),
-                        result.get("question", ""),
-                        result.get("options", [])
-                    ))
-                else:
-                    # No clarification needed - continue to Phase 2 (brand research)
-                    research_data = gen.research_brand()
-                    notify_from_thread(notify_moodboard_ready(str(project_id), research_data))
-
-                    # Layout generation disabled - focus on research flow first
-                    # print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
-                    # layouts = gen.generate_layouts()
-                    # notify_from_thread(notify_layouts_ready(str(project_id), layouts))
+                # Always asks a question (brand or project scope)
+                notify_from_thread(notify_clarification_needed(
+                    str(project_id),
+                    result.get("question", ""),
+                    result.get("options", [])
+                ))
         except Exception as e:
             print(f"[ERROR] Phase 1 failed: {e}", flush=True)
             import traceback
