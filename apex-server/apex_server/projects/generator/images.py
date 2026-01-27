@@ -62,7 +62,7 @@ class ImageGenerationMixin:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search query for the photo (e.g., 'luxury hotel lobby', 'business team meeting', 'mountain landscape sunset'). Be specific and descriptive."
+                        "description": "Short search query, 2-4 words (e.g., 'luxury hotel lobby', 'farm sunset landscape', 'team meeting office'). Keep it simple — Pexels works best with concise queries. Do NOT write long descriptive sentences."
                     },
                     "filename": {
                         "type": "string",

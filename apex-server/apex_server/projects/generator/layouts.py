@@ -404,7 +404,10 @@ STRATEGY B: "stock_photo" (real photography from Pexels)
   Downloads a real, high-quality photograph.
   → Best for: people, portraits, lifestyle, nature, food — anything where photorealism matters.
   → AI-generated faces look uncanny — always use stock_photo for people.
-  Parameters: query, filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
+  → IMPORTANT: query must be SHORT (2-4 words). Pexels is a search engine, not a prompt.
+    ✅ Good: "farm sunset landscape", "hotel lobby luxury", "conference room modern"
+    ❌ Bad: "scandinavian countryside farm golden hour pastoral landscape with rolling hills"
+  Parameters: query (2-4 words!), filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
 
 STRATEGY C: "generate_image" without reference_image (pure AI generation)
   Generates an image from scratch using GPT-Image.
@@ -424,7 +427,10 @@ TOOL 1: "stock_photo" (real photography from Pexels)
   Downloads a real, high-quality photograph.
   → Best for: people, venues, nature, food, professional environments — anything where photorealism matters.
   → AI-generated faces look uncanny — always use stock_photo for people.
-  Parameters: query, filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
+  → IMPORTANT: query must be SHORT (2-4 words). Pexels is a search engine, not a prompt.
+    ✅ Good: "farm sunset landscape", "hotel lobby luxury", "conference room modern"
+    ❌ Bad: "scandinavian countryside farm golden hour pastoral landscape with rolling hills"
+  Parameters: query (2-4 words!), filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
 
 TOOL 2: "generate_image" (AI-generated image via GPT-Image)
   Generates an image from scratch.
