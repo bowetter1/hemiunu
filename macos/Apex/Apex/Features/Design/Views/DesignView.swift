@@ -3,96 +3,51 @@ import AppKit
 
 /// Main design mode container
 struct DesignView: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
     @ObservedObject var wsClient: WebSocketManager
+    @StateObject private var viewModel: DesignViewModel
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedPageId: String?
     var showResearchJSON: Bool = false
     var onProjectCreated: ((String) -> Void)? = nil
-    @State private var pageVersions: [PageVersion] = []
-    @State private var lastKnownVersion: Int = 0
+
+    private var client: APIClient { appState.client }
+
+    init(appState: AppState, wsClient: WebSocketManager, sidebarVisible: Bool = true, toolsPanelVisible: Bool = true, selectedPageId: String? = nil, showResearchJSON: Bool = false, onProjectCreated: ((String) -> Void)? = nil) {
+        self.appState = appState
+        self.wsClient = wsClient
+        _viewModel = StateObject(wrappedValue: DesignViewModel(appState: appState))
+        self.sidebarVisible = sidebarVisible
+        self.toolsPanelVisible = toolsPanelVisible
+        self.selectedPageId = selectedPageId
+        self.showResearchJSON = showResearchJSON
+        self.onProjectCreated = onProjectCreated
+    }
 
     // Find the selected page from sidebar
     var selectedPage: Page? {
         guard let pageId = selectedPageId else { return nil }
-        return client.pages.first { $0.id == pageId }
+        return appState.pages.first { $0.id == pageId }
     }
 
     var body: some View {
-        if let project = client.currentProject {
+        if let project = appState.currentProject {
             projectContent(project)
                 .onChange(of: selectedPageId) { _, newPageId in
-                    if let pageId = newPageId {
-                        if let page = client.pages.first(where: { $0.id == pageId }) {
-                            lastKnownVersion = page.currentVersion
-                        }
-                        loadVersions(projectId: project.id, pageId: pageId)
-                    } else {
-                        pageVersions = []
-                    }
+                    viewModel.handlePageChange(projectId: project.id, pageId: newPageId)
                 }
-                .onChange(of: client.pages) { _, newPages in
-                    // Detect version changes by watching the pages array
-                    guard let pageId = selectedPageId,
-                          let page = newPages.first(where: { $0.id == pageId }) else { return }
-
-                    if page.currentVersion != lastKnownVersion {
-                        lastKnownVersion = page.currentVersion
-                        loadVersions(projectId: project.id, pageId: pageId)
-                    }
+                .onChange(of: appState.pages) { _, newPages in
+                    viewModel.handlePagesUpdate(projectId: project.id, selectedPageId: selectedPageId, newPages: newPages)
                 }
                 .onAppear {
-                    // Load versions if page already selected
                     if let pageId = selectedPageId {
-                        loadVersions(projectId: project.id, pageId: pageId)
-                        // Track initial version
-                        if let page = client.pages.first(where: { $0.id == pageId }) {
-                            lastKnownVersion = page.currentVersion
-                        }
+                        viewModel.handlePageChange(projectId: project.id, pageId: pageId)
                     }
                 }
         } else {
-            BriefBuilderView(client: client) { projectId in
+            BriefBuilderView(appState: appState) { projectId in
                 onProjectCreated?(projectId)
-            }
-        }
-    }
-
-    private func loadVersions(projectId: String, pageId: String) {
-        Task {
-            do {
-                let versions = try await client.getPageVersions(projectId: projectId, pageId: pageId)
-                await MainActor.run {
-                    pageVersions = versions
-                    if let page = client.pages.first(where: { $0.id == pageId }) {
-                        lastKnownVersion = page.currentVersion
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    pageVersions = []
-                }
-            }
-        }
-    }
-
-    private func restoreVersion(project: Project, pageId: String, version: Int) {
-        Task {
-            do {
-                let updated = try await client.restorePageVersion(
-                    projectId: project.id,
-                    pageId: pageId,
-                    version: version
-                )
-                await MainActor.run {
-                    // Update page in local list
-                    if let index = client.pages.firstIndex(where: { $0.id == pageId }) {
-                        client.pages[index] = updated
-                    }
-                }
-            } catch {
-                // Version restore failed
             }
         }
     }
@@ -114,10 +69,10 @@ struct DesignView: View {
                 projectId: project.id,
                 sidebarVisible: sidebarVisible,
                 toolsPanelVisible: toolsPanelVisible,
-                versions: pageVersions,
+                versions: viewModel.pageVersions,
                 currentVersion: page.currentVersion,
                 onRestoreVersion: { version in
-                    restoreVersion(project: project, pageId: page.id, version: version)
+                    viewModel.restoreVersion(project: project, pageId: page.id, version: version)
                 }
             )
         } else {
@@ -139,16 +94,16 @@ struct DesignView: View {
 
             case .layouts:
                 // Show first layout by default, user can select others from sidebar
-                if let firstLayout = client.pages.first(where: { $0.layoutVariant != nil }) {
+                if let firstLayout = appState.pages.first(where: { $0.layoutVariant != nil }) {
                     WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
                 } else {
                     GeneratingView(message: "Loading layouts...")
                 }
 
             case .editing, .done:
-                if let mainPage = client.pages.first(where: { $0.layoutVariant == nil }) {
+                if let mainPage = appState.pages.first(where: { $0.layoutVariant == nil }) {
                     WebPreview(html: mainPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
-                } else if let firstLayout = client.pages.first(where: { $0.layoutVariant != nil }) {
+                } else if let firstLayout = appState.pages.first(where: { $0.layoutVariant != nil }) {
                     WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
                 } else {
                     GeneratingView(message: "Loading...")
@@ -165,8 +120,10 @@ struct DesignView: View {
 // MARK: - Design Command Bar
 
 struct DesignCommandBar: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
     @State private var commandText = ""
+
+    private var client: APIClient { appState.client }
 
     var body: some View {
         CommandBar(
@@ -178,7 +135,7 @@ struct DesignCommandBar: View {
     }
 
     private var placeholderText: String {
-        if let project = client.currentProject {
+        if let project = appState.currentProject {
             switch project.status {
             case .editing, .done:
                 return "Describe what you want to change..."
@@ -194,7 +151,7 @@ struct DesignCommandBar: View {
         let text = commandText
         commandText = ""
 
-        if let project = client.currentProject,
+        if let project = appState.currentProject,
            project.status == .editing || project.status == .done {
             editCurrentPage(instruction: text)
         } else {
@@ -205,7 +162,7 @@ struct DesignCommandBar: View {
     private func createProject(brief: String) {
         Task {
             do {
-                _ = try await client.createProject(brief: brief)
+                _ = try await client.projectService.create(brief: brief)
             } catch {
                 // Project creation failed
             }
@@ -213,19 +170,19 @@ struct DesignCommandBar: View {
     }
 
     private func editCurrentPage(instruction: String) {
-        guard let project = client.currentProject,
-              let page = client.pages.first(where: { $0.layoutVariant == nil }) else { return }
+        guard let project = appState.currentProject,
+              let page = appState.pages.first(where: { $0.layoutVariant == nil }) else { return }
 
         Task {
             do {
-                let updated = try await client.editPage(
+                let updated = try await client.pageService.edit(
                     projectId: project.id,
                     pageId: page.id,
                     instruction: instruction
                 )
                 await MainActor.run {
-                    if let index = client.pages.firstIndex(where: { $0.id == page.id }) {
-                        client.pages[index] = updated
+                    if let index = appState.pages.firstIndex(where: { $0.id == page.id }) {
+                        appState.pages[index] = updated
                     }
                 }
             } catch {

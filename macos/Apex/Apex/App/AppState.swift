@@ -62,17 +62,29 @@ class AppState: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var errorMessage: String?
 
-    // MARK: - Projects
+    // MARK: - Selection
 
     @Published var selectedProjectId: String?
     @Published var selectedVariantId: String?
     @Published var selectedPageId: String?
     @Published var showResearchJSON: Bool = false
 
+    // MARK: - Domain Data (migrated from APIClient)
+
+    @Published var projects: [Project] = []
+    @Published var currentProject: Project?
+    @Published var projectLogs: [LogEntry] = []
+    @Published var variants: [Variant] = []
+    @Published var pages: [Page] = []
+
     // MARK: - Services
 
     let client = APIClient()
     let wsClient = WebSocketManager()
+
+    // MARK: - View Models
+
+    lazy var chatViewModel = ChatViewModel(appState: self)
 
     // MARK: - Initialization
 
@@ -82,21 +94,27 @@ class AppState: ObservableObject {
 
     func connect() async {
         do {
-            _ = try await client.getDevToken()
+            _ = try await client.auth.getDevToken()
             isConnected = true
             errorMessage = nil
 
             // Fetch existing projects
-            _ = try await client.listProjects()
+            let fetchedProjects = try await client.projectService.list()
+            projects = fetchedProjects
         } catch {
             errorMessage = "Cannot connect"
         }
     }
 
     func logout() {
-        client.logout()
+        client.auth.logout()
         isConnected = false
         selectedProjectId = nil
+        currentProject = nil
+        projects = []
+        projectLogs = []
+        pages = []
+        variants = []
     }
 
     // MARK: - Projects
@@ -106,36 +124,34 @@ class AppState: ObservableObject {
 
     func loadProject(id: String) async {
         do {
-            let project = try await client.getProject(id: id)
-            client.currentProject = project
+            let project = try await client.projectService.get(id: id)
+            currentProject = project
 
             // Load variants
-            let variants = try await client.getVariants(projectId: id)
-            client.variants = variants
+            let loadedVariants = try await client.variantService.getAll(projectId: id)
+            variants = loadedVariants
 
             // Load pages
-            let pages = try await client.getPages(projectId: id)
-            client.pages = pages
+            let loadedPages = try await client.pageService.getAll(projectId: id)
+            pages = loadedPages
 
             // Auto-select first variant and its first page
-            if let firstVariant = variants.first {
+            if let firstVariant = loadedVariants.first {
                 selectedVariantId = firstVariant.id
-                // Find first page in this variant
-                if let firstPage = pages.first(where: { $0.variantId == firstVariant.id }) {
+                if let firstPage = loadedPages.first(where: { $0.variantId == firstVariant.id }) {
                     selectedPageId = firstPage.id
                 }
-            } else if !pages.isEmpty {
-                // Fallback: layouts without variants - select first layout
-                if let firstLayout = pages.first(where: { $0.layoutVariant != nil }) {
+            } else if !loadedPages.isEmpty {
+                if let firstLayout = loadedPages.first(where: { $0.layoutVariant != nil }) {
                     selectedPageId = firstLayout.id
-                } else if let firstPage = pages.first {
+                } else if let firstPage = loadedPages.first {
                     selectedPageId = firstPage.id
                 }
             }
 
             // Load logs
-            let logs = try await client.getProjectLogs(projectId: id)
-            client.projectLogs = logs
+            let logs = try await client.projectService.getLogs(projectId: id)
+            projectLogs = logs
 
             // Connect WebSocket only if not already connected to this project
             if connectedProjectId != id, let token = client.authToken {
@@ -157,10 +173,10 @@ class AppState: ObservableObject {
     }
 
     func clearCurrentProject() {
-        client.currentProject = nil
-        client.variants = []
-        client.pages = []
-        client.projectLogs = []
+        currentProject = nil
+        variants = []
+        pages = []
+        projectLogs = []
         selectedProjectId = nil
         selectedVariantId = nil
         selectedPageId = nil

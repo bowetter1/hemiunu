@@ -4,7 +4,8 @@ import UniformTypeIdentifiers
 // MARK: - New Project Card
 
 struct NewProjectCard: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
+    private var client: APIClient { appState.client }
     let onProjectCreated: (String) -> Void
 
     @State private var isExpanded = false
@@ -206,7 +207,7 @@ struct NewProjectCard: View {
 
         Task {
             do {
-                let project = try await client.createProject(brief: enhancedBrief)
+                let project = try await client.projectService.create(brief: enhancedBrief)
                 await MainActor.run {
                     isCreating = false
                     isExpanded = false

@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Unified sidebar showing files, components and assets
 struct UnifiedSidebar: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
+    private var client: APIClient { appState.client }
     @ObservedObject var webSocket: WebSocketManager
     let currentMode: AppMode
     @Binding var selectedProjectId: String?
@@ -43,7 +44,7 @@ struct UnifiedSidebar: View {
                     // Files section
                     SidebarSection(title: "Pages", icon: "doc.text", isExpanded: .constant(true)) {
                         FilesTabContent(
-                            client: client,
+                            appState: appState,
                             currentMode: currentMode,
                             selectedProjectId: $selectedProjectId,
                             selectedVariantId: $selectedVariantId,
@@ -54,7 +55,7 @@ struct UnifiedSidebar: View {
                     }
 
                     // Research section - click to show JSON in main area
-                    if client.currentProject?.moodboard != nil {
+                    if appState.currentProject?.moodboard != nil {
                         Button(action: {
                             selectedPageId = nil
                             showResearchJSON = true

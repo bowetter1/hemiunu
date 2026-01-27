@@ -4,8 +4,10 @@ import SwiftUI
 
 /// Right-side tools panel for actions, settings, and chat
 struct ToolsPanel: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
     @ObservedObject var webSocket: WebSocketManager
+    @ObservedObject var chatViewModel: ChatViewModel
+    private var client: APIClient { appState.client }
     let selectedPageId: String?  // Currently selected page (used as parent for generate site)
     @Binding var isExpanded: Bool
     let onProjectCreated: (String) -> Void
@@ -67,7 +69,7 @@ struct ToolsPanel: View {
                 ScrollView {
                     VStack(spacing: 8) {
                         // New Project - always at top
-                        NewProjectCard(client: client, onProjectCreated: onProjectCreated)
+                        NewProjectCard(appState: appState, onProjectCreated: onProjectCreated)
 
                         Divider()
                             .padding(.vertical, 4)
@@ -85,7 +87,7 @@ struct ToolsPanel: View {
                                 title: "Generate Site",
                                 description: "Create full website from layout",
                                 color: .blue,
-                                disabled: client.currentProject == nil || client.pages.isEmpty
+                                disabled: appState.currentProject == nil || appState.pages.isEmpty
                             ) {
                                 generateSite()
                             }
@@ -153,8 +155,9 @@ struct ToolsPanel: View {
 
                 // Chat section (takes remaining space)
                 ChatTabContent(
-                    client: client,
+                    appState: appState,
                     webSocket: webSocket,
+                    chatViewModel: chatViewModel,
                     selectedPageId: selectedPageId,
                     onProjectCreated: { projectId in
                         onProjectCreated(projectId)
@@ -221,7 +224,7 @@ struct ToolsPanel: View {
     }
 
     private func generateSite() {
-        guard let projectId = client.currentProject?.id else { return }
+        guard let projectId = appState.currentProject?.id else { return }
 
         guard let pageId = selectedPageId else {
             errorMessage = "Select a layout page first"
@@ -233,15 +236,15 @@ struct ToolsPanel: View {
 
         Task {
             do {
-                let result = try await client.generateSite(projectId: projectId, parentPageId: pageId)
+                let result = try await client.projectService.generateSite(projectId: projectId, parentPageId: pageId)
 
                 // Refresh pages to show new ones
-                let updatedPages = try await client.getPages(projectId: projectId)
+                let updatedPages = try await client.pageService.getAll(projectId: projectId)
 
                 await MainActor.run {
                     isGenerating = false
                     generationResult = result
-                    client.pages = updatedPages
+                    appState.pages = updatedPages
                 }
             } catch {
                 await MainActor.run {

@@ -3,8 +3,11 @@ import SwiftUI
 // MARK: - Floating Chat Bar
 
 struct FloatingChatWindow: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
     @ObservedObject var webSocket: WebSocketManager
+    @ObservedObject var chatViewModel: ChatViewModel
+
+    private var client: APIClient { appState.client }
     var selectedPageId: String?
     var onProjectCreated: ((String) -> Void)?
     let onClose: () -> Void
@@ -108,33 +111,8 @@ struct FloatingChatWindow: View {
 
     private func sendMessage() {
         guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        isSending = true
-
         let text = inputText
         inputText = ""
-
-        Task {
-            do {
-                if client.currentProject == nil {
-                    // Create new project
-                    let project = try await client.createProject(brief: text)
-                    await MainActor.run {
-                        isSending = false
-                        onProjectCreated?(project.id)
-                    }
-                } else if let project = client.currentProject, let pageId = selectedPageId {
-                    // Edit existing page
-                    try await client.editPage(projectId: project.id, pageId: pageId, instruction: text)
-                    await MainActor.run {
-                        isSending = false
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    isSending = false
-                }
-                // Error handled silently
-            }
-        }
+        chatViewModel.sendMessage(text, selectedPageId: selectedPageId, onProjectCreated: onProjectCreated)
     }
 }

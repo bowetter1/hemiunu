@@ -3,12 +3,7 @@ import SwiftUI
 /// Main app router - handles navigation between modes
 struct AppRouter: View {
     @StateObject private var appState = AppState.shared
-    @ObservedObject private var client: APIClient
     @State private var showToolsPanel = true
-
-    init() {
-        _client = ObservedObject(wrappedValue: AppState.shared.client)
-    }
 
     var body: some View {
         ZStack {
@@ -27,8 +22,8 @@ struct AppRouter: View {
                     appearanceMode: $appState.appearanceMode,
                     isConnected: appState.isConnected,
                     errorMessage: appState.errorMessage,
-                    hasProject: client.currentProject != nil,
-                    logs: client.projectLogs,
+                    hasProject: appState.currentProject != nil,
+                    logs: appState.projectLogs,
                     onNewProject: {
                         appState.clearCurrentProject()
                         appState.currentMode = .design
@@ -43,7 +38,7 @@ struct AppRouter: View {
                     // Left sidebar
                     if appState.showSidebar {
                         UnifiedSidebar(
-                            client: client,
+                            appState: appState,
                             webSocket: appState.wsClient,
                             currentMode: appState.currentMode,
                             selectedProjectId: $appState.selectedProjectId,
@@ -76,8 +71,9 @@ struct AppRouter: View {
 
                     // Right tools panel
                     ToolsPanel(
-                        client: client,
+                        appState: appState,
                         webSocket: appState.wsClient,
+                        chatViewModel: appState.chatViewModel,
                         selectedPageId: appState.selectedPageId,
                         isExpanded: $showToolsPanel,
                         onProjectCreated: { projectId in
@@ -106,8 +102,9 @@ struct AppRouter: View {
             // Floating chat window
             if appState.showFloatingChat {
                 FloatingChatWindow(
-                    client: client,
+                    appState: appState,
                     webSocket: appState.wsClient,
+                    chatViewModel: appState.chatViewModel,
                     selectedPageId: appState.selectedPageId,
                     onProjectCreated: { projectId in
                         appState.selectedProjectId = projectId
@@ -144,7 +141,7 @@ struct AppRouter: View {
         switch appState.currentMode {
         case .design:
             DesignView(
-                client: client,
+                appState: appState,
                 wsClient: appState.wsClient,
                 sidebarVisible: appState.showSidebar,
                 toolsPanelVisible: showToolsPanel,
@@ -157,7 +154,7 @@ struct AppRouter: View {
                 }
             )
         case .code:
-            CodeModeView(client: client, selectedPageId: $appState.selectedPageId)
+            CodeModeView(appState: appState, selectedPageId: $appState.selectedPageId)
         }
     }
 
@@ -165,16 +162,53 @@ struct AppRouter: View {
 
     private func handleWebSocketEvent(_ event: WebSocketEvent?) {
         guard let event = event,
-              let projectId = client.currentProject?.id else { return }
+              let projectId = appState.currentProject?.id else {
+            if event != nil {
+                print("[WS-Handler] Event received but no currentProject: \(String(describing: event))")
+            }
+            return
+        }
+        print("[WS-Handler] Handling event: \(event) for project: \(projectId)")
 
         switch event {
-        case .moodboardReady, .layoutsReady, .statusChanged, .pageUpdated:
+        case .moodboardReady:
             appState.scheduleLoadProject(id: projectId)
+            NotificationService.shared.notify(
+                title: "Moodboard Ready",
+                body: "Brand research and color palette are done."
+            )
+        case .layoutsReady(let count):
+            appState.scheduleLoadProject(id: projectId)
+            NotificationService.shared.notify(
+                title: "Layouts Ready",
+                body: "\(count) layout\(count == 1 ? "" : "s") generated. Pick your favorite."
+            )
+        case .statusChanged(let status):
+            appState.scheduleLoadProject(id: projectId)
+            if status == "done" || status == "editing" {
+                NotificationService.shared.notify(
+                    title: "Site Ready",
+                    body: "Your website has been generated."
+                )
+            }
+        case .pageUpdated:
+            appState.scheduleLoadProject(id: projectId)
+            NotificationService.shared.notify(
+                title: "Page Updated",
+                body: "Your edits have been applied."
+            )
         case .clarificationNeeded:
-            // Also reload project to update status
             appState.scheduleLoadProject(id: projectId)
+            NotificationService.shared.notify(
+                title: "Input Needed",
+                body: "Apex needs your input to continue."
+            )
         case .error(let message):
             appState.errorMessage = message
+            NotificationService.shared.notify(
+                title: "Error",
+                body: message
+            )
         default:
             break
         }

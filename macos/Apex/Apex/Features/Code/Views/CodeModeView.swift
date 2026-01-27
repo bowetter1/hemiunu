@@ -2,21 +2,19 @@ import SwiftUI
 
 /// Main Code Mode view with file tree, editor, and preview
 struct CodeModeView: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
     @Binding var selectedPageId: String?
+    @StateObject private var viewModel: CodeViewModel
 
-    @State private var files: [FileTreeNode] = []
-    @State private var selectedFilePath: String?
-    @State private var currentFileContent: String = ""
-    @State private var isLoadingFiles = false
-    @State private var isLoadingContent = false
-    @State private var isSaving = false
     @State private var showGenerateSheet = false
-    @State private var isGenerating = false
-    @State private var generationProgress: String = ""
-    @State private var errorMessage: String?
 
     private let fileTreeWidth: CGFloat = 240
+
+    init(appState: AppState, selectedPageId: Binding<String?>) {
+        self.appState = appState
+        _selectedPageId = selectedPageId
+        _viewModel = StateObject(wrappedValue: CodeViewModel(appState: appState))
+    }
 
     var body: some View {
         HSplitView {
@@ -33,17 +31,17 @@ struct CodeModeView: View {
                 .frame(minWidth: 300)
         }
         .onAppear {
-            loadFiles()
+            viewModel.loadFiles()
         }
-        .onChange(of: client.currentProject?.id) { _, _ in
-            loadFiles()
+        .onChange(of: appState.currentProject?.id) { _, _ in
+            viewModel.loadFiles()
         }
         .sheet(isPresented: $showGenerateSheet) {
             GenerateProjectSheet(
                 isPresented: $showGenerateSheet,
-                isGenerating: $isGenerating,
-                progress: $generationProgress,
-                onGenerate: generateProject
+                isGenerating: $viewModel.isGenerating,
+                progress: $viewModel.generationProgress,
+                onGenerate: viewModel.generateProject
             )
         }
     }
@@ -61,13 +59,13 @@ struct CodeModeView: View {
                 Spacer()
 
                 // Refresh button
-                Button(action: loadFiles) {
+                Button(action: viewModel.loadFiles) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-                .disabled(isLoadingFiles)
+                .disabled(viewModel.isLoadingFiles)
 
                 // Generate button
                 Button(action: { showGenerateSheet = true }) {
@@ -83,7 +81,7 @@ struct CodeModeView: View {
             Divider()
 
             // File tree
-            if isLoadingFiles {
+            if viewModel.isLoadingFiles {
                 VStack {
                     Spacer()
                     ProgressView()
@@ -92,9 +90,9 @@ struct CodeModeView: View {
                 }
             } else {
                 FileTreeView(
-                    files: files,
-                    selectedPath: $selectedFilePath,
-                    onFileSelect: loadFileContent
+                    files: viewModel.files,
+                    selectedPath: $viewModel.selectedFilePath,
+                    onFileSelect: viewModel.loadFileContent
                 )
             }
         }
@@ -105,13 +103,13 @@ struct CodeModeView: View {
 
     private var editorSection: some View {
         VStack(spacing: 0) {
-            if let path = selectedFilePath {
+            if let path = viewModel.selectedFilePath {
                 CodeEditorView(
-                    content: $currentFileContent,
+                    content: $viewModel.currentFileContent,
                     fileName: (path as NSString).lastPathComponent,
                     language: detectLanguage(path),
-                    isLoading: isLoadingContent,
-                    onSave: saveCurrentFile
+                    isLoading: viewModel.isLoadingContent,
+                    onSave: viewModel.saveCurrentFile
                 )
             } else {
                 emptyEditorState
@@ -131,7 +129,7 @@ struct CodeModeView: View {
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
 
-            if files.isEmpty && client.currentProject != nil {
+            if viewModel.files.isEmpty && appState.currentProject != nil {
                 Button(action: { showGenerateSheet = true }) {
                     HStack(spacing: 6) {
                         Image(systemName: "wand.and.stars")
@@ -178,7 +176,7 @@ struct CodeModeView: View {
 
             // Preview content
             if isHtmlFile {
-                HTMLWebView(html: currentFileContent, projectId: client.currentProject?.id)
+                HTMLWebView(html: viewModel.currentFileContent, projectId: appState.currentProject?.id)
             } else {
                 VStack {
                     Spacer()
@@ -201,7 +199,7 @@ struct CodeModeView: View {
     // MARK: - Helpers
 
     private var isHtmlFile: Bool {
-        guard let path = selectedFilePath else { return false }
+        guard let path = viewModel.selectedFilePath else { return false }
         return path.lowercased().hasSuffix(".html")
     }
 
@@ -219,101 +217,6 @@ struct CodeModeView: View {
         case "md": return "markdown"
         case "swift": return "swift"
         default: return "text"
-        }
-    }
-
-    // MARK: - API Calls
-
-    private func loadFiles() {
-        guard let projectId = client.currentProject?.id else { return }
-
-        isLoadingFiles = true
-
-        Task {
-            do {
-                let response = try await client.listProjectFiles(projectId: projectId)
-                await MainActor.run {
-                    files = response.tree.map { $0.toNode() }
-                    isLoadingFiles = false
-                }
-            } catch {
-                await MainActor.run {
-                    isLoadingFiles = false
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func loadFileContent(_ path: String) {
-        guard let projectId = client.currentProject?.id else { return }
-
-        isLoadingContent = true
-
-        Task {
-            do {
-                let file = try await client.readProjectFile(projectId: projectId, path: path)
-                await MainActor.run {
-                    currentFileContent = file.content ?? ""
-                    isLoadingContent = false
-                }
-            } catch {
-                await MainActor.run {
-                    isLoadingContent = false
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func saveCurrentFile() {
-        guard let projectId = client.currentProject?.id,
-              let path = selectedFilePath else { return }
-
-        isSaving = true
-
-        Task {
-            do {
-                _ = try await client.writeProjectFile(
-                    projectId: projectId,
-                    path: path,
-                    content: currentFileContent
-                )
-                await MainActor.run {
-                    isSaving = false
-                }
-            } catch {
-                await MainActor.run {
-                    isSaving = false
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func generateProject(type: String) {
-        guard let projectId = client.currentProject?.id else { return }
-
-        isGenerating = true
-        generationProgress = "Starting generation..."
-
-        Task {
-            do {
-                let result = try await client.generateCodeProject(
-                    projectId: projectId,
-                    projectType: type
-                )
-                await MainActor.run {
-                    isGenerating = false
-                    showGenerateSheet = false
-                    loadFiles()
-                }
-            } catch {
-                await MainActor.run {
-                    isGenerating = false
-                    errorMessage = error.localizedDescription
-                }
-            }
         }
     }
 }
@@ -495,7 +398,7 @@ struct ProjectTypeRow: View {
 
 #Preview {
     CodeModeView(
-        client: APIClient(),
+        appState: AppState.shared,
         selectedPageId: .constant(nil)
     )
     .frame(width: 1200, height: 700)

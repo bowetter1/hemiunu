@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Simple welcome view when no project is selected
 struct BriefBuilderView: View {
-    @ObservedObject var client: APIClient
+    var appState: AppState
+    private var client: APIClient { appState.client }
     let onProjectCreated: (String) -> Void
 
     var body: some View {
@@ -38,6 +39,6 @@ struct BriefBuilderView: View {
 }
 
 #Preview {
-    BriefBuilderView(client: APIClient()) { _ in }
+    BriefBuilderView(appState: AppState.shared) { _ in }
         .frame(width: 600, height: 400)
 }

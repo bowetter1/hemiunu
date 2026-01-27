@@ -3,7 +3,8 @@ import SwiftUI
 // MARK: - Files Tab Content
 
 struct FilesTabContent: View {
-    @ObservedObject var client: APIClient
+    @ObservedObject var appState: AppState
+    private var client: APIClient { appState.client }
     let currentMode: AppMode
     @Binding var selectedProjectId: String?
     @Binding var selectedVariantId: String?
@@ -20,7 +21,7 @@ struct FilesTabContent: View {
 
             Divider()
 
-            if client.currentProject != nil {
+            if appState.currentProject != nil {
                 if currentMode == .code {
                     filesList
                 } else {
@@ -36,14 +37,14 @@ struct FilesTabContent: View {
 
     private var projectDropdown: some View {
         Menu {
-            ForEach(client.projects) { project in
+            ForEach(appState.projects) { project in
                 Button(action: { selectedProjectId = project.id }) {
                     HStack {
                         Circle()
                             .fill(statusColor(for: project))
                             .frame(width: 8, height: 8)
                         Text(projectTitle(project))
-                        if project.id == client.currentProject?.id {
+                        if project.id == appState.currentProject?.id {
                             Spacer()
                             Image(systemName: "checkmark")
                         }
@@ -51,7 +52,7 @@ struct FilesTabContent: View {
                 }
             }
 
-            if client.currentProject != nil {
+            if appState.currentProject != nil {
                 Divider()
                 Button(action: onNewProject) {
                     Label("Back to Projects", systemImage: "arrow.left")
@@ -59,7 +60,7 @@ struct FilesTabContent: View {
             }
         } label: {
             HStack(spacing: 8) {
-                if let project = client.currentProject {
+                if let project = appState.currentProject {
                     Circle()
                         .fill(statusColor(for: project))
                         .frame(width: 8, height: 8)
@@ -89,20 +90,11 @@ struct FilesTabContent: View {
     }
 
     private func projectTitle(_ project: Project) -> String {
-        let words = project.brief.split(separator: " ").prefix(4)
-        let title = words.joined(separator: " ")
-        return title.count < project.brief.count ? "\(title)..." : title
+        ProjectFormatters.projectTitle(project)
     }
 
     private func statusColor(for project: Project) -> Color {
-        switch project.status {
-        case .brief, .clarification, .moodboard, .layouts:
-            return .orange
-        case .editing, .done:
-            return .green
-        case .failed:
-            return .red
-        }
+        ProjectFormatters.statusColor(for: project)
     }
 
     // MARK: - Files List (Code mode)
@@ -153,12 +145,12 @@ struct FilesTabContent: View {
 
     /// Root pages (pages without a parent - these are the layout/hero pages)
     private var rootPages: [Page] {
-        client.pages.filter { $0.parentPageId == nil }
+        PageFilters.rootPages(from: appState.pages)
     }
 
     /// Child pages for a given parent page
     private func childPages(for parentId: String) -> [Page] {
-        client.pages.filter { $0.parentPageId == parentId }
+        PageFilters.childPages(for: parentId, from: appState.pages)
     }
 
     // MARK: - Variants List (Design mode)
@@ -177,9 +169,9 @@ struct FilesTabContent: View {
 
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    if !client.variants.isEmpty {
+                    if !appState.variants.isEmpty {
                         // Show variants with their pages
-                        ForEach(client.variants) { variant in
+                        ForEach(appState.variants) { variant in
                             SidebarVariantRow(
                                 variant: variant,
                                 pages: pagesForVariant(variant.id),
@@ -243,21 +235,21 @@ struct FilesTabContent: View {
     }
 
     private func pagesForVariant(_ variantId: String) -> [Page] {
-        client.pages.filter { $0.variantId == variantId }
+        PageFilters.pagesForVariant(variantId, from: appState.pages)
     }
 
     private var pagesWithoutVariant: [Page] {
-        client.pages.filter { $0.variantId == nil }
+        PageFilters.pagesWithoutVariant(from: appState.pages)
     }
 
     /// Root layout pages (pages without a parent - these are layout/hero pages)
     private var rootLayoutPages: [Page] {
-        client.pages.filter { $0.variantId == nil && $0.parentPageId == nil }
+        PageFilters.pagesWithoutVariant(from: appState.pages).filter { $0.parentPageId == nil }
     }
 
     /// Child pages for a given parent layout page
     private func childPagesFor(_ parentId: String) -> [Page] {
-        client.pages.filter { $0.parentPageId == parentId }
+        PageFilters.childPages(for: parentId, from: appState.pages)
     }
 
     // MARK: - Projects List
@@ -276,14 +268,15 @@ struct FilesTabContent: View {
 
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(client.projects) { project in
+                    ForEach(appState.projects) { project in
                         SidebarProjectRow(
                             project: project,
                             isSelected: selectedProjectId == project.id,
                             onSelect: { selectedProjectId = project.id },
                             onDelete: {
                                 Task {
-                                    try? await client.deleteProject(projectId: project.id)
+                                    try? await client.projectService.delete(projectId: project.id)
+                                    appState.projects.removeAll { $0.id == project.id }
                                     if selectedProjectId == project.id {
                                         selectedProjectId = nil
                                     }
@@ -617,30 +610,14 @@ struct SidebarProjectRow: View {
     }
 
     var projectTitle: String {
-        let words = project.brief.split(separator: " ").prefix(4)
-        let title = words.joined(separator: " ")
-        return title.count < project.brief.count ? "\(title)..." : title
+        ProjectFormatters.projectTitle(project)
     }
 
     var formattedDate: String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: project.createdAt) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateFormat = "MMM d"
-            return displayFormatter.string(from: date)
-        }
-        return ""
+        ProjectFormatters.formattedDate(project.createdAt)
     }
 
     var statusColor: Color {
-        switch project.status {
-        case .brief, .clarification, .moodboard, .layouts:
-            return .orange
-        case .editing, .done:
-            return .green
-        case .failed:
-            return .red
-        }
+        ProjectFormatters.statusColor(for: project)
     }
 }

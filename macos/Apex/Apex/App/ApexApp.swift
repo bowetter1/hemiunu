@@ -16,6 +16,9 @@ struct ApexApp: App {
             AppRouter()
                 .preferredColorScheme(appState.appearanceMode.colorScheme)
                 .background(WindowAccessor())
+                .onAppear {
+                    NotificationService.shared.requestPermission()
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
