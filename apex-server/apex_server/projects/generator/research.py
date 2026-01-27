@@ -203,13 +203,15 @@ Pick colors that feel like THIS SPECIFIC BRAND, not generic web colors."""
 Project: {search_context}
 Company URL: {company_urls[0]['url'] if company_urls else 'unknown'}
 
-YOUR GOAL: Find actual company/brand websites with beautiful designs — NOT template galleries, NOT "best of" articles, NOT design tool sites.
+YOUR GOAL: Find the most BEAUTIFUL, high-budget websites in this industry and adjacent premium industries. Expensive brands spend more on design — so always look UPMARKET for inspiration, regardless of the client's actual market segment.
 
 SEARCH STRATEGY (do all of these):
-1. Search: "[industry] site:awwwards.com" — find awarded sites in this industry
-2. Search: "[industry] site:siteinspire.com" — find curated inspiration
-3. Search: Top competitors or premium brands in same industry (e.g., for a golf club, search "TPC Scottsdale website", "Augusta National website", "St Andrews golf website")
-4. Search: Premium brands in adjacent industries with similar audience (e.g., for golf → luxury hotels, country clubs, premium sports brands)
+1. Search: "[industry] site:awwwards.com" — find award-winning sites in this industry
+2. Search: "[industry] site:siteinspire.com" — find curated design inspiration
+3. Search: The MOST PREMIUM brands in this industry (e.g., for a hotel → Four Seasons, Aman, Rosewood; for golf → Augusta National, TPC Scottsdale; for fintech → Stripe, Wise)
+4. Search: Luxury/premium brands in ADJACENT industries with overlapping audiences (e.g., for a conference hotel → luxury travel brands, premium event venues, high-end restaurants)
+
+KEY PRINCIPLE: Always aim ABOVE the client's price tier. A budget hotel should be inspired by a luxury hotel's website. A local golf club should look at world-class resorts. Premium brands have bigger design budgets — their websites are simply better designed, and we can adapt that quality for any client.
 
 CRITICAL RULES:
 - We need the ACTUAL website URLs (like "wise.com", "stripe.com", "fourseasons.com")
@@ -334,6 +336,8 @@ Search now."""
             messages=[{
                 "role": "user",
                 "content": f"""You are a senior web designer creating a design brief for a layout developer. Your report will be handed DIRECTLY to the person building the HTML/CSS — so it must be specific and actionable.
+
+DESIGN PHILOSOPHY: Always design as if the client has a premium budget. Study the inspiration sites for their high-end design techniques — generous whitespace, elegant typography, refined animations, premium photography treatment — and bring that level of polish to every blueprint, regardless of the client's actual market segment. Beautiful design is universal.
 
 PROJECT BRIEF: {self.project.brief}
 COMPANY URL: {company_url_str}
