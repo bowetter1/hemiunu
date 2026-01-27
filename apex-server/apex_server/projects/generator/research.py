@@ -182,41 +182,62 @@ Pick colors that feel like THIS SPECIFIC BRAND, not generic web colors."""
         print(f"[TIMING] Step 2 (analyze colors): {time.time() - step2_start:.1f}s", flush=True)
 
         # ============================================
-        # STEP 3: Search for 6 beautiful inspiration websites
+        # STEP 3: Search for REAL inspiration websites (not template galleries)
         # ============================================
         step3_start = time.time()
-        print("[STEP 3] Searching for inspiration websites...", flush=True)
+        print("[STEP 3] Searching for real inspiration websites...", flush=True)
 
-        # Determine industry from brief
         inspiration_search_response = self.client.beta.messages.create(
             model=MODEL_OPUS,
-            max_tokens=1200,
+            max_tokens=1500,
             betas=["web-search-2025-03-05"],
             tools=[{
                 "type": "web_search_20250305",
                 "name": "web_search",
-                "max_uses": 4
+                "max_uses": 5
             }],
             messages=[{
                 "role": "user",
-                "content": f"""Search for 6 BEAUTIFUL, AWARD-WINNING websites that could inspire the design for this project:
+                "content": f"""Find 6+ REAL, LIVE websites that we can use as design inspiration for this project:
 
 Project: {search_context}
+Company URL: {company_urls[0]['url'] if company_urls else 'unknown'}
 
-SEARCH STRATEGY:
-1. First search: "best [industry] website design 2024 2025" (e.g., "best restaurant website design 2024")
-2. Second search: "awwwards [industry] website" (e.g., "awwwards restaurant website")
-3. Third search: "beautiful [industry] landing page inspiration"
+YOUR GOAL: Find actual company/brand websites with beautiful designs — NOT template galleries, NOT "best of" articles, NOT design tool sites.
 
-We want to find REAL websites with stunning designs that we can use as visual inspiration.
-NOT articles about design - actual LIVE websites we can look at."""
+SEARCH STRATEGY (do all of these):
+1. Search: "[industry] site:awwwards.com" — find awarded sites in this industry
+2. Search: "[industry] site:siteinspire.com" — find curated inspiration
+3. Search: Top competitors or premium brands in same industry (e.g., for a golf club, search "TPC Scottsdale website", "Augusta National website", "St Andrews golf website")
+4. Search: Premium brands in adjacent industries with similar audience (e.g., for golf → luxury hotels, country clubs, premium sports brands)
+
+CRITICAL RULES:
+- We need the ACTUAL website URLs (like "wise.com", "stripe.com", "fourseasons.com")
+- NOT articles about design (no "best X website design 2024" listicles)
+- NOT template marketplaces
+- Think: "What website would I open in a browser to study its design?"
+
+Search now."""
             }]
         )
         self.track_usage(inspiration_search_response)
 
-        # Collect inspiration URLs
+        # Collect inspiration URLs — aggressively filter out non-website results
         inspiration_urls = []
         search_queries = []
+
+        # Domains that are template galleries / articles, NOT real design inspiration
+        skip_domains = [
+            "awwwards.com", "behance.net", "dribbble.com", "pinterest.com",
+            "medium.com", "wordpress.com", "themeforest.net", "templatemonster.com",
+            "99designs.com", "subframe.com", "motocms.com", "instapage.com",
+            "wix.com", "squarespace.com", "hubspot.com", "colorlib.com",
+            "siteinspire.com", "bestwebsite.gallery", "onepagelove.com",
+            "designspiration.com", "webdesign-inspiration.com", "land-book.com",
+            "godaddy.com", "shopify.com/blog", "brandcrowd.com", "flaticon.com",
+            "youtube.com", "wikipedia.org", "reddit.com", "quora.com",
+            "mycodelesswebsite.com", "clubmarketing.com/blog",
+        ]
 
         for block in inspiration_search_response.content:
             if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
@@ -228,16 +249,17 @@ NOT articles about design - actual LIVE websites we can look at."""
             if block.type == "web_search_tool_result":
                 content = getattr(block, 'content', [])
                 if isinstance(content, list):
-                    for item in content[:5]:  # More results per search
+                    for item in content[:5]:
                         url = getattr(item, 'url', '')
                         title = getattr(item, 'title', '')
                         if url and url not in [u["url"] for u in inspiration_urls]:
-                            # Skip aggregator sites, keep actual company sites
-                            skip_domains = ["awwwards.com", "behance.net", "dribbble.com", "pinterest.com", "medium.com", "wordpress.com"]
                             if not any(skip in url.lower() for skip in skip_domains):
                                 inspiration_urls.append({"url": url, "title": title})
                                 print(f"[STEP 3] Found: {url[:60]}", flush=True)
+                            else:
+                                print(f"[STEP 3] Skipped (gallery/article): {url[:60]}", flush=True)
 
+        print(f"[STEP 3] Total real sites found: {len(inspiration_urls)}", flush=True)
         print(f"[TIMING] Step 3 (search inspiration): {time.time() - step3_start:.1f}s", flush=True)
 
         # ============================================
@@ -307,64 +329,82 @@ NOT articles about design - actual LIVE websites we can look at."""
 
         research_response = self.client.messages.create(
             model=MODEL_OPUS,
-            max_tokens=6000,
+            max_tokens=8000,
             tools=[save_research_tool],
             messages=[{
                 "role": "user",
-                "content": f"""You are a senior web designer doing brand research. Analyze ALL the data below and write a comprehensive markdown research report.
+                "content": f"""You are a senior web designer creating a design brief for a layout developer. Your report will be handed DIRECTLY to the person building the HTML/CSS — so it must be specific and actionable.
 
 PROJECT BRIEF: {self.project.brief}
 COMPANY URL: {company_url_str}
-BRAND COLORS FOUND: {brand_colors if brand_colors else 'None found - you must suggest appropriate colors'}
+BRAND COLORS FOUND: {brand_colors if brand_colors else 'None found — you must suggest appropriate colors'}
 
 ═══════════════════════════════════════════════════════════════
-INSPIRATION WEBSITES FOUND (with their actual content):
+INSPIRATION WEBSITES (with their actual content/styles):
 ═══════════════════════════════════════════════════════════════
 {sites_for_analysis}
 
 ═══════════════════════════════════════════════════════════════
-YOUR TASK:
+INSTRUCTIONS:
 ═══════════════════════════════════════════════════════════════
 
-1. FIRST: Write a detailed markdown report as FREE TEXT in your response (not in the tool call). Use this exact structure:
+Write your report as FREE TEXT (markdown), then call the save_research_metadata tool.
+
+Pick the 3 BEST real websites from above (skip any that are template galleries or design articles — those are useless as inspiration). If fewer than 3 real sites exist, use your knowledge of well-designed sites in this industry.
+
+Use this EXACT structure:
 
 # Brand Research: [Company Name]
 
 ## Brand Identity
-- Primary color: [hex] — [what it's used for]
-- Secondary color: [hex] — [what it's used for]
-- Accent color: [hex] — [what it's used for]
-- Overall brand feel: [describe]
+- Primary: [hex] — [usage]
+- Secondary: [hex] — [usage]
+- Accent: [hex] — [usage]
+- Brand feel: [2-3 words]
 
 ## Typography
-- Heading font: [Google Font name] — [why this font fits]
-- Body font: [Google Font name] — [why this font fits]
+- Heading: [Google Font] — [why]
+- Body: [Google Font] — [why]
 
 ## Inspiration Site 1: [Name]
-- **URL:** [url]
-- **Design style:** [detailed description of visual style]
-- **Layout:** [describe hero section, grid, spacing]
-- **Typography:** [what fonts/sizes they use, how hierarchy works]
-- **Colors:** [their color scheme and how they use it]
-- **Key elements to borrow:** [specific CSS/design patterns]
-- **Why inspiring:** [1-2 sentences]
+- **URL:** [actual website url]
+- **What they do well:** [2-3 sentences about their design approach]
+- **Key design patterns:** [bullet list of specific techniques: navigation style, hero layout, section transitions, card styles, etc.]
+
+### → Layout Blueprint 1 (inspired by [Name])
+Build a hero section and landing page with these specifics:
+- **Hero structure:** [exact layout — e.g. "full-width background image with centered text overlay" or "split 50/50 with image left, text right"]
+- **Navigation:** [e.g. "sticky transparent nav, becomes solid white on scroll, logo left, links center, CTA button right"]
+- **Hero content:** [what goes in it — headline, subline, CTA button, maybe stats or trust badges]
+- **Sections below hero (in order):**
+  1. [Section name] — [layout: e.g. "3-column card grid with icons"] — [content: e.g. "key services/features"]
+  2. [Section name] — [layout] — [content]
+  3. [Section name] — [layout] — [content]
+- **Visual style:** [padding, border-radius, shadows, background colors for sections]
+- **What makes this layout unique:** [1 sentence]
 
 ## Inspiration Site 2: [Name]
-[same structure]
+[same structure as above]
+
+### → Layout Blueprint 2 (inspired by [Name])
+[same blueprint structure]
 
 ## Inspiration Site 3: [Name]
-[same structure]
+[same structure as above]
+
+### → Layout Blueprint 3 (inspired by [Name])
+[same blueprint structure]
 
 ## Design Direction
-[2-3 sentences summarizing the overall design direction for this project, combining the best elements from the inspiration sites with the brand identity]
+[2-3 sentences: overall direction combining brand identity with the best elements]
 
-2. THEN: Call the save_research_metadata tool with the structured data (fonts + 3 inspiration sites).
+CRITICAL RULES:
+- Each blueprint must describe a DIFFERENT layout approach (e.g. one image-heavy, one minimal/typographic, one bold/dark)
+- Be specific enough that a developer could build the HTML without guessing
+- Include real section names relevant to THIS company (e.g. for a golf club: "Tee Times", "Course Overview", "Membership"; for a bank: "Services", "Rates", "Download App")
+- The 3 layouts must all use the same brand colors but feel distinctly different
 
-IMPORTANT:
-- Select the 3 BEST inspiration sites from those found. Pick diverse styles.
-- Be very specific about CSS details (padding, font sizes, layout patterns)
-- If no brand colors were found, suggest appropriate ones based on the industry
-- The markdown report will be sent directly to the layout designer, so be thorough"""
+After writing the markdown, call the save_research_metadata tool with fonts + the 3 sites."""
             }]
         )
         self.track_usage(research_response)

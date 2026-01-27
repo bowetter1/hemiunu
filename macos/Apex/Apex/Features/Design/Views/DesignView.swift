@@ -130,9 +130,12 @@ struct DesignView: View {
                 GeneratingView(message: "Waiting for your input...")
 
             case .moodboard:
-                // Moodboard is auto-selected, layouts are being generated
-                // User can change moodboard from the right panel if needed
-                GeneratingView(message: "Creating layouts...")
+                // Research done — show markdown if available
+                if let md = project.researchMd, !md.isEmpty {
+                    ResearchMarkdownView(markdown: md)
+                } else {
+                    GeneratingView(message: "Researching brand...")
+                }
 
             case .layouts:
                 // Show first layout by default, user can select others from sidebar
