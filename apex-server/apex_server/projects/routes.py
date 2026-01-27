@@ -324,10 +324,9 @@ def clarify_project(
                 research_data = gen.research_brand()
                 notify_from_thread(notify_moodboard_ready(str(project_id), research_data))
 
-                # Layout generation disabled - focus on research flow first
-                # print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
-                # layouts = gen.generate_layouts()
-                # notify_from_thread(notify_layouts_ready(str(project_id), layouts))
+                print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
+                layouts = gen.generate_layouts()
+                notify_from_thread(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
             print(f"[ERROR] Phase 2/3 failed: {e}", flush=True)
             import traceback
