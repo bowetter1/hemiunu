@@ -26,7 +26,10 @@ class LayoutsMixin:
         print("[GENERATE_LAYOUTS] Starting...", flush=True)
         self.log("layouts", "Generating 3 layouts from inspiration sites...")
 
-        # Get research data
+        # Get research markdown (primary source of design context)
+        research_md = self.project.research_md or ""
+
+        # Get structured data from moodboard (for colors, fonts, site names)
         research_data = self.project.moodboard
         if not research_data:
             raise ValueError("Research data missing - run research_brand first")
@@ -40,14 +43,13 @@ class LayoutsMixin:
         secondary_color = brand_colors[1]
         accent_color = brand_colors[2]
 
-        # Get fonts
+        # Get fonts (needed for inject_google_fonts)
         fonts = research_data.get("fonts", {"heading": "Inter", "body": "Inter"})
 
-        # Get inspiration sites
+        # Get inspiration site names (for layout naming)
         inspiration_sites = research_data.get("inspiration_sites", [])
-        if len(inspiration_sites) < 3:
-            raise ValueError("Need at least 3 inspiration sites")
 
+        print(f"[GENERATE_LAYOUTS] Research markdown: {len(research_md)} chars", flush=True)
         print(f"[GENERATE_LAYOUTS] Brand colors: {brand_colors}", flush=True)
         print(f"[GENERATE_LAYOUTS] Fonts: {fonts}", flush=True)
         print(f"[GENERATE_LAYOUTS] Inspiration sites: {[s.get('name') for s in inspiration_sites]}", flush=True)
@@ -77,56 +79,24 @@ class LayoutsMixin:
             }
         }
 
-        # Format inspiration sites for prompt
-        inspiration_details = ""
-        for i, site in enumerate(inspiration_sites[:3], 1):
-            inspiration_details += f"""
-═══════════════════════════════════════════════════════════════
-LAYOUT {i} - Inspired by: {site.get('name', 'Unknown')}
-═══════════════════════════════════════════════════════════════
-Website: {site.get('url', '')}
-Design Style: {site.get('design_style', '')}
-Why inspiring: {site.get('why', '')}
-Key elements to borrow: {', '.join(site.get('key_elements', []))}
-"""
-
         opus_start = time.time()
-        print(f"[GENERATE_LAYOUTS] Calling Opus with web search to study inspiration sites...", flush=True)
+        print(f"[GENERATE_LAYOUTS] Calling Opus with research markdown context...", flush=True)
 
-        # Give Opus web search, layout tool, AND image generation tool
+        # Give Opus web search (reduced - backup only), layout tool, AND image generation tool
         image_tool = self.get_image_tools()[0]
         web_search_tool = {
             "type": "web_search_20250305",
             "name": "web_search",
-            "max_uses": 6  # Allow searching each inspiration site
+            "max_uses": 2  # Backup only - research markdown has the details
         }
 
-        # Build the initial prompt (save for conversation continuations)
+        # Build the initial prompt using research markdown as primary context
         initial_prompt = f"""Create THREE world-class hero section designs, each inspired by a different reference website.
 
 ═══════════════════════════════════════════════════════════════
-STEP 1: FIRST, USE WEB SEARCH TO STUDY THE INSPIRATION SITES
+RESEARCH REPORT (from our brand researcher):
 ═══════════════════════════════════════════════════════════════
-Before creating any layouts, you MUST use web_search to visit and study each inspiration site.
-Search for each site to see their actual design, layout, colors, typography, and structure.
-
-DO THIS FIRST:
-1. Search for "{inspiration_sites[0].get('url', '')}" - study the design
-2. Search for "{inspiration_sites[1].get('url', '')}" - study the design
-3. Search for "{inspiration_sites[2].get('url', '')}" - study the design
-
-Look at:
-- Hero section layout and structure
-- Navigation style
-- Typography choices
-- Image usage and placement
-- Overall visual feel
-
-═══════════════════════════════════════════════════════════════
-STEP 2: THEN CREATE 3 LAYOUTS BASED ON WHAT YOU SAW
-═══════════════════════════════════════════════════════════════
-
-Brief: {self.project.brief}
+{research_md}
 
 ═══════════════════════════════════════════════════════════════
 MANDATORY BRAND COLORS (from the company's REAL website):
@@ -145,9 +115,19 @@ Heading font: {fonts.get('heading', 'Inter')}
 Body font: {fonts.get('body', 'Inter')}
 
 ═══════════════════════════════════════════════════════════════
-YOUR TASK: Create 3 layouts, each inspired by one reference site
+PROJECT BRIEF:
 ═══════════════════════════════════════════════════════════════
-{inspiration_details}
+{self.project.brief}
+
+═══════════════════════════════════════════════════════════════
+YOUR TASK: Create 3 layouts, each inspired by one of the 3 inspiration sites described above.
+═══════════════════════════════════════════════════════════════
+Use the DETAILED design analysis from the research report above. Each layout should clearly
+borrow the design style, layout patterns, typography approach, and key elements described
+for its corresponding inspiration site.
+
+You have web_search available as backup if you need to verify something, but the research
+report above should contain everything you need.
 
 ═══════════════════════════════════════════════════════════════
 DESIGN PRINCIPLES:

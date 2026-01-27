@@ -25,6 +25,7 @@ struct Project: Identifiable, Codable {
     let status: ProjectStatus
     let moodboard: MoodboardContainer?
     let clarification: Clarification?
+    let researchMd: String?
     let selectedMoodboard: Int?
     let selectedLayout: Int?
     let createdAt: String
@@ -35,6 +36,7 @@ struct Project: Identifiable, Codable {
 
     enum CodingKeys: String, CodingKey {
         case id, brief, status, moodboard, clarification
+        case researchMd = "research_md"
         case selectedMoodboard = "selected_moodboard"
         case selectedLayout = "selected_layout"
         case createdAt = "created_at"

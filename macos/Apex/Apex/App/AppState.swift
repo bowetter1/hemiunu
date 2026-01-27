@@ -67,6 +67,7 @@ class AppState: ObservableObject {
     @Published var selectedProjectId: String?
     @Published var selectedVariantId: String?
     @Published var selectedPageId: String?
+    @Published var showResearchJSON: Bool = false
 
     // MARK: - Services
 

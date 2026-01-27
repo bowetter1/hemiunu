@@ -104,6 +104,7 @@ class ProjectResponse(BaseModel):
     status: str
     moodboard: Optional[dict] = None
     clarification: Optional[dict] = None  # Question and options when status is CLARIFICATION
+    research_md: Optional[str] = None  # Markdown research report
     selected_moodboard: Optional[int] = None
     selected_layout: Optional[int] = None
     created_at: str
@@ -188,6 +189,7 @@ def project_to_response(project: Project) -> ProjectResponse:
         status=project.status.value,
         moodboard=project.moodboard,
         clarification=project.clarification,
+        research_md=project.research_md,
         selected_moodboard=project.selected_moodboard,
         selected_layout=project.selected_layout,
         created_at=project.created_at.isoformat(),
@@ -264,10 +266,10 @@ def create_project(
                     research_data = gen.research_brand()
                     notify_from_thread(notify_moodboard_ready(str(project_id), research_data))
 
-                    # AUTO-CONTINUE to Phase 3 (layouts) - AI already selected best moodboard
-                    print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
-                    layouts = gen.generate_layouts()
-                    notify_from_thread(notify_layouts_ready(str(project_id), layouts))
+                    # Layout generation disabled - focus on research flow first
+                    # print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
+                    # layouts = gen.generate_layouts()
+                    # notify_from_thread(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
             print(f"[ERROR] Phase 1 failed: {e}", flush=True)
             import traceback
@@ -333,10 +335,10 @@ def clarify_project(
                 research_data = gen.research_brand()
                 notify_from_thread(notify_moodboard_ready(str(project_id), research_data))
 
-                # AUTO-CONTINUE to Phase 3 (layouts)
-                print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
-                layouts = gen.generate_layouts()
-                notify_from_thread(notify_layouts_ready(str(project_id), layouts))
+                # Layout generation disabled - focus on research flow first
+                # print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
+                # layouts = gen.generate_layouts()
+                # notify_from_thread(notify_layouts_ready(str(project_id), layouts))
         except Exception as e:
             print(f"[ERROR] Phase 2/3 failed: {e}", flush=True)
             import traceback

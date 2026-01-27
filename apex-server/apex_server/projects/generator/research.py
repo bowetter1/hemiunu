@@ -89,6 +89,10 @@ Do 1-2 searches to find the official company website."""
 
         print(f"[TIMING] Step 1 (find company site): {time.time() - step1_start:.1f}s", flush=True)
 
+        # Log to database for app visibility
+        if company_urls:
+            self.log("research", f"Found company site: {company_urls[0]['url']}", {"urls": company_urls})
+
         # ============================================
         # STEP 2: Have Opus analyze the website and identify brand colors
         # ============================================
@@ -258,23 +262,26 @@ NOT articles about design - actual LIVE websites we can look at."""
         print(f"[TIMING] Step 4 (fetch inspiration): {time.time() - step4_start:.1f}s", flush=True)
 
         # ============================================
-        # STEP 5: Have Opus select 3 best inspiration sites
+        # STEP 5: Opus writes comprehensive markdown research report
         # ============================================
         step5_start = time.time()
-        print("[STEP 5] Selecting best inspiration sites...", flush=True)
+        print("[STEP 5] Having Opus write research markdown report...", flush=True)
 
-        # Format fetched content for analysis
+        # Format fetched content for analysis (2000 chars per site for richer context)
         sites_for_analysis = "\n\n".join([
-            f"URL: {c.get('url', 'unknown')}\nTitle: {c.get('title', 'unknown')}\nDescription: {c.get('text', '')[:300]}"
+            f"URL: {c.get('url', 'unknown')}\nTitle: {c.get('title', 'unknown')}\nCSS/Styles: {json.dumps(c.get('colors_found', []))}\nContent: {c.get('text', '')[:2000]}"
             for c in inspiration_content if not c.get("error")
         ])
 
-        select_tool = {
-            "name": "select_inspiration",
-            "description": "Select the 3 best inspiration websites for this project",
+        # Tool for Opus to return structured metadata alongside the markdown
+        save_research_tool = {
+            "name": "save_research_metadata",
+            "description": "Save the research metadata (fonts, site names) alongside the markdown report",
             "input_schema": {
                 "type": "object",
                 "properties": {
+                    "heading_font": {"type": "string", "description": "Recommended Google Font for headings"},
+                    "body_font": {"type": "string", "description": "Recommended Google Font for body text"},
                     "inspiration_sites": {
                         "type": "array",
                         "minItems": 3,
@@ -282,80 +289,109 @@ NOT articles about design - actual LIVE websites we can look at."""
                         "items": {
                             "type": "object",
                             "properties": {
-                                "url": {"type": "string", "description": "Full URL to the website"},
-                                "name": {"type": "string", "description": "Website/company name"},
-                                "design_style": {"type": "string", "description": "Description of the design style (e.g., 'minimal with bold typography', 'full-bleed imagery with dark overlays')"},
-                                "why": {"type": "string", "description": "Why this site is inspiring for this project (1 sentence)"},
-                                "key_elements": {"type": "array", "items": {"type": "string"}, "description": "2-3 specific design elements to borrow (e.g., 'large hero image', 'animated text', 'floating cards')"}
+                                "url": {"type": "string"},
+                                "name": {"type": "string"},
+                                "design_style": {"type": "string"},
+                                "why": {"type": "string"},
+                                "key_elements": {"type": "array", "items": {"type": "string"}}
                             },
                             "required": ["url", "name", "design_style", "why", "key_elements"]
                         }
-                    },
-                    "recommended_fonts": {
-                        "type": "object",
-                        "properties": {
-                            "heading": {"type": "string", "description": "Recommended Google Font for headings"},
-                            "body": {"type": "string", "description": "Recommended Google Font for body text"}
-                        },
-                        "description": "Based on the inspiration sites, recommend fonts that would work well"
                     }
                 },
-                "required": ["inspiration_sites", "recommended_fonts"]
+                "required": ["heading_font", "body_font", "inspiration_sites"]
             }
         }
 
-        selection_response = self.client.messages.create(
+        company_url_str = company_urls[0]["url"] if company_urls else "unknown"
+
+        research_response = self.client.messages.create(
             model=MODEL_OPUS,
-            max_tokens=2000,
-            tools=[select_tool],
-            tool_choice={"type": "tool", "name": "select_inspiration"},
+            max_tokens=6000,
+            tools=[save_research_tool],
             messages=[{
                 "role": "user",
-                "content": f"""Select the 3 BEST inspiration websites for this web design project.
+                "content": f"""You are a senior web designer doing brand research. Analyze ALL the data below and write a comprehensive markdown research report.
 
-PROJECT: {self.project.brief}
+PROJECT BRIEF: {self.project.brief}
+COMPANY URL: {company_url_str}
+BRAND COLORS FOUND: {brand_colors if brand_colors else 'None found - you must suggest appropriate colors'}
 
-BRAND COLORS WE'LL USE: {brand_colors[:5] if brand_colors else 'Not found - will need to create'}
-
-WEBSITES FOUND:
+═══════════════════════════════════════════════════════════════
+INSPIRATION WEBSITES FOUND (with their actual content):
+═══════════════════════════════════════════════════════════════
 {sites_for_analysis}
 
 ═══════════════════════════════════════════════════════════════
-SELECTION CRITERIA:
+YOUR TASK:
 ═══════════════════════════════════════════════════════════════
-1. VISUAL QUALITY: Sites with stunning, modern design
-2. RELEVANCE: Sites in same or similar industry
-3. DIVERSITY: Pick 3 sites with DIFFERENT design styles:
-   - One with bold imagery/photography focus
-   - One with typography-focused minimal design
-   - One with unique layout/structure
-4. PRACTICALITY: Designs we can actually implement
 
-For each site, describe:
-- The design style in detail
-- Why it's inspiring for this specific project
-- 2-3 specific design elements we should borrow
+1. FIRST: Write a detailed markdown report as FREE TEXT in your response (not in the tool call). Use this exact structure:
 
-Also recommend Google Fonts that would match these inspiration sites."""
+# Brand Research: [Company Name]
+
+## Brand Identity
+- Primary color: [hex] — [what it's used for]
+- Secondary color: [hex] — [what it's used for]
+- Accent color: [hex] — [what it's used for]
+- Overall brand feel: [describe]
+
+## Typography
+- Heading font: [Google Font name] — [why this font fits]
+- Body font: [Google Font name] — [why this font fits]
+
+## Inspiration Site 1: [Name]
+- **URL:** [url]
+- **Design style:** [detailed description of visual style]
+- **Layout:** [describe hero section, grid, spacing]
+- **Typography:** [what fonts/sizes they use, how hierarchy works]
+- **Colors:** [their color scheme and how they use it]
+- **Key elements to borrow:** [specific CSS/design patterns]
+- **Why inspiring:** [1-2 sentences]
+
+## Inspiration Site 2: [Name]
+[same structure]
+
+## Inspiration Site 3: [Name]
+[same structure]
+
+## Design Direction
+[2-3 sentences summarizing the overall design direction for this project, combining the best elements from the inspiration sites with the brand identity]
+
+2. THEN: Call the save_research_metadata tool with the structured data (fonts + 3 inspiration sites).
+
+IMPORTANT:
+- Select the 3 BEST inspiration sites from those found. Pick diverse styles.
+- Be very specific about CSS details (padding, font sizes, layout patterns)
+- If no brand colors were found, suggest appropriate ones based on the industry
+- The markdown report will be sent directly to the layout designer, so be thorough"""
             }]
         )
-        self.track_usage(selection_response)
+        self.track_usage(research_response)
 
-        # Extract selected sites
+        # Extract markdown from text blocks and metadata from tool call
+        research_md = ""
         selected_sites = []
         recommended_fonts = {"heading": "Inter", "body": "Inter"}
 
-        for block in selection_response.content:
-            if block.type == "tool_use" and block.name == "select_inspiration":
-                selected_sites = block.input.get("inspiration_sites", [])
-                recommended_fonts = block.input.get("recommended_fonts", recommended_fonts)
-                break
+        for block in research_response.content:
+            if block.type == "text":
+                research_md += block.text
+            elif block.type == "tool_use" and block.name == "save_research_metadata":
+                metadata = block.input
+                recommended_fonts = {
+                    "heading": metadata.get("heading_font", "Inter"),
+                    "body": metadata.get("body_font", "Inter")
+                }
+                selected_sites = metadata.get("inspiration_sites", [])
 
+        print(f"[STEP 5] Research markdown: {len(research_md)} chars", flush=True)
         print(f"[STEP 5] Selected {len(selected_sites)} inspiration sites", flush=True)
         for site in selected_sites:
-            print(f"  - {site.get('name')}: {site.get('design_style')[:50]}...", flush=True)
+            print(f"  - {site.get('name')}: {site.get('design_style', '')[:50]}...", flush=True)
+        print(f"[STEP 5] Fonts: {recommended_fonts}", flush=True)
 
-        print(f"[TIMING] Step 5 (select best): {time.time() - step5_start:.1f}s", flush=True)
+        print(f"[TIMING] Step 5 (research markdown): {time.time() - step5_start:.1f}s", flush=True)
 
         # ============================================
         # STEP 6: Finalize brand colors (or create if not found)
@@ -428,7 +464,10 @@ Create colors that:
             "search_queries": search_queries
         }
 
-        # Store in project (reusing moodboard field for now)
+        # Store markdown report on project
+        self.project.research_md = research_md
+
+        # Store structured data in moodboard (brand_colors for swatches, fonts for inject_google_fonts)
         self.project.moodboard = {
             "research": research_data,
             "brand_colors": brand_colors,
@@ -436,10 +475,10 @@ Create colors that:
             "inspiration_sites": selected_sites
         }
         self.project.selected_moodboard = 1  # Not used anymore, but keep for compatibility
-        self.project.status = ProjectStatus.MOODBOARD  # Will rename to RESEARCH later
+        self.project.status = ProjectStatus.MOODBOARD
         self.db.commit()
 
-        print(f"[RESEARCH DATA] Full JSON:", flush=True)
+        print(f"[RESEARCH DATA] Markdown saved ({len(research_md)} chars)", flush=True)
         print(json.dumps(research_data, indent=2, ensure_ascii=False), flush=True)
 
         print(f"[TIMING] TOTAL research: {time.time() - phase_start:.1f}s", flush=True)

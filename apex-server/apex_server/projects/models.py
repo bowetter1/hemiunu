@@ -39,6 +39,9 @@ class Project(Base, TimestampMixin):
     # Clarification (JSON) - question and options when status is CLARIFICATION
     clarification: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
+    # Research markdown report (written by Opus during research phase)
+    research_md: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Selected moodboard (1, 2, or 3)
     selected_moodboard: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 

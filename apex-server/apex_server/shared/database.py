@@ -147,6 +147,8 @@ def _run_migrations():
         ("pages", "variant_id", "ALTER TABLE pages ADD COLUMN variant_id VARCHAR(36) REFERENCES variants(id) ON DELETE CASCADE"),
         # Add parent_page_id to pages table for grouping generated pages under their parent layout
         ("pages", "parent_page_id", "ALTER TABLE pages ADD COLUMN parent_page_id VARCHAR(36) REFERENCES pages(id) ON DELETE CASCADE"),
+        # Add research_md to projects table for markdown research report
+        ("projects", "research_md", "ALTER TABLE projects ADD COLUMN research_md TEXT"),
     ]
 
     # Add new enum values (PostgreSQL specific)
