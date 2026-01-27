@@ -193,6 +193,20 @@ The layouts should look like they came from a professional design agency."""
         # Initialize filesystem early (needed for image generation)
         self.fs.init_project()
 
+        def serialize_assistant_content(content_blocks):
+            """Serialize assistant content blocks, filtering out web search internals that cause API errors."""
+            serialized = []
+            for block in content_blocks:
+                if block.type in ("server_tool_use", "web_search_tool_result"):
+                    # Skip web search internal blocks — API rejects them on re-send
+                    continue
+                dumped = block.model_dump()
+                # Remove 'caller' field from tool_use blocks (beta artifact)
+                if block.type == "tool_use" and "caller" in dumped:
+                    del dumped["caller"]
+                serialized.append(dumped)
+            return serialized
+
         # Agentic loop - process tool calls until we get save_layouts
         layouts = []
         max_iterations = 15  # More iterations since web search takes extra turns
@@ -241,7 +255,7 @@ The layouts should look like they came from a professional design agency."""
             if response.stop_reason == "end_turn" and not tool_results and not has_web_search:
                 print("[GENERATE_LAYOUTS] End turn without layouts - prompting to continue", flush=True)
                 # Prompt Opus to now create the layouts
-                conversation_messages.append({"role": "assistant", "content": [b.model_dump() for b in response.content]})
+                conversation_messages.append({"role": "assistant", "content": serialize_assistant_content(response.content)})
                 # TODO: Restore for 3 layouts:
                 # conversation_messages.append({"role": "user", "content": "Great! Now that you've studied the inspiration sites, please create the 3 layouts using the save_layouts tool."})
                 conversation_messages.append({"role": "user", "content": "Great! Now please create the 1 layout using the save_layouts tool."})
@@ -258,7 +272,7 @@ The layouts should look like they came from a professional design agency."""
 
             # If we have tool results to send back (image generation)
             if tool_results:
-                conversation_messages.append({"role": "assistant", "content": [b.model_dump() for b in response.content]})
+                conversation_messages.append({"role": "assistant", "content": serialize_assistant_content(response.content)})
                 conversation_messages.append({"role": "user", "content": tool_results})
 
                 response = self.client.beta.messages.create(
