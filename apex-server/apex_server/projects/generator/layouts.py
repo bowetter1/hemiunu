@@ -91,7 +91,9 @@ class LayoutsMixin:
         }
 
         # Build the initial prompt using research markdown as primary context
-        initial_prompt = f"""Create THREE world-class hero section designs, each inspired by a different reference website.
+        # TODO: Restore to THREE layouts when ready
+        # initial_prompt = f"""Create THREE world-class hero section designs, each inspired by a different reference website.
+        initial_prompt = f"""Create ONE world-class hero section design, inspired by the BEST reference website from the research report.
 
 ═══════════════════════════════════════════════════════════════
 RESEARCH REPORT (from our brand researcher):
@@ -120,11 +122,17 @@ PROJECT BRIEF:
 {self.project.brief}
 
 ═══════════════════════════════════════════════════════════════
-YOUR TASK: Create 3 layouts, each inspired by one of the 3 inspiration sites described above.
+YOUR TASK: Create 1 layout, inspired by the BEST inspiration site from the research report above.
 ═══════════════════════════════════════════════════════════════
-Use the DETAILED design analysis from the research report above. Each layout should clearly
+Pick the inspiration site with the best design quality and most relevant style.
+Use the DETAILED design analysis from the research report above. The layout should clearly
 borrow the design style, layout patterns, typography approach, and key elements described
-for its corresponding inspiration site.
+for that inspiration site.
+# TODO: Restore to 3 layouts:
+# YOUR TASK: Create 3 layouts, each inspired by one of the 3 inspiration sites described above.
+# Use the DETAILED design analysis from the research report above. Each layout should clearly
+# borrow the design style, layout patterns, typography approach, and key elements described
+# for its corresponding inspiration site.
 
 You have web_search available as backup if you need to verify something, but the research
 report above should contain everything you need.
@@ -164,10 +172,11 @@ The tool returns a path like "images/hero1.png" - use that in your HTML.
 IMPORTANT: Each layout must:
 ═══════════════════════════════════════════════════════════════
 1. Use the EXACT brand colors above (no variations!)
-2. Be clearly inspired by its reference site's design style
-3. Borrow specific design elements mentioned for each site
+2. Be clearly inspired by the chosen reference site's design style
+3. Borrow specific design elements mentioned for that site
 4. Be a COMPLETE HTML file with all CSS in <style> tag
-5. Be unique and different from the other layouts
+# TODO: Restore for 3 layouts:
+# 5. Be unique and different from the other layouts
 
 The layouts should look like they came from a professional design agency."""
 
@@ -233,7 +242,9 @@ The layouts should look like they came from a professional design agency."""
                 print("[GENERATE_LAYOUTS] End turn without layouts - prompting to continue", flush=True)
                 # Prompt Opus to now create the layouts
                 conversation_messages.append({"role": "assistant", "content": [b.model_dump() for b in response.content]})
-                conversation_messages.append({"role": "user", "content": "Great! Now that you've studied the inspiration sites, please create the 3 layouts using the save_layouts tool."})
+                # TODO: Restore for 3 layouts:
+                # conversation_messages.append({"role": "user", "content": "Great! Now that you've studied the inspiration sites, please create the 3 layouts using the save_layouts tool."})
+                conversation_messages.append({"role": "user", "content": "Great! Now please create the 1 layout using the save_layouts tool."})
 
                 response = self.client.beta.messages.create(
                     model=MODEL_OPUS,
