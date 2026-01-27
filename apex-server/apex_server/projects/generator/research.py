@@ -657,31 +657,23 @@ ANALYSIS:
 
 FORMULATE 3 QUESTIONS to understand what the user wants to build.
 
-If the brand is AMBIGUOUS (e.g., "Forex" could mean different companies):
-  Q1: Which company? (with specific options)
-  Q2: What should the site focus on? (industry-specific options)
-  Q3: What tone/style? (with options)
+Q1 MUST ALWAYS verify the company/website. Include the URL you found.
+  Example: "Is this the right company: Forex Bank (forex.se)?" → "Yes, forex.se", "No, forex.com (trading)", "No, different company"
+  Example: "Is this the right company: Vår Gård (vargard.se)?" → "Yes, vargard.se", "No, different Vår Gård"
 
-If the brand is CLEAR:
-  Q1: What should the website focus on? (industry-specific)
-  Q2: Who is the target audience?
-  Q3: What tone/style should the design have?
+Q2: What should the site focus on? (industry-specific options)
+  Example for a golf club: "What should the website focus on?" → "Tee time booking", "Membership recruitment", "Events & tournaments", "Full club experience"
+  Example for a bank: "Main service to highlight?" → "Currency exchange", "Travel money & cards", "Personal banking", "All services"
 
-EXAMPLES for a golf club:
-  Q1: "What should the website focus on?" → "Tee time booking", "Membership recruitment", "Events & tournaments", "Full club experience"
-  Q2: "Who is the primary audience?" → "Existing members", "New member prospects", "Casual visitors & tourists", "Corporate events"
-  Q3: "What design style fits the club?" → "Classic & prestigious", "Modern & sporty", "Scandinavian minimal", "Warm & welcoming"
-
-EXAMPLES for a bank:
-  Q1: "What's the main service to highlight?" → "Currency exchange", "Travel money & cards", "Personal banking", "All services"
-  Q2: "Target audience?" → "Travelers", "Expats & immigrants", "Business clients", "Everyone"
-  Q3: "Brand personality?" → "Trustworthy & traditional", "Modern & digital-first", "Friendly & accessible", "Premium & exclusive"
+Q3: What design style/tone? (with options)
+  Example: "What design style fits best?" → "Classic & prestigious", "Modern & sporty", "Scandinavian minimal", "Warm & welcoming"
 
 RULES:
+- Q1 MUST always confirm the company with its URL — never skip this
 - Questions must be specific to THIS company/industry
 - Options must be short (max 6 words) and clickable
 - Each question must have 2-4 options
-- The 3 questions together should give us enough context to design the right website"""
+- Write questions in the same language as the user's brief"""
             }]
         )
         self.track_usage(analysis_response)
