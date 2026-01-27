@@ -4,7 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
-from .utils import MODEL_OPUS, fetch_page_content
+from .utils import MODEL_OPUS, MODEL_HAIKU, fetch_page_content
 
 if TYPE_CHECKING:
     from .base import Generator
@@ -56,7 +56,7 @@ class ResearchMixin:
         }
 
         find_site_response = self.client.beta.messages.create(
-            model=MODEL_OPUS,
+            model=MODEL_HAIKU,
             max_tokens=800,
             betas=["web-search-2025-03-05"],
             tools=[web_search_tool],
@@ -127,7 +127,7 @@ Do 1-2 searches to find the official company website."""
                 }
 
                 color_analysis = self.client.messages.create(
-                    model=MODEL_OPUS,
+                    model=MODEL_HAIKU,
                     max_tokens=500,
                     tools=[color_tool],
                     tool_choice={"type": "tool", "name": "identify_brand_colors"},
@@ -188,7 +188,7 @@ Pick colors that feel like THIS SPECIFIC BRAND, not generic web colors."""
         print("[STEP 3] Searching for real inspiration websites...", flush=True)
 
         inspiration_search_response = self.client.beta.messages.create(
-            model=MODEL_OPUS,
+            model=MODEL_HAIKU,
             max_tokens=1500,
             betas=["web-search-2025-03-05"],
             tools=[{
@@ -328,7 +328,7 @@ Search now."""
         company_url_str = company_urls[0]["url"] if company_urls else "unknown"
 
         research_response = self.client.messages.create(
-            model=MODEL_OPUS,
+            model=MODEL_HAIKU,
             max_tokens=8000,
             tools=[save_research_tool],
             messages=[{
@@ -458,7 +458,7 @@ After writing the markdown, call the save_research_metadata tool with fonts + th
             }
 
             color_response = self.client.messages.create(
-                model=MODEL_OPUS,
+                model=MODEL_HAIKU,
                 max_tokens=500,
                 tools=[color_tool],
                 tool_choice={"type": "tool", "name": "create_colors"},
@@ -552,7 +552,7 @@ Create colors that:
 
         # First, do a broad search
         search_response = self.client.beta.messages.create(
-            model=MODEL_OPUS,
+            model=MODEL_HAIKU,
             max_tokens=1000,
             betas=["web-search-2025-03-05"],
             tools=[web_search_tool],
@@ -635,7 +635,7 @@ Search now."""
         }
 
         analysis_response = self.client.messages.create(
-            model=MODEL_OPUS,
+            model=MODEL_HAIKU,
             max_tokens=800,
             tools=[clarify_tool],
             tool_choice={"type": "tool", "name": "clarification_questions"},

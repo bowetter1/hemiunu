@@ -4,6 +4,7 @@ from .base import Generator
 from .utils import (
     MODEL_OPUS,
     MODEL_SONNET,
+    MODEL_HAIKU,
     MODEL_DEFAULT,
     MODEL_QUALITY,
     with_retry,
@@ -17,6 +18,7 @@ __all__ = [
     "CodeProjectMixin",
     "MODEL_OPUS",
     "MODEL_SONNET",
+    "MODEL_HAIKU",
     "MODEL_DEFAULT",
     "MODEL_QUALITY",
     "with_retry",
