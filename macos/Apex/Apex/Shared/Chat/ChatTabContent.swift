@@ -12,8 +12,10 @@ struct ChatTabContent: View {
     @State private var globalMessages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var isLoading = false
-    @State private var clarificationQuestion: String?
-    @State private var clarificationOptions: [String] = []
+
+    // Multi-question clarification state
+    @State private var clarificationQuestions: [ClarificationQuestion] = []
+    @State private var clarificationAnswers: [String] = []  // answers collected so far
 
     private var selectedPage: Page? {
         if let pageId = selectedPageId {
@@ -40,14 +42,21 @@ struct ChatTabContent: View {
         }
     }
 
+    /// The current question index (how many have been answered)
+    private var currentQuestionIndex: Int {
+        clarificationAnswers.count
+    }
+
+    /// The current question to show, if any
+    private var currentQuestion: ClarificationQuestion? {
+        guard currentQuestionIndex < clarificationQuestions.count else { return nil }
+        return clarificationQuestions[currentQuestionIndex]
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Messages
             messagesView
-
             Divider()
-
-            // Input
             chatInput
         }
         .onChange(of: client.currentProject?.id) { _, _ in
@@ -64,16 +73,24 @@ struct ChatTabContent: View {
     private func checkForClarification() {
         guard let project = client.currentProject,
               project.status == .clarification,
-              let clarification = project.clarification,
-              let question = clarification.question,
-              let options = clarification.options,
-              !options.isEmpty else {
-            return
-        }
-        clarificationQuestion = question
-        clarificationOptions = options
-    }
+              let clarification = project.clarification else { return }
 
+        // New multi-question format
+        if let questions = clarification.questions, !questions.isEmpty {
+            if clarificationQuestions.isEmpty {
+                clarificationQuestions = questions
+                clarificationAnswers = []
+            }
+        }
+        // Legacy single-question fallback
+        else if let question = clarification.question,
+                let options = clarification.options, !options.isEmpty {
+            if clarificationQuestions.isEmpty {
+                clarificationQuestions = [ClarificationQuestion(question: question, options: options)]
+                clarificationAnswers = []
+            }
+        }
+    }
 
     private var messagesView: some View {
         ScrollViewReader { proxy in
@@ -88,8 +105,13 @@ struct ChatTabContent: View {
                             .id(message.id)
                     }
 
-                    if let question = clarificationQuestion, !clarificationOptions.isEmpty {
-                        clarificationView(question: question, options: clarificationOptions)
+                    // Show current question if we have unanswered ones
+                    if let question = currentQuestion {
+                        multiQuestionView(
+                            question: question,
+                            index: currentQuestionIndex,
+                            total: clarificationQuestions.count
+                        )
                     }
 
                     if isLoading {
@@ -142,18 +164,30 @@ struct ChatTabContent: View {
         .cornerRadius(10)
     }
 
-    private func clarificationView(question: String, options: [String]) -> some View {
+    private func multiQuestionView(question: ClarificationQuestion, index: Int, total: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(question)
-                .font(.system(size: 12))
-                .foregroundColor(.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color(nsColor: .windowBackgroundColor))
-                .cornerRadius(10)
+            // Question counter + text
+            HStack(spacing: 6) {
+                Text("\(index + 1)/\(total)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue)
+                    .cornerRadius(4)
 
-            ForEach(options, id: \.self) { option in
-                Button(action: { selectClarificationOption(option) }) {
+                Text(question.question)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .cornerRadius(10)
+
+            // Options as buttons
+            ForEach(question.options, id: \.self) { option in
+                Button(action: { answerQuestion(option) }) {
                     Text(option)
                         .font(.system(size: 12))
                         .foregroundColor(.blue)
@@ -191,6 +225,9 @@ struct ChatTabContent: View {
     private var placeholderText: String {
         if let project = client.currentProject {
             if project.status == .clarification {
+                if currentQuestion != nil {
+                    return "Or type your own answer..."
+                }
                 return "Type your answer..."
             } else if !client.pages.isEmpty {
                 if let page = selectedPage {
@@ -206,11 +243,71 @@ struct ChatTabContent: View {
 
     // MARK: - Actions
 
+    private func answerQuestion(_ option: String) {
+        // Show user's choice as a chat message
+        let userMessage = ChatMessage(role: .user, content: option, timestamp: Date())
+        addMessage(userMessage)
+
+        // Record the answer
+        clarificationAnswers.append(option)
+
+        // Check if all questions answered
+        if clarificationAnswers.count >= clarificationQuestions.count {
+            submitAllAnswers()
+        }
+    }
+
+    private func submitAllAnswers() {
+        guard let projectId = client.currentProject?.id else { return }
+
+        // Combine answers into a structured string for the research phase
+        var combined = ""
+        for i in 0..<min(clarificationQuestions.count, clarificationAnswers.count) {
+            let q = clarificationQuestions[i].question
+            let a = clarificationAnswers[i]
+            combined += "\(q) → \(a)\n"
+        }
+
+        clarificationQuestions = []
+        clarificationAnswers = []
+        isLoading = true
+
+        Task {
+            do {
+                let _ = try await client.clarifyProject(projectId: projectId, answer: combined.trimmingCharacters(in: .whitespacesAndNewlines))
+                await MainActor.run {
+                    let response = ChatMessage(
+                        role: .assistant,
+                        content: "Got it! Starting brand research...",
+                        timestamp: Date()
+                    )
+                    addMessage(response)
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    let response = ChatMessage(
+                        role: .assistant,
+                        content: "Error: \(error.localizedDescription)",
+                        timestamp: Date()
+                    )
+                    addMessage(response)
+                }
+            }
+        }
+    }
+
     private func sendMessage() {
         guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
 
         let text = inputText
         inputText = ""
+
+        // If we're in the middle of answering questions, treat typed input as answer
+        if currentQuestion != nil {
+            answerQuestion(text)
+            return
+        }
 
         let userMessage = ChatMessage(role: .user, content: text, timestamp: Date())
         addMessage(userMessage)
@@ -218,7 +315,8 @@ struct ChatTabContent: View {
 
         if let project = client.currentProject {
             if project.status == .clarification {
-                selectClarificationOption(text)
+                // Fallback: submit typed answer directly
+                submitTypedClarification(text)
             } else if !client.pages.isEmpty {
                 editPage(instruction: text)
             } else {
@@ -231,6 +329,37 @@ struct ChatTabContent: View {
         }
     }
 
+    private func submitTypedClarification(_ text: String) {
+        guard let projectId = client.currentProject?.id else { return }
+
+        clarificationQuestions = []
+        clarificationAnswers = []
+
+        Task {
+            do {
+                let _ = try await client.clarifyProject(projectId: projectId, answer: text)
+                await MainActor.run {
+                    let response = ChatMessage(
+                        role: .assistant,
+                        content: "Got it! Starting brand research...",
+                        timestamp: Date()
+                    )
+                    addMessage(response)
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    let response = ChatMessage(
+                        role: .assistant,
+                        content: "Error: \(error.localizedDescription)",
+                        timestamp: Date()
+                    )
+                    addMessage(response)
+                }
+            }
+        }
+    }
+
     private func createProject(brief: String) {
         Task {
             do {
@@ -240,7 +369,7 @@ struct ChatTabContent: View {
                     onProjectCreated?(project.id)
                     let response = ChatMessage(
                         role: .assistant,
-                        content: "Creating your website. First, I'll generate moodboard options...",
+                        content: "Searching for your brand...",
                         timestamp: Date()
                     )
                     addMessage(response)
@@ -302,62 +431,29 @@ struct ChatTabContent: View {
         }
     }
 
-    private func selectClarificationOption(_ option: String) {
-        guard let projectId = client.currentProject?.id else { return }
-
-        let userMessage = ChatMessage(role: .user, content: option, timestamp: Date())
-        addMessage(userMessage)
-
-        clarificationQuestion = nil
-        clarificationOptions = []
-        isLoading = true
-
-        Task {
-            do {
-                let _ = try await client.clarifyProject(projectId: projectId, answer: option)
-                await MainActor.run {
-                    let response = ChatMessage(
-                        role: .assistant,
-                        content: "Got it! Searching for \(option) brand info...",
-                        timestamp: Date()
-                    )
-                    addMessage(response)
-                }
-            } catch {
-                await MainActor.run {
-                    isLoading = false
-                    let response = ChatMessage(
-                        role: .assistant,
-                        content: "Error: \(error.localizedDescription)",
-                        timestamp: Date()
-                    )
-                    addMessage(response)
-                }
-            }
-        }
-    }
+    // MARK: - WebSocket
 
     private func handleWebSocketEvent(_ event: WebSocketEvent?) {
         guard let event = event else { return }
 
         switch event {
-        case .clarificationNeeded(let question, let options):
+        case .clarificationNeeded(let questions):
             isLoading = false
-            clarificationQuestion = question
-            clarificationOptions = options
+            clarificationQuestions = questions
+            clarificationAnswers = []
             let response = ChatMessage(
                 role: .assistant,
-                content: "I need some clarification:",
+                content: "Before I start, I have a few questions:",
                 timestamp: Date()
             )
             addMessage(response)
 
         case .moodboardReady:
-            clarificationQuestion = nil
-            clarificationOptions = []
+            clarificationQuestions = []
+            clarificationAnswers = []
             let response = ChatMessage(
                 role: .assistant,
-                content: "Created 3 moodboard options. Select one to continue.",
+                content: "Research complete! Check the main area for the brand report.",
                 timestamp: Date()
             )
             addMessage(response)

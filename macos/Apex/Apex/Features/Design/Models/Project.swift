@@ -11,8 +11,17 @@ enum ProjectStatus: String, Codable {
     case failed = "failed"
 }
 
+/// A single clarification question with options
+struct ClarificationQuestion: Codable, Equatable {
+    let question: String
+    let options: [String]
+}
+
 /// Clarification data when status is .clarification
 struct Clarification: Codable {
+    // New multi-question format
+    let questions: [ClarificationQuestion]?
+    // Legacy single-question format (backward compat)
     let question: String?
     let options: [String]?
     let answer: String?

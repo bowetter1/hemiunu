@@ -7,7 +7,7 @@ enum WebSocketEvent: Equatable {
     case layoutsReady(count: Int)
     case statusChanged(status: String)
     case pageUpdated(pageId: String)
-    case clarificationNeeded(question: String, options: [String])
+    case clarificationNeeded(questions: [ClarificationQuestion])
     case error(message: String)
     case connected
     case disconnected
@@ -191,11 +191,16 @@ class WebSocketManager: ObservableObject {
             return
         }
 
+        print("[WS] Raw message: \(text.prefix(200))")
+
         guard let data = text.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let event = json["event"] as? String else {
+            print("[WS] Failed to parse message as JSON with 'event' key")
             return
         }
+
+        print("[WS] Parsed event: \(event)")
 
         let eventData = json["data"] as? [String: Any] ?? [:]
 
@@ -221,9 +226,22 @@ class WebSocketManager: ObservableObject {
                 self?.lastEvent = .error(message: message)
 
             case "clarification_needed":
-                let question = eventData["question"] as? String ?? "Please clarify"
-                let options = eventData["options"] as? [String] ?? []
-                self?.lastEvent = .clarificationNeeded(question: question, options: options)
+                // New format: array of questions
+                if let rawQuestions = eventData["questions"] as? [[String: Any]] {
+                    let questions = rawQuestions.compactMap { q -> ClarificationQuestion? in
+                        guard let question = q["question"] as? String,
+                              let options = q["options"] as? [String] else { return nil }
+                        return ClarificationQuestion(question: question, options: options)
+                    }
+                    self?.lastEvent = .clarificationNeeded(questions: questions)
+                } else {
+                    // Legacy single-question fallback
+                    let question = eventData["question"] as? String ?? "Please clarify"
+                    let options = eventData["options"] as? [String] ?? []
+                    self?.lastEvent = .clarificationNeeded(questions: [
+                        ClarificationQuestion(question: question, options: options)
+                    ])
+                }
 
             default:
                 break

@@ -590,48 +590,58 @@ Search now."""
 
         print(f"[TIMING] Phase 1 search: {time.time() - search_start:.1f}s", flush=True)
 
-        # Now ask Opus to formulate a clarification question.
-        # ALWAYS ask — either about brand ambiguity OR about project scope.
+        # Now ask Opus to formulate 3 clarification questions.
+        # ALWAYS ask — to understand what the user wants before building.
         analysis_start = time.time()
         clarify_tool = {
-            "name": "clarification_question",
-            "description": "Formulate a question to ask the user before we start designing",
+            "name": "clarification_questions",
+            "description": "Formulate 3 questions to ask the user before we start designing",
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "question_type": {
-                        "type": "string",
-                        "enum": ["brand", "project"],
-                        "description": "'brand' if the company is ambiguous, 'project' if the brand is clear but we need to understand what to build"
-                    },
                     "identified_brand": {
                         "type": "string",
                         "description": "The brand/company identified from search results"
                     },
-                    "question": {
-                        "type": "string",
-                        "description": "The question to ask the user"
+                    "brand_is_ambiguous": {
+                        "type": "boolean",
+                        "description": "True if the brand/company is unclear and Q1 should ask about that"
                     },
-                    "options": {
+                    "questions": {
                         "type": "array",
-                        "items": {"type": "string"},
-                        "minItems": 2,
-                        "maxItems": 4,
-                        "description": "2-4 options for the user to choose from"
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "question": {
+                                    "type": "string",
+                                    "description": "The question to ask"
+                                },
+                                "options": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "minItems": 2,
+                                    "maxItems": 4,
+                                    "description": "2-4 clickable options (short, max 6 words each)"
+                                }
+                            },
+                            "required": ["question", "options"]
+                        }
                     }
                 },
-                "required": ["question_type", "identified_brand", "question", "options"]
+                "required": ["identified_brand", "brand_is_ambiguous", "questions"]
             }
         }
 
         analysis_response = self.client.messages.create(
             model=MODEL_OPUS,
-            max_tokens=600,
+            max_tokens=800,
             tools=[clarify_tool],
-            tool_choice={"type": "tool", "name": "clarification_question"},
+            tool_choice={"type": "tool", "name": "clarification_questions"},
             messages=[{
                 "role": "user",
-                "content": f"""Analyze these search results and formulate ONE question for the user.
+                "content": f"""Analyze these search results and formulate exactly 3 questions for the user.
 
 PROJECT BRIEF: "{self.project.brief}"
 
@@ -641,41 +651,53 @@ SEARCH RESULTS FOUND:
 ANALYSIS:
 {chr(10).join(search_results_text)}
 
-YOU MUST ALWAYS ASK A QUESTION. Pick the most important one:
+FORMULATE 3 QUESTIONS to understand what the user wants to build.
 
-OPTION A — Brand is AMBIGUOUS (e.g., "Forex" could be forex.se or forex trading):
-→ Ask which company they mean. Provide 2-4 specific options.
+If the brand is AMBIGUOUS (e.g., "Forex" could mean different companies):
+  Q1: Which company? (with specific options)
+  Q2: What should the site focus on? (industry-specific options)
+  Q3: What tone/style? (with options)
 
-OPTION B — Brand is CLEAR (e.g., search found their official website):
-→ Ask about the PROJECT SCOPE. What kind of website do they want?
-→ Think about what matters most for THIS specific company/industry.
+If the brand is CLEAR:
+  Q1: What should the website focus on? (industry-specific)
+  Q2: Who is the target audience?
+  Q3: What tone/style should the design have?
 
-Examples of good project-scope questions:
-- Golf club → "What should the website focus on?" → "Tee time booking & green fees", "Membership recruitment", "Tournament & events calendar", "Full club experience (all of the above)"
-- Restaurant → "What's the primary goal?" → "Online reservations", "Showcase menu & atmosphere", "Catering & events", "Full restaurant site"
-- SaaS company → "What type of page?" → "Product landing page", "Full marketing site with pricing", "Documentation & developer portal"
-- Bank → "What's the main purpose?" → "Personal banking services", "Business/corporate banking", "Currency exchange & travel money", "All services overview"
+EXAMPLES for a golf club:
+  Q1: "What should the website focus on?" → "Tee time booking", "Membership recruitment", "Events & tournaments", "Full club experience"
+  Q2: "Who is the primary audience?" → "Existing members", "New member prospects", "Casual visitors & tourists", "Corporate events"
+  Q3: "What design style fits the club?" → "Classic & prestigious", "Modern & sporty", "Scandinavian minimal", "Warm & welcoming"
 
-The question should help us understand what to prioritize in the design.
-Keep options short (max 6 words each) and specific to this company."""
+EXAMPLES for a bank:
+  Q1: "What's the main service to highlight?" → "Currency exchange", "Travel money & cards", "Personal banking", "All services"
+  Q2: "Target audience?" → "Travelers", "Expats & immigrants", "Business clients", "Everyone"
+  Q3: "Brand personality?" → "Trustworthy & traditional", "Modern & digital-first", "Friendly & accessible", "Premium & exclusive"
+
+RULES:
+- Questions must be specific to THIS company/industry
+- Options must be short (max 6 words) and clickable
+- Each question must have 2-4 options
+- The 3 questions together should give us enough context to design the right website"""
             }]
         )
         self.track_usage(analysis_response)
 
         print(f"[TIMING] Phase 1 analysis: {time.time() - analysis_start:.1f}s", flush=True)
 
-        # Extract decision — always ask
+        # Extract questions — always ask
         for block in analysis_response.content:
-            if block.type == "tool_use" and block.name == "clarification_question":
+            if block.type == "tool_use" and block.name == "clarification_questions":
                 decision = block.input
-                print(f"[PHASE 1] Question: {decision}", flush=True)
+                questions = decision.get("questions", [])
+                print(f"[PHASE 1] Brand: {decision.get('identified_brand')}", flush=True)
+                for i, q in enumerate(questions):
+                    print(f"[PHASE 1] Q{i+1}: {q.get('question')} → {q.get('options')}", flush=True)
                 print(f"[TIMING] TOTAL Phase 1: {time.time() - phase1_start:.1f}s", flush=True)
 
                 self.project.clarification = {
-                    "question": decision.get("question", "What kind of website do you want?"),
-                    "options": decision.get("options", []),
-                    "question_type": decision.get("question_type", "project"),
+                    "questions": questions,
                     "identified_brand": decision.get("identified_brand", ""),
+                    "brand_is_ambiguous": decision.get("brand_is_ambiguous", False),
                     "initial_research": {
                         "urls_found": urls_found,
                         "analysis": search_results_text
@@ -684,18 +706,21 @@ Keep options short (max 6 words each) and specific to this company."""
                 self.project.status = ProjectStatus.CLARIFICATION
                 self.db.commit()
 
-                self.log("research", f"Asking user: {decision.get('question')}")
+                self.log("research", f"Asking user 3 questions about {decision.get('identified_brand')}")
                 return {
                     "needs_clarification": True,
-                    "question": decision.get("question"),
-                    "options": decision.get("options", [])
+                    "questions": questions
                 }
 
-        # Fallback — ask a generic question
+        # Fallback — ask 3 generic questions
+        fallback_questions = [
+            {"question": "What type of website?", "options": ["Landing page", "Full marketing site", "Web application", "Portfolio"]},
+            {"question": "Primary audience?", "options": ["Consumers", "Businesses", "Both"]},
+            {"question": "Design style?", "options": ["Modern & minimal", "Bold & colorful", "Classic & professional", "Warm & friendly"]}
+        ]
         self.project.clarification = {
-            "question": "What type of website do you want?",
-            "options": ["Landing page", "Full marketing site", "Web application", "Portfolio / showcase"],
-            "question_type": "project",
+            "questions": fallback_questions,
+            "identified_brand": "",
             "initial_research": {
                 "urls_found": urls_found,
                 "analysis": search_results_text
@@ -705,6 +730,5 @@ Keep options short (max 6 words each) and specific to this company."""
         self.db.commit()
         return {
             "needs_clarification": True,
-            "question": "What type of website do you want?",
-            "options": ["Landing page", "Full marketing site", "Web application", "Portfolio / showcase"]
+            "questions": fallback_questions
         }

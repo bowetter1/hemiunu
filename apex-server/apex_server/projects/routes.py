@@ -254,11 +254,10 @@ def create_project(
                 result = gen.search_and_clarify()
                 print(f"[PHASE1] search_and_clarify result: {result}", flush=True)
 
-                # Always asks a question (brand or project scope)
+                # Always asks 3 questions (brand/scope/style)
                 notify_from_thread(notify_clarification_needed(
                     str(project_id),
-                    result.get("question", ""),
-                    result.get("options", [])
+                    result.get("questions", [])
                 ))
         except Exception as e:
             print(f"[ERROR] Phase 1 failed: {e}", flush=True)
