@@ -1,10 +1,20 @@
 """
 Apex Server - AI Design Tool Backend
 """
+import logging
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+
+# Configure logging to stdout for Railway
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("apex")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -23,9 +33,9 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Startup
-    print("Starting Apex Server...")
+    logger.info("Starting Apex Server...")
     init_db()
-    print("Database initialized")
+    logger.info("Database initialized")
     try:
         from apex_server.auth import firebase as firebase_auth
         if not firebase_auth._ensure_initialized():
@@ -46,7 +56,7 @@ async def lifespan(app: FastAPI):
     if settings.telegram_enabled:
         from apex_server.integrations.telegram import telegram_bot
         await telegram_bot.stop()
-    print("Shutting down...")
+    logger.info("Shutting down...")
 
 
 app = FastAPI(
@@ -73,10 +83,12 @@ app.include_router(projects_router, prefix="/api/v1")
 @app.get("/health")
 def health():
     """Health check endpoint"""
+    logger.info("Health check called")
     return {
         "status": "ok",
         "version": "0.1.0",
-        "storage": settings.storage_path
+        "storage": settings.storage_path,
+        "telegram_enabled": settings.telegram_enabled
     }
 
 
