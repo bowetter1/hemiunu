@@ -192,3 +192,24 @@ def reject_user(user_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends
     user.status = "rejected"
     db.commit()
     return {"status": "rejected"}
+
+
+# --- Telegram linking ---
+
+
+class TelegramLinkCodeResponse(BaseModel):
+    code: str
+    expires_in: int = 300  # seconds
+
+
+@router.post("/telegram-link-code", response_model=TelegramLinkCodeResponse)
+def get_telegram_link_code(current_user=Depends(get_current_user)):
+    """Generate a 6-digit code for linking Telegram account.
+
+    The code is valid for 5 minutes. User enters this code in the
+    Telegram bot with /link <code> to connect their account.
+    """
+    from apex_server.integrations.telegram_auth import generate_link_code
+
+    code = generate_link_code(current_user.id)
+    return TelegramLinkCodeResponse(code=code)

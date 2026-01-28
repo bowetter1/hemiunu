@@ -17,7 +17,7 @@ from apex_server.config import get_settings
 from apex_server.shared.database import SessionLocal
 from apex_server.auth.models import User
 from apex_server.projects.models import Project, Page, ProjectStatus
-from apex_server.integrations.telegram_auth import link_telegram, get_user_by_chat_id
+from apex_server.integrations.telegram_auth import verify_link_code, get_user_by_chat_id
 
 settings = get_settings()
 
@@ -75,40 +75,60 @@ class TelegramBot:
 
     async def cmd_start(self, update: Update, context):
         """Handle /start — welcome message."""
-        await update.message.reply_text(
-            "Hej! Jag är Apex-boten.\n\n"
-            "Koppla ditt konto:\n"
-            "/link <din-jwt-token>\n\n"
-            "Kopiera token från Apex-appen (Inställningar → API Token)."
-        )
-
-    async def cmd_link(self, update: Update, context):
-        """Handle /link <token> — link Telegram chat to Apex user."""
-        if not context.args:
-            await update.message.reply_text("Ange din token: /link <jwt-token>")
-            return
-
-        token = context.args[0]
-        chat_id = str(update.effective_chat.id)
-        user = link_telegram(token, chat_id)
-
+        # Check if already linked
+        user = get_user_by_chat_id(str(update.effective_chat.id))
         if user:
             await update.message.reply_text(
-                f"Kopplat! Du är inloggad som {user.name} ({user.email}).\n\n"
+                f"Välkommen tillbaka, {user.name}!\n\n"
                 "Kommandon:\n"
                 "/projects — Lista projekt\n"
-                "/select <namn> — Välj aktivt projekt\n"
+                "/select <nr> — Välj aktivt projekt\n"
                 "/status — Visa status\n\n"
                 "Eller skriv en brief för att starta ett nytt projekt."
             )
         else:
-            await update.message.reply_text("Ogiltig eller utgången token. Försök igen.")
+            await update.message.reply_text(
+                "Hej! Jag är Apex-boten.\n\n"
+                "För att koppla ditt konto:\n"
+                "1. Öppna Apex-appen\n"
+                "2. Gå till Inställningar → Telegram\n"
+                "3. Skriv den 6-siffriga koden här\n\n"
+                "Exempel: /link 482619"
+            )
+
+    async def cmd_link(self, update: Update, context):
+        """Handle /link <code> — link Telegram chat to Apex user via 6-digit code."""
+        if not context.args:
+            await update.message.reply_text(
+                "Ange din 6-siffriga kod från Apex-appen:\n"
+                "/link 482619"
+            )
+            return
+
+        code = context.args[0].strip()
+        chat_id = str(update.effective_chat.id)
+        user = verify_link_code(code, chat_id)
+
+        if user:
+            await update.message.reply_text(
+                f"✅ Kopplat! Du är inloggad som {user.name} ({user.email}).\n\n"
+                "Kommandon:\n"
+                "/projects — Lista projekt\n"
+                "/select <nr> — Välj aktivt projekt\n"
+                "/status — Visa status\n\n"
+                "Eller skriv en brief för att starta ett nytt projekt."
+            )
+        else:
+            await update.message.reply_text(
+                "❌ Ogiltig eller utgången kod.\n\n"
+                "Generera en ny kod i Apex-appen (Inställningar → Telegram)."
+            )
 
     async def cmd_projects(self, update: Update, context):
         """Handle /projects — list user's projects."""
         user = get_user_by_chat_id(str(update.effective_chat.id))
         if not user:
-            await update.message.reply_text("Du är inte kopplad. Använd /link <token> först.")
+            await update.message.reply_text("Du är inte kopplad. Använd /link <kod> först.")
             return
 
         db = SessionLocal()
@@ -167,7 +187,7 @@ class TelegramBot:
         """Handle /status — show active project status."""
         user = get_user_by_chat_id(str(update.effective_chat.id))
         if not user:
-            await update.message.reply_text("Du är inte kopplad. Använd /link <token> först.")
+            await update.message.reply_text("Du är inte kopplad. Använd /link <kod> först.")
             return
 
         project_id = context.user_data.get("active_project")
@@ -210,13 +230,30 @@ class TelegramBot:
     # ------------------------------------------------------------------
 
     async def handle_message(self, update: Update, context):
-        """Handle free text — create new project or edit active project."""
-        user = get_user_by_chat_id(str(update.effective_chat.id))
+        """Handle free text — create new project, edit active project, or link with code."""
+        text = update.message.text.strip()
+        chat_id = str(update.effective_chat.id)
+
+        # Check if it's a 6-digit code (for linking)
+        if text.isdigit() and len(text) == 6:
+            user = verify_link_code(text, chat_id)
+            if user:
+                await update.message.reply_text(
+                    f"✅ Kopplat! Du är inloggad som {user.name} ({user.email}).\n\n"
+                    "Skriv en brief för att starta ett nytt projekt!"
+                )
+                return
+            # If code didn't work, fall through to normal handling
+
+        user = get_user_by_chat_id(chat_id)
         if not user:
-            await update.message.reply_text("Du är inte kopplad. Använd /link <token> först.")
+            await update.message.reply_text(
+                "Du är inte kopplad än.\n\n"
+                "Hämta en 6-siffrig kod i Apex-appen och skriv den här,\n"
+                "eller använd /link <kod>"
+            )
             return
 
-        text = update.message.text.strip()
         active_project = context.user_data.get("active_project")
 
         if active_project:
