@@ -199,7 +199,7 @@ struct TelegramLinkSheet: View {
 
         Task {
             do {
-                let response = try await client.authService.getTelegramLinkCode()
+                let response = try await client.auth.getTelegramLinkCode()
                 await MainActor.run {
                     linkCode = response.code
                     isLoading = false
