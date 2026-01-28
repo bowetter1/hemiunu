@@ -197,4 +197,22 @@ struct AuthService {
         try? Auth.auth().signOut()
         client.authToken = nil
     }
+
+    // MARK: - Telegram Linking
+
+    struct TelegramLinkCodeResponse: Codable {
+        let code: String
+        let expires_in: Int
+    }
+
+    /// Get a 6-digit code for linking Telegram account (valid 5 minutes)
+    func getTelegramLinkCode() async throws -> TelegramLinkCodeResponse {
+        let url = client.baseURL.appendingPathComponent("/api/v1/auth/telegram-link-code")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(client.authToken ?? "")", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await NetworkSession.standard.data(for: request)
+        return try client.decodeResponse(TelegramLinkCodeResponse.self, data: data, response: response)
+    }
 }

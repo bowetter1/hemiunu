@@ -112,7 +112,7 @@ struct ToolsPanel: View {
                         DatabaseToolCard()
 
                         // Settings
-                        SettingsToolCard()
+                        SettingsToolCard(appState: appState)
                     }
                     .padding(12)
                 }
