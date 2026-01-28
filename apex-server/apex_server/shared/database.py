@@ -139,6 +139,8 @@ def _run_migrations():
     migrations = [
         # Add selected_moodboard to projects table
         ("projects", "selected_moodboard", "ALTER TABLE projects ADD COLUMN selected_moodboard INTEGER"),
+        # Add image_source to projects table (ai/stock/existing_site)
+        ("projects", "image_source", "ALTER TABLE projects ADD COLUMN image_source VARCHAR(20) DEFAULT 'ai'"),
         # Add clarification JSON column for two-phase flow
         ("projects", "clarification", "ALTER TABLE projects ADD COLUMN clarification JSON"),
         # Add current_version to pages table for version history
@@ -149,6 +151,12 @@ def _run_migrations():
         ("pages", "parent_page_id", "ALTER TABLE pages ADD COLUMN parent_page_id VARCHAR(36) REFERENCES pages(id) ON DELETE CASCADE"),
         # Add research_md to projects table for markdown research report
         ("projects", "research_md", "ALTER TABLE projects ADD COLUMN research_md TEXT"),
+        # Add firebase_uid to users table for Firebase auth
+        ("users", "firebase_uid", "ALTER TABLE users ADD COLUMN firebase_uid VARCHAR(128) UNIQUE"),
+        # Add status to users table for admin approval flow
+        ("users", "status", "ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'approved'"),
+        # Add telegram_chat_id to users table for Telegram bot linking
+        ("users", "telegram_chat_id", "ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR(50)"),
     ]
 
     # Add new enum values (PostgreSQL specific)

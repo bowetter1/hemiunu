@@ -60,6 +60,7 @@ class AppState: ObservableObject {
     // MARK: - Auth
 
     @Published var isConnected: Bool = false
+    @Published var isPendingApproval: Bool = false
     @Published var errorMessage: String?
 
     // MARK: - Selection
@@ -93,16 +94,44 @@ class AppState: ObservableObject {
     // MARK: - Auth
 
     func connect() async {
+        // Try to restore existing Firebase session
+        if client.auth.isSignedIn {
+            do {
+                _ = try await client.auth.refreshToken()
+            } catch {
+                return // Token refresh failed — show LoginView
+            }
+            await didSignIn()
+        }
+        // Otherwise: show LoginView (no auto-connect)
+    }
+
+    /// Called after a successful Google Sign-In
+    func didSignIn() async {
         do {
-            _ = try await client.auth.getDevToken()
             isConnected = true
             errorMessage = nil
+            isPendingApproval = false
 
-            // Fetch existing projects
             let fetchedProjects = try await client.projectService.list()
             projects = fetchedProjects
+        } catch let error as APIClient.APIError {
+            if case .server(let status, _) = error, status == 403 {
+                isPendingApproval = true
+                isConnected = false
+            } else {
+                errorMessage = error.localizedDescription
+                isConnected = false
+            }
+#if DEBUG
+            print("[Auth] didSignIn() failed: \(error.localizedDescription)")
+#endif
         } catch {
-            errorMessage = "Cannot connect"
+            errorMessage = error.localizedDescription
+            isConnected = false
+#if DEBUG
+            print("[Auth] didSignIn() failed: \(error.localizedDescription)")
+#endif
         }
     }
 

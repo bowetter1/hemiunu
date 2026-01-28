@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     data_dir: str = "/data"
 
     # Auth
+    firebase_credentials_json: str = ""  # Service account JSON string
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 1 week
@@ -36,6 +37,10 @@ class Settings(BaseSettings):
     # Qdrant (for Mem0)
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
+
+    # Telegram
+    telegram_bot_token: str = ""
+    telegram_enabled: bool = False
 
     class Config:
         env_file = ".env"

@@ -10,6 +10,7 @@ struct Topbar: View {
     let hasProject: Bool
     let logs: [LogEntry]
     var onNewProject: (() -> Void)? = nil
+    var onLogout: (() -> Void)? = nil
     var showModeSelector: Bool = true
     var inlineTrafficLights: Bool = false
 
@@ -76,6 +77,13 @@ struct Topbar: View {
             Capsule()
                 .fill(Color.primary.opacity(0.1))
                 .frame(width: 1, height: 16)
+
+            if isConnected {
+                IconButton(icon: "rectangle.portrait.and.arrow.right", size: iconSize) {
+                    onLogout?()
+                }
+                .help("Log out")
+            }
 
             // Appearance toggle
             IconButton(icon: appearanceIcon, size: iconSize) {

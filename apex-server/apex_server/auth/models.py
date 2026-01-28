@@ -18,6 +18,9 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20), default="member")  # admin, member
+    firebase_uid: Mapped[Optional[str]] = mapped_column(String(128), unique=True, nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="approved")  # pending, approved, rejected
+    telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     # Tenant relationship
     tenant_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("tenants.id"))

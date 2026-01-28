@@ -5,7 +5,7 @@ struct ProjectService {
     let client: APIClient
 
     /// Create a new project
-    func create(brief: String) async throws -> Project {
+    func create(brief: String, imageSource: String? = nil) async throws -> Project {
         let url = client.baseURL.appendingPathComponent("/api/v1/projects")
         var request = client.authorizedRequest(url: url)
         request.httpMethod = "POST"
@@ -14,9 +14,15 @@ struct ProjectService {
 
         struct CreateProjectRequest: Codable {
             let brief: String
+            let imageSource: String?
+
+            enum CodingKeys: String, CodingKey {
+                case brief
+                case imageSource = "image_source"
+            }
         }
 
-        request.httpBody = try JSONEncoder().encode(CreateProjectRequest(brief: brief))
+        request.httpBody = try JSONEncoder().encode(CreateProjectRequest(brief: brief, imageSource: imageSource))
         let (data, response) = try await NetworkSession.aiGeneration.data(for: request)
         return try client.decodeResponse(Project.self, data: data, response: response)
     }

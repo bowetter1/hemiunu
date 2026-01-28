@@ -26,10 +26,26 @@ async def lifespan(app: FastAPI):
     print("Starting Apex Server...")
     init_db()
     print("Database initialized")
+    try:
+        from apex_server.auth import firebase as firebase_auth
+        if not firebase_auth._ensure_initialized():
+            print("Firebase Admin not initialized at startup", flush=True)
+    except Exception as e:
+        print(f"Firebase Admin startup check failed: {e}", flush=True)
     # Store main event loop for background thread notifications
     set_main_loop()
+
+    # Start Telegram bot if enabled
+    if settings.telegram_enabled:
+        from apex_server.integrations.telegram import telegram_bot
+        await telegram_bot.start()
+
     yield
+
     # Shutdown
+    if settings.telegram_enabled:
+        from apex_server.integrations.telegram import telegram_bot
+        await telegram_bot.stop()
     print("Shutting down...")
 
 

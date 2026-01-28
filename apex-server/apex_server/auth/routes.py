@@ -1,13 +1,16 @@
 """Auth routes"""
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from apex_server.shared.database import get_db
 from apex_server.config import get_settings
-from apex_server.shared.dependencies import get_current_user
+from apex_server.shared.dependencies import get_current_user, get_current_admin
 from apex_server.tenants.service import TenantService
 from .service import AuthService
+from .models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -158,3 +161,34 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
     user.password_hash = auth_service.hash_password(request.new_password)
     db.commit()
     return {"status": "ok", "message": "Password updated"}
+
+
+# --- Admin user-approval endpoints ---
+
+
+@router.get("/admin/pending-users")
+def list_pending_users(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """List all users awaiting approval"""
+    return db.query(User).filter(User.status == "pending").all()
+
+
+@router.post("/admin/approve-user/{user_id}")
+def approve_user(user_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """Approve a pending user"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.status = "approved"
+    db.commit()
+    return {"status": "approved"}
+
+
+@router.post("/admin/reject-user/{user_id}")
+def reject_user(user_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """Reject a pending user"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.status = "rejected"
+    db.commit()
+    return {"status": "rejected"}

@@ -76,7 +76,46 @@ def rewrite_asset_urls(html: str, project_id: str, base_url: str) -> str:
 
 @router.websocket("/{project_id}/ws")
 async def websocket_endpoint(websocket: WebSocket, project_id: uuid.UUID):
-    """WebSocket connection for real-time project updates"""
+    """WebSocket connection for real-time project updates (authenticated)"""
+    from apex_server.auth.firebase import verify_firebase_token
+    from apex_server.auth.service import AuthService
+    from apex_server.auth.models import User as UserModel
+    from apex_server.shared.database import SessionLocal
+
+    # Extract token from query param or Authorization header
+    token = websocket.query_params.get("token")
+    if not token:
+        auth_header = websocket.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return
+
+    # Verify token
+    db = SessionLocal()
+    try:
+        user = None
+
+        # Try Firebase first
+        firebase_claims = verify_firebase_token(token)
+        if firebase_claims:
+            uid = firebase_claims["uid"]
+            user = db.query(UserModel).filter(UserModel.firebase_uid == uid).first()
+        else:
+            # Fallback: HS256 dev token
+            auth_service = AuthService(db)
+            payload = auth_service.decode_token(token)
+            if payload:
+                user = auth_service.get_by_id(uuid.UUID(payload["sub"]))
+
+        if not user or user.status != "approved":
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+    finally:
+        db.close()
+
     # Store main loop reference for background thread notifications
     set_main_loop()
 
@@ -96,6 +135,7 @@ async def websocket_endpoint(websocket: WebSocket, project_id: uuid.UUID):
 
 class CreateProjectRequest(BaseModel):
     brief: str
+    image_source: str = "ai"
 
 
 class ProjectResponse(BaseModel):
@@ -219,10 +259,23 @@ def create_project(
     project_id = uuid.uuid4()
     project_dir = str(Path(settings.storage_path) / str(project_id))
 
+    image_source = (request.image_source or "ai").strip().lower()
+    legacy_map = {
+        "existing_site": "img2img",
+        "existing": "existing_images",
+        "from_site": "existing_images",
+        "no_images": "none",
+        "none": "none",
+    }
+    image_source = legacy_map.get(image_source, image_source)
+    if image_source not in {"none", "existing_images", "img2img", "ai", "stock"}:
+        image_source = "ai"
+
     project = Project(
         id=project_id,
         brief=request.brief,
         project_dir=project_dir,
+        image_source=image_source,
         user_id=current_user.id
     )
     db.add(project)

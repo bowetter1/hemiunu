@@ -184,6 +184,36 @@ class ChatViewModel: ObservableObject {
         }
     }
 
+    /// Poll for clarification updates when Phase 1 completes before WebSocket connects.
+    func pollClarificationIfNeeded(selectedPageId: String?, onProjectCreated: ((String) -> Void)?) {
+        guard let project = appState.currentProject else { return }
+        guard project.status != .clarification else {
+            checkForClarification()
+            return
+        }
+        guard clarificationQuestions.isEmpty else { return }
+
+        let projectId = project.id
+        Task {
+            for attempt in 1...3 {
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard let fetched = try? await client.projectService.get(id: projectId) else { continue }
+                await MainActor.run {
+                    appState.currentProject = fetched
+                }
+                if fetched.status == .clarification, fetched.clarification != nil {
+                    await MainActor.run {
+                        checkForClarification()
+                    }
+                    return
+                }
+                #if DEBUG
+                print("[Chat] Clarification poll \(attempt) did not find questions yet")
+                #endif
+            }
+        }
+    }
+
     /// Reset chat state for a new project
     func resetForProject() {
         globalMessages = []

@@ -4,7 +4,8 @@ import re
 import time
 from typing import TYPE_CHECKING
 
-from .utils import MODEL_OPUS, inject_google_fonts
+from .utils import MODEL_SONNET, inject_google_fonts
+from .tool_policy import build_layout_tools, resolve_image_source
 
 if TYPE_CHECKING:
     from .base import Generator
@@ -53,6 +54,27 @@ class LayoutsMixin:
         # Get company images scraped from their website (for img2img)
         company_images = research_data.get("company_images", [])
 
+        image_source, did_fallback = resolve_image_source(self.project.image_source, bool(company_images))
+        if did_fallback:
+            print("[GENERATE_LAYOUTS] No company images found, falling back to AI generation", flush=True)
+        print(f"[GENERATE_LAYOUTS] Image source preference: {image_source}", flush=True)
+
+        # Get existing site analysis (Haiku vision analysis of their current website)
+        existing_site_analysis = research_data.get("existing_site_analysis", "")
+
+        # Build existing site analysis section for prompt
+        existing_site_section = ""
+        if existing_site_analysis:
+            existing_site_section = f"""
+═══════════════════════════════════════════════════════════════
+EXISTING WEBSITE ANALYSIS (their current site):
+═══════════════════════════════════════════════════════════════
+{existing_site_analysis}
+
+Your layout should feel like a PREMIUM UPGRADE of their current site.
+Keep what works. Fix what doesn't. Elevate the overall quality.
+"""
+
         print(f"[GENERATE_LAYOUTS] Research markdown: {len(research_md)} chars", flush=True)
         print(f"[GENERATE_LAYOUTS] Brand colors: {brand_colors}", flush=True)
         print(f"[GENERATE_LAYOUTS] Fonts: {fonts}", flush=True)
@@ -84,30 +106,15 @@ class LayoutsMixin:
             }
         }
 
-        opus_start = time.time()
-        print(f"[GENERATE_LAYOUTS] Calling Opus with research markdown context...", flush=True)
+        model_start = time.time()
+        print(f"[GENERATE_LAYOUTS] Calling Sonnet with research markdown context...", flush=True)
 
-        # Give Opus web search (reduced - backup only), layout tool, AND image generation tool
-        image_tool = self.get_image_tools()[0]
-        # Extend image tool with optional reference_image parameter when company images are available
-        if company_images:
-            image_tool = dict(image_tool)  # shallow copy
-            schema = dict(image_tool["input_schema"])
-            props = dict(schema["properties"])
-            props["reference_image"] = {
-                "type": "string",
-                "description": "Path to a company reference image to use as img2img input (e.g., 'images/company/img_1.jpg'). When provided, the image generation will use the reference as a starting point, producing a result that retains the feel of the original photo."
-            }
-            schema["properties"] = props
-            image_tool["input_schema"] = schema
-
-        stock_photo_tool = self.get_stock_photo_tool()
-
-        web_search_tool = {
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": 2  # Backup only - research markdown has the details
-        }
+        tools_for_layouts = build_layout_tools(
+            generator=self,
+            layout_tool=layout_tool,
+            image_source=image_source,
+            has_company_images=bool(company_images),
+        )
 
         # Build the initial prompt using research markdown as primary context
         # TODO: Restore to THREE layouts when ready
@@ -130,7 +137,7 @@ ACCENT:    {accent_color}  ← Use for: CTA buttons, links, highlights
 
 These are the ACTUAL brand colors from the company's website.
 You MUST use these exact hex codes. Do NOT change them.
-
+{existing_site_section}
 ═══════════════════════════════════════════════════════════════
 TYPOGRAPHY:
 ═══════════════════════════════════════════════════════════════
@@ -184,10 +191,10 @@ DESIGN PRINCIPLES:
 ═══════════════════════════════════════════════════════════════
 IMAGES — YOU ARE THE ART DIRECTOR:
 ═══════════════════════════════════════════════════════════════
-{self._format_image_tools_prompt(company_images)}
+{self._format_image_tools_prompt(company_images, image_source)}
 
 Each tool returns a path like "images/hero1.png" — use that path in your HTML.
-IMPORTANT: Generate only 1 image (the hero). We will add more images later.
+{self._image_usage_note(image_source)}
 
 ═══════════════════════════════════════════════════════════════
 IMPORTANT: Each layout must:
@@ -202,10 +209,10 @@ IMPORTANT: Each layout must:
 The layouts should look like they came from a professional design agency."""
 
         response = self.client.beta.messages.create(
-            model=MODEL_OPUS,
+            model=MODEL_SONNET,
             max_tokens=20000,
             betas=["web-search-2025-03-05"],
-            tools=[web_search_tool, layout_tool, image_tool, stock_photo_tool],
+            tools=tools_for_layouts,
             messages=[{"role": "user", "content": initial_prompt}]
         )
 
@@ -312,10 +319,10 @@ The layouts should look like they came from a professional design agency."""
                 conversation_messages.append({"role": "user", "content": "Great! Now please create the 1 layout using the save_layouts tool."})
 
                 response = self.client.beta.messages.create(
-                    model=MODEL_OPUS,
+                    model=MODEL_SONNET,
                     max_tokens=20000,
                     betas=["web-search-2025-03-05"],
-                    tools=[web_search_tool, layout_tool, image_tool, stock_photo_tool],
+                    tools=tools_for_layouts,
                     messages=conversation_messages
                 )
                 self.track_usage(response)
@@ -327,10 +334,10 @@ The layouts should look like they came from a professional design agency."""
                 conversation_messages.append({"role": "user", "content": tool_results})
 
                 response = self.client.beta.messages.create(
-                    model=MODEL_OPUS,
+                    model=MODEL_SONNET,
                     max_tokens=20000,
                     betas=["web-search-2025-03-05"],
-                    tools=[web_search_tool, layout_tool, image_tool, stock_photo_tool],
+                    tools=tools_for_layouts,
                     messages=conversation_messages
                 )
                 self.track_usage(response)
@@ -341,7 +348,7 @@ The layouts should look like they came from a professional design agency."""
                 print("[GENERATE_LAYOUTS] Unknown tool use, breaking", flush=True)
                 break
 
-        print(f"[TIMING] Opus layout generation: {time.time() - opus_start:.1f}s", flush=True)
+        print(f"[TIMING] Sonnet layout generation: {time.time() - model_start:.1f}s", flush=True)
 
         # Save layouts as pages
         for i, layout in enumerate(layouts, 1):
@@ -387,57 +394,75 @@ The layouts should look like they came from a professional design agency."""
         self.log("layouts", f"Created {len(layouts)} layouts", {"count": len(layouts)})
         return layouts
 
-    def _format_image_tools_prompt(self: "Generator", company_images: list[dict]) -> str:
+    def _format_image_tools_prompt(self: "Generator", company_images: list[dict], image_source: str) -> str:
         """Build the image tools section of the prompt, adapting to available resources."""
-        if company_images:
-            # Three strategies available
-            img_list = "\n".join(f"  - {img['path']}: {img.get('description', 'Company image')}" for img in company_images)
-            return f"""You have THREE image strategies. Pick the best one for the hero:
+        if image_source == "none":
+            return """Do NOT use any images. Do not add <img> tags or background images.
+Use typography, layout, gradients, shapes, and color blocks for visual interest."""
 
-STRATEGY A: "generate_image" with reference_image (img2img)
+        if image_source == "existing_images":
+            if company_images:
+                img_list = "\n".join(
+                    f"  - {img['path']}: {img.get('description', 'Company image')}"
+                    for img in company_images
+                )
+                return f"""You must ONLY use existing company images (no generation).
+Use the image paths below directly in HTML.
+
+AVAILABLE COMPANY IMAGES:
+{img_list}"""
+            return """No usable company images were found.
+Fallback: Use generate_image (AI) only."""
+
+        if image_source == "img2img":
+            if company_images:
+                img_list = "\n".join(
+                    f"  - {img['path']}: {img.get('description', 'Company image')}"
+                    for img in company_images
+                )
+                return f"""You may ONLY use generate_image WITH reference_image (img2img).
+
+TOOL: "generate_image" with reference_image
   Uses a real photo from the company's website as starting point.
   The result KEEPS the feel of the original but is restyled.
   → Best for: hero images that should look like the company's real venue/environment.
   Parameters: prompt, filename, size ("1536x1024" landscape, "1024x1536" portrait, "1024x1024" square), reference_image (path from list below)
 
-STRATEGY B: "stock_photo" (real photography from Pexels)
-  Downloads a real, high-quality photograph.
-  → Best for: people, portraits, lifestyle, nature, food — anything where photorealism matters.
-  → AI-generated faces look uncanny — always use stock_photo for people.
-  → IMPORTANT: query must be SHORT (2-4 words). Pexels is a search engine, not a prompt.
-    ✅ Good: "farm sunset landscape", "hotel lobby luxury", "conference room modern"
-    ❌ Bad: "scandinavian countryside farm golden hour pastoral landscape with rolling hills"
-  Parameters: query (2-4 words!), filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
-
-STRATEGY C: "generate_image" without reference_image (pure AI generation)
-  Generates an image from scratch using GPT-Image.
-  → Best for: abstract backgrounds, artistic illustrations, brand-specific graphics.
-  → Use as last resort — stock photos look more professional, img2img looks more authentic.
-  Parameters: prompt, filename, size, quality ("low", "medium", "high")
-
 AVAILABLE COMPANY IMAGES (scraped from their real website):
-{img_list}
+{img_list}"""
+            return """No usable company images were found.
+Fallback: Use generate_image (AI) only."""
 
-DECISION: Pick the strategy that produces the most authentic result for this company's hero section."""
-        else:
-            # Two strategies — no company images available
-            return """You have TWO image tools. Pick the best one for the hero:
+        if image_source == "stock":
+            return """You may ONLY use the stock_photo tool for images.
 
-TOOL 1: "stock_photo" (real photography from Pexels)
+TOOL: "stock_photo" (real photography from Pexels)
   Downloads a real, high-quality photograph.
   → Best for: people, venues, nature, food, professional environments — anything where photorealism matters.
-  → AI-generated faces look uncanny — always use stock_photo for people.
   → IMPORTANT: query must be SHORT (2-4 words). Pexels is a search engine, not a prompt.
     ✅ Good: "farm sunset landscape", "hotel lobby luxury", "conference room modern"
     ❌ Bad: "scandinavian countryside farm golden hour pastoral landscape with rolling hills"
-  Parameters: query (2-4 words!), filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")
+  Parameters: query (2-4 words!), filename, orientation ("landscape", "portrait", "square"), size ("large", "medium", "small")"""
 
-TOOL 2: "generate_image" (AI-generated image via GPT-Image)
-  Generates an image from scratch.
+        # Default: AI-only
+        return """You may ONLY use generate_image (AI).
+
+TOOL: "generate_image"
+  Generates an image from scratch using GPT-Image.
   → Best for: abstract backgrounds, artistic illustrations, stylized brand visuals.
-  Parameters: prompt, filename, size ("1536x1024" landscape, "1024x1536" portrait, "1024x1024" square), quality ("low", "medium", "high")
+  Parameters: prompt, filename, size ("1536x1024" landscape, "1024x1536" portrait, "1024x1024" square), quality ("low", "medium", "high")"""
 
-DECISION: Prefer stock_photo for realistic scenes and people. Use generate_image for abstract/artistic visuals."""
+    def _image_usage_note(self: "Generator", image_source: str) -> str:
+        """Add a short rule about image usage to the prompt."""
+        if image_source == "none":
+            return "IMPORTANT: Do not use any images."
+        if image_source == "existing_images":
+            return "IMPORTANT: Use at most 1 existing company image. Do not generate new images."
+        if image_source == "img2img":
+            return "IMPORTANT: Generate only 1 image (the hero) using reference_image."
+        if image_source == "stock":
+            return "IMPORTANT: Use only 1 stock image (the hero)."
+        return "IMPORTANT: Generate only 1 image (the hero)."
 
     def _extract_layouts_fallback(self: "Generator", text: str) -> list[dict]:
         """Fallback: extract HTML blocks when JSON parsing fails"""

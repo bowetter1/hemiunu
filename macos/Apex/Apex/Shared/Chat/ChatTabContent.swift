@@ -25,12 +25,14 @@ struct ChatTabContent: View {
                 inputText = ""
             }
             chatViewModel.checkForClarification()
+            chatViewModel.pollClarificationIfNeeded(selectedPageId: selectedPageId, onProjectCreated: onProjectCreated)
         }
         .onChange(of: webSocket.lastEvent) { _, event in
             chatViewModel.handleWebSocketEvent(event, selectedPageId: selectedPageId)
         }
         .onAppear {
             chatViewModel.checkForClarification()
+            chatViewModel.pollClarificationIfNeeded(selectedPageId: selectedPageId, onProjectCreated: onProjectCreated)
         }
     }
 

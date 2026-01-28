@@ -4,6 +4,8 @@ import asyncio
 from typing import Dict, Set
 from fastapi import WebSocket, WebSocketDisconnect
 
+from apex_server.config import get_settings
+
 
 class ConnectionManager:
     """Manages WebSocket connections per project"""
@@ -55,6 +57,30 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+async def _telegram_notify(project_id: str, message: str, preview_url: str = None):
+    """Send a Telegram notification for a project event (if enabled)."""
+    settings = get_settings()
+    if not settings.telegram_enabled:
+        return
+    try:
+        from apex_server.integrations.telegram import telegram_bot
+        await telegram_bot.notify_project_event(project_id, message, preview_url)
+    except Exception as e:
+        print(f"[TELEGRAM] Notification error: {e}", flush=True)
+
+
+async def _telegram_notify_clarification(project_id: str, questions: list):
+    """Send Telegram clarification questions with inline buttons (if enabled)."""
+    settings = get_settings()
+    if not settings.telegram_enabled:
+        return
+    try:
+        from apex_server.integrations.telegram import telegram_bot
+        await telegram_bot.notify_clarification(project_id, questions)
+    except Exception as e:
+        print(f"[TELEGRAM] Clarification notification error: {e}", flush=True)
+
+
 async def notify_status_change(project_id: str, status: str, data: dict = None):
     """Notify all clients that project status changed"""
     await manager.broadcast(str(project_id), "status_changed", {
@@ -68,6 +94,7 @@ async def notify_moodboard_ready(project_id: str, moodboards: list):
     await manager.broadcast(str(project_id), "moodboard_ready", {
         "moodboards": moodboards
     })
+    await _telegram_notify(project_id, "🎨 Moodboard klar! Designförslag redo att granska.")
 
 
 async def notify_layouts_ready(project_id: str, layouts: list):
@@ -75,6 +102,10 @@ async def notify_layouts_ready(project_id: str, layouts: list):
     await manager.broadcast(str(project_id), "layouts_ready", {
         "count": len(layouts)
     })
+    await _telegram_notify(
+        project_id,
+        f"📐 Layouts klara! {len(layouts)} alternativ att välja mellan.",
+    )
 
 
 async def notify_page_updated(project_id: str, page_id: str):
@@ -82,6 +113,7 @@ async def notify_page_updated(project_id: str, page_id: str):
     await manager.broadcast(str(project_id), "page_updated", {
         "page_id": page_id
     })
+    await _telegram_notify(project_id, "✅ Sidan uppdaterad!")
 
 
 async def notify_error(project_id: str, message: str):
@@ -89,6 +121,7 @@ async def notify_error(project_id: str, message: str):
     await manager.broadcast(str(project_id), "error", {
         "message": message
     })
+    await _telegram_notify(project_id, f"❌ Fel: {message[:200]}")
 
 
 async def notify_clarification_needed(project_id: str, questions: list):
@@ -97,3 +130,4 @@ async def notify_clarification_needed(project_id: str, questions: list):
     await manager.broadcast(str(project_id), "clarification_needed", {
         "questions": questions
     })
+    await _telegram_notify_clarification(project_id, questions)

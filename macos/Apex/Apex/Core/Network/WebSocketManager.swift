@@ -32,7 +32,7 @@ class WebSocketManager: ObservableObject {
     @Published var isConnected = false
     @Published var lastEvent: WebSocketEvent?
 
-    init(baseURL: String = "wss://apex-server-production-a540.up.railway.app") {
+    init(baseURL: String = AppEnvironment.wsBaseURL) {
         self.baseURL = baseURL
     }
 

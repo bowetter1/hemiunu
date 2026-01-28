@@ -8,12 +8,38 @@ struct NewProjectCard: View {
     private var client: APIClient { appState.client }
     let onProjectCreated: (String) -> Void
 
+    private enum ImageSource: String, CaseIterable, Identifiable {
+        case none = "none"
+        case existingImages = "existing_images"
+        case img2img = "img2img"
+        case ai = "ai"
+        case stock = "stock"
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .none:
+                return "No images"
+            case .existingImages:
+                return "Existing images (from site)"
+            case .img2img:
+                return "Img2img (restyle existing)"
+            case .ai:
+                return "New AI images"
+            case .stock:
+                return "Stock photos"
+            }
+        }
+    }
+
     @State private var isExpanded = false
     @State private var briefText = ""
     @State private var websiteURL = ""
     @State private var selectedImage: NSImage?
     @State private var isCreating = false
     @State private var isDraggingOver = false
+    @State private var selectedImageSource: ImageSource = .ai
 
     var body: some View {
         VStack(spacing: 0) {
@@ -72,6 +98,24 @@ struct NewProjectCard: View {
                             .padding(10)
                             .background(Color(nsColor: .textBackgroundColor))
                             .cornerRadius(8)
+                    }
+
+                    // Image source
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Image Source", systemImage: "photo.on.rectangle")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+
+                        Picker("", selection: $selectedImageSource) {
+                            ForEach(ImageSource.allCases) { source in
+                                Text(source.title).tag(source)
+                            }
+                        }
+                        .pickerStyle(.radioGroup)
+                        .font(.system(size: 11))
+                        .padding(6)
+                        .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+                        .cornerRadius(8)
                     }
 
                     // Image upload
@@ -207,13 +251,17 @@ struct NewProjectCard: View {
 
         Task {
             do {
-                let project = try await client.projectService.create(brief: enhancedBrief)
+                let project = try await client.projectService.create(
+                    brief: enhancedBrief,
+                    imageSource: selectedImageSource.rawValue
+                )
                 await MainActor.run {
                     isCreating = false
                     isExpanded = false
                     briefText = ""
                     websiteURL = ""
                     selectedImage = nil
+                    selectedImageSource = .ai
                     onProjectCreated(project.id)
                 }
             } catch {

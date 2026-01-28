@@ -140,7 +140,7 @@ struct HTMLWebView: NSViewRepresentable {
     private var assetsBaseURL: URL? {
         guard let projectId = projectId else { return nil }
         // Point to the assets endpoint so relative image URLs resolve correctly
-        let baseURLString = "https://apex-server-production-a540.up.railway.app/api/v1/projects/\(projectId)/assets/"
+        let baseURLString = "\(AppEnvironment.apiBaseURL)/api/v1/projects/\(projectId)/assets/"
         return URL(string: baseURLString)
     }
 

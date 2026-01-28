@@ -6,7 +6,7 @@ class APIClient {
     var authToken: String?
     private let decoder = JSONDecoder()
 
-    init(baseURL: String = "https://apex-server-production-a540.up.railway.app") {
+    init(baseURL: String = AppEnvironment.apiBaseURL) {
         self.baseURL = URL(string: baseURL) ?? URL(string: "https://localhost:8000")!
     }
 
@@ -35,9 +35,49 @@ class APIClient {
         var request = URLRequest(url: url)
         if let token = authToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+#if DEBUG
+            debugAuthToken(token, url: url)
+#endif
         }
         return request
     }
+
+#if DEBUG
+    private func debugAuthToken(_ token: String, url: URL) {
+        let path = url.path.isEmpty ? "/" : url.path
+        let parts = token.split(separator: ".")
+        guard parts.count >= 2 else {
+            print("[Auth] Authorization set for \(path), token format invalid")
+            return
+        }
+
+        let payload = String(parts[1])
+        guard let data = base64URLDecode(payload),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            print("[Auth] Authorization set for \(path), token payload unreadable")
+            return
+        }
+
+        let aud = object["aud"] as? String ?? "n/a"
+        let iss = object["iss"] as? String ?? "n/a"
+        let sub = object["sub"] as? String ?? "n/a"
+        let exp = object["exp"] as? TimeInterval ?? 0
+        let expDate = exp > 0 ? Date(timeIntervalSince1970: exp) : nil
+        let expText = expDate.map { ISO8601DateFormatter().string(from: $0) } ?? "n/a"
+
+        print("[Auth] Authorization set for \(path), aud=\(aud), iss=\(iss), sub=\(sub), exp=\(expText)")
+    }
+
+    private func base64URLDecode(_ input: String) -> Data? {
+        var base64 = input.replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let padding = 4 - (base64.count % 4)
+        if padding < 4 {
+            base64.append(String(repeating: "=", count: padding))
+        }
+        return Data(base64Encoded: base64)
+    }
+#endif
 
     enum APIError: LocalizedError {
         case invalidResponse

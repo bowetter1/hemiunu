@@ -5,6 +5,11 @@ struct AppRouter: View {
     @StateObject private var appState = AppState.shared
     @State private var showToolsPanel = true
 
+    /// Auth gate — show login when not connected
+    private var showAuthGate: Bool {
+        !appState.isConnected
+    }
+
     var body: some View {
         ZStack {
             // Background
@@ -13,114 +18,128 @@ struct AppRouter: View {
 
             GridBackground()
 
-            // Main layout - ignore safe area to flow into title bar
-            VStack(spacing: 0) {
-                // Topbar spanning full width - flows into title bar area
-                Topbar(
-                    showSidebar: $appState.showSidebar,
-                    selectedMode: $appState.currentMode,
-                    appearanceMode: $appState.appearanceMode,
-                    isConnected: appState.isConnected,
-                    errorMessage: appState.errorMessage,
-                    hasProject: appState.currentProject != nil,
-                    logs: appState.projectLogs,
-                    onNewProject: {
-                        appState.clearCurrentProject()
-                        appState.currentMode = .design
-                    },
-                    showModeSelector: false,
-                    inlineTrafficLights: true
-                )
-                .padding(.horizontal, 0)
+            if showAuthGate {
+                LoginView(appState: appState)
+            } else {
+                // Main layout - ignore safe area to flow into title bar
+                VStack(spacing: 0) {
+                    // Topbar spanning full width - flows into title bar area
+                    Topbar(
+                        showSidebar: $appState.showSidebar,
+                        selectedMode: $appState.currentMode,
+                        appearanceMode: $appState.appearanceMode,
+                        isConnected: appState.isConnected,
+                        errorMessage: appState.errorMessage,
+                        hasProject: appState.currentProject != nil,
+                        logs: appState.projectLogs,
+                        onNewProject: {
+                            appState.clearCurrentProject()
+                            appState.currentMode = .design
+                        },
+                        onLogout: {
+                            appState.logout()
+                            appState.clearCurrentProject()
+                        },
+                        showModeSelector: false,
+                        inlineTrafficLights: true
+                    )
+                    .padding(.horizontal, 0)
 
-                // Content row: left sidebar + main + right sidebar
-                HStack(spacing: 0) {
-                    // Left sidebar
-                    if appState.showSidebar {
-                        UnifiedSidebar(
+                    // Content row: left sidebar + main + right sidebar
+                    HStack(spacing: 0) {
+                        // Left sidebar
+                        if appState.showSidebar {
+                            UnifiedSidebar(
+                                appState: appState,
+                                webSocket: appState.wsClient,
+                                currentMode: appState.currentMode,
+                                selectedProjectId: $appState.selectedProjectId,
+                                selectedVariantId: $appState.selectedVariantId,
+                                selectedPageId: $appState.selectedPageId,
+                                showResearchJSON: $appState.showResearchJSON,
+                                onNewProject: {
+                                    appState.clearCurrentProject()
+                                    appState.currentMode = .design
+                                },
+                                onClose: {
+                                    appState.showSidebar = false
+                                }
+                            )
+                            .padding(.leading, 16)
+                            .padding(.trailing, 8)
+                        }
+
+                        // Main content card
+                        modeContent
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+                            .padding(.leading, appState.showSidebar ? 0 : 16)
+                            .padding(.trailing, 8)
+
+                        // Right tools panel
+                        ToolsPanel(
                             appState: appState,
                             webSocket: appState.wsClient,
-                            currentMode: appState.currentMode,
-                            selectedProjectId: $appState.selectedProjectId,
-                            selectedVariantId: $appState.selectedVariantId,
-                            selectedPageId: $appState.selectedPageId,
-                            showResearchJSON: $appState.showResearchJSON,
-                            onNewProject: {
-                                appState.clearCurrentProject()
+                            chatViewModel: appState.chatViewModel,
+                            selectedPageId: appState.selectedPageId,
+                            isExpanded: $showToolsPanel,
+                            onProjectCreated: { projectId in
+                                appState.selectedProjectId = projectId
                                 appState.currentMode = .design
                             },
-                            onClose: {
-                                appState.showSidebar = false
+                            onOpenFloatingChat: {
+                                appState.showFloatingChat = true
                             }
                         )
-                        .padding(.leading, 16)
-                        .padding(.trailing, 8)
+                        .padding(.trailing, 16)
                     }
+                    .padding(.bottom, 16)
+                }
+                .ignoresSafeArea(edges: .top)
 
-                    // Main content card
-                    modeContent
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
-                        .padding(.leading, appState.showSidebar ? 0 : 16)
-                        .padding(.trailing, 8)
+                // Centered Mode Selector overlay (centered on entire window)
+                VStack {
+                    ModeSelector(selectedMode: $appState.currentMode)
+                        .padding(.top, 8)
+                    Spacer()
+                }
+                .ignoresSafeArea(edges: .top)
+                .zIndex(20)
 
-                    // Right tools panel
-                    ToolsPanel(
+                // Floating chat window
+                if appState.showFloatingChat {
+                    FloatingChatWindow(
                         appState: appState,
                         webSocket: appState.wsClient,
                         chatViewModel: appState.chatViewModel,
                         selectedPageId: appState.selectedPageId,
-                        isExpanded: $showToolsPanel,
                         onProjectCreated: { projectId in
                             appState.selectedProjectId = projectId
                             appState.currentMode = .design
                         },
-                        onOpenFloatingChat: {
-                            appState.showFloatingChat = true
+                        onClose: {
+                            appState.showFloatingChat = false
                         }
                     )
-                    .padding(.trailing, 16)
+                    .zIndex(30)
                 }
-                .padding(.bottom, 16)
             }
-            .ignoresSafeArea(edges: .top)
 
-            // Centered Mode Selector overlay (centered on entire window)
-            VStack {
-                ModeSelector(selectedMode: $appState.currentMode)
-                    .padding(.top, 8)
-                Spacer()
-            }
-            .ignoresSafeArea(edges: .top)
-            .zIndex(20)
-
-            // Floating chat window
-            if appState.showFloatingChat {
-                FloatingChatWindow(
-                    appState: appState,
-                    webSocket: appState.wsClient,
-                    chatViewModel: appState.chatViewModel,
-                    selectedPageId: appState.selectedPageId,
-                    onProjectCreated: { projectId in
-                        appState.selectedProjectId = projectId
-                        appState.currentMode = .design
-                    },
-                    onClose: {
-                        appState.showFloatingChat = false
-                    }
-                )
-                .zIndex(30)
-            }
         }
         .onAppear {
             Task {
                 await appState.connect()
             }
+        }
+        .onChange(of: appState.isConnected) { _, newValue in
+#if DEBUG
+            print("[Auth] isConnected changed -> \(newValue)")
+#endif
         }
         .onChange(of: appState.selectedProjectId) { _, newId in
             if let id = newId {

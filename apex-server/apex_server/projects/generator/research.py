@@ -97,10 +97,10 @@ Do 1-2 searches to find the official company website."""
             self.log("research", f"Found company site: {company_urls[0]['url']}", {"urls": company_urls})
 
         # ============================================
-        # STEP 2: Have Opus analyze the website and identify brand colors
+        # STEP 2: Analyze website for brand colors + scrape images
         # ============================================
         step2_start = time.time()
-        print("[STEP 2] Having Opus analyze website for brand colors...", flush=True)
+        print("[STEP 2] Analyzing website for brand colors...", flush=True)
 
         brand_colors = []
         company_content = None
@@ -115,7 +115,23 @@ Do 1-2 searches to find the official company website."""
                 raw_colors = company_content.get("colors_found", [])
                 print(f"[STEP 2] Raw colors found on page: {raw_colors[:10]}", flush=True)
 
-                # Have Opus analyze and pick the REAL brand colors
+                # Also check Brandfetch for structured brand colors
+                brandfetch_colors = []
+                try:
+                    from urllib.parse import urlparse
+                    domain = urlparse(main_url).netloc.replace("www.", "")
+                    brandfetch_url = f"https://brandfetch.com/{domain}"
+                    print(f"[STEP 2] Checking Brandfetch: {brandfetch_url}", flush=True)
+                    bf_content = fetch_page_content(brandfetch_url)
+                    brandfetch_colors = bf_content.get("brand_colors", [])
+                    if brandfetch_colors:
+                        print(f"[STEP 2] Brandfetch colors: {brandfetch_colors}", flush=True)
+                    else:
+                        print("[STEP 2] No Brandfetch colors found", flush=True)
+                except Exception as e:
+                    print(f"[STEP 2] Brandfetch lookup failed: {e}", flush=True)
+
+                # Have Haiku analyze and pick the REAL brand colors
                 color_tool = {
                     "name": "identify_brand_colors",
                     "description": "Identify the real brand colors from the website",
@@ -143,8 +159,10 @@ WEBSITE: {main_url}
 TITLE: {company_content.get('title', 'Unknown')}
 
 COLORS FOUND ON PAGE: {raw_colors[:15]}
+BRANDFETCH COLORS (structured brand data): {brandfetch_colors if brandfetch_colors else 'None found'}
 
 YOUR TASK: Pick the 3 colors that are the ACTUAL BRAND colors.
+If Brandfetch colors are available, prefer those — they are usually the most accurate.
 
 ⚠️ IGNORE THESE (they are from social media widgets, NOT the brand):
 - #1877F2, #4267B2, #3b5998 = Facebook blue
@@ -177,7 +195,7 @@ Pick colors that feel like THIS SPECIFIC BRAND, not generic web colors."""
                             colors.get("secondary", "#ffffff"),
                             colors.get("accent", "#0066cc")
                         ]
-                        print(f"[STEP 2] Opus identified brand colors: {brand_colors}", flush=True)
+                        print(f"[STEP 2] Identified brand colors: {brand_colors}", flush=True)
                         break
 
             except Exception as e:
@@ -275,6 +293,16 @@ Rules:
 
         print(f"[TIMING] Step 2 (analyze colors + scrape images): {time.time() - step2_start:.1f}s", flush=True)
 
+        # ── Start site analysis in background (parallel with Step 3) ──
+        site_analysis_future = None
+        site_analysis_executor = None
+        if company_content and company_images:
+            site_analysis_executor = ThreadPoolExecutor(max_workers=1)
+            site_analysis_future = site_analysis_executor.submit(
+                self._analyze_existing_site, company_content, company_images
+            )
+            print("[STEP 2] Started site analysis (parallel with Step 3)...", flush=True)
+
         # ============================================
         # STEP 3: Search for REAL inspiration websites (not template galleries)
         # ============================================
@@ -357,6 +385,16 @@ Search now."""
 
         print(f"[STEP 3] Total real sites found: {len(inspiration_urls)}", flush=True)
         print(f"[TIMING] Step 3 (search inspiration): {time.time() - step3_start:.1f}s", flush=True)
+
+        # ── Collect site analysis result (started in Step 2) ──
+        existing_site_analysis = ""
+        if site_analysis_future:
+            try:
+                existing_site_analysis = site_analysis_future.result(timeout=30)
+                print(f"[STEP 2] Site analysis: {existing_site_analysis[:80]}...", flush=True)
+            except Exception as e:
+                print(f"[STEP 2] Site analysis error: {e}", flush=True)
+            site_analysis_executor.shutdown(wait=False)
 
         # ============================================
         # STEP 4: Fetch inspiration sites in parallel
@@ -612,7 +650,8 @@ Create colors that:
             "brand_colors": brand_colors,
             "fonts": recommended_fonts,
             "inspiration_sites": selected_sites,
-            "company_images": company_images if company_urls else []
+            "company_images": company_images if company_urls else [],
+            "existing_site_analysis": existing_site_analysis,
         }
         self.project.selected_moodboard = 1  # Not used anymore, but keep for compatibility
         self.project.status = ProjectStatus.MOODBOARD
@@ -625,6 +664,79 @@ Create colors that:
         self.log("research", f"Found {len(brand_colors)} colors, {len(selected_sites)} inspiration sites")
 
         return research_data
+
+    def _analyze_existing_site(self: "Generator", company_content: dict, company_images: list[dict]) -> str:
+        """Analyze the existing website using Haiku vision with scraped images.
+
+        Sends all kept images + page text to Haiku vision for a design analysis.
+        Runs as a background Future parallel to Step 3 (inspiration search).
+        """
+        import base64 as _b64
+
+        content_blocks = []
+
+        # Add all kept images as base64
+        for img in company_images:
+            img_path = f"public/{img['path']}"
+            full_path = self.fs.base_dir / img_path
+            if full_path.exists():
+                img_bytes = full_path.read_bytes()
+                path_lower = img["path"].lower()
+                if path_lower.endswith(".png"):
+                    media_type = "image/png"
+                elif path_lower.endswith(".webp"):
+                    media_type = "image/webp"
+                else:
+                    media_type = "image/jpeg"
+
+                content_blocks.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": _b64.b64encode(img_bytes).decode(),
+                    }
+                })
+
+        if not content_blocks:
+            return ""
+
+        # Add text prompt with page context
+        site_text = company_content.get("text", "")[:2000]
+        site_title = company_content.get("title", "Unknown")
+        site_url = company_content.get("url", "Unknown")
+        colors = company_content.get("colors_found", [])
+
+        content_blocks.append({
+            "type": "text",
+            "text": f"""Analyze this company's EXISTING website based on the images above and the page content below.
+
+WEBSITE: {site_url}
+TITLE: {site_title}
+BRAND COLORS ON PAGE: {colors[:10]}
+PAGE TEXT (first 2000 chars):
+{site_text}
+
+Provide a concise analysis covering:
+1. Overall feel/tone (e.g., warm, corporate, rustic, playful, luxurious, dated)
+2. Layout style (e.g., hero image, text-heavy, grid, split layout, single-column)
+3. Image usage (photo-heavy, illustrations, minimal, stock vs real photography)
+4. Typography feel (serif/classic, sans-serif/modern, decorative, mixed)
+5. Color usage (dark/light theme, monochrome, colorful, accent usage)
+6. What works well (2-3 bullet points)
+7. What needs improvement (2-3 bullet points)
+
+Keep it concise — this will be fed into a layout prompt as context. Write as a design expert evaluating the site."""
+        })
+
+        response = self.client.messages.create(
+            model=MODEL_HAIKU,
+            max_tokens=800,
+            messages=[{"role": "user", "content": content_blocks}]
+        )
+        self.track_usage(response)
+
+        return response.content[0].text.strip()
 
     def search_and_clarify(self: "Generator") -> dict:
         """

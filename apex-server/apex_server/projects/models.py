@@ -30,6 +30,9 @@ class Project(Base, TimestampMixin):
     # Brief from user
     brief: Mapped[str] = mapped_column(Text)
 
+    # Image source preference ("ai", "stock", "existing_site")
+    image_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="ai")
+
     # Status
     status: Mapped[ProjectStatus] = mapped_column(Enum(ProjectStatus), default=ProjectStatus.BRIEF)
 
