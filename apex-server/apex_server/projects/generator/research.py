@@ -1,30 +1,27 @@
-"""Brand research mixin - extracts real colors from company website + finds inspiration sites"""
+"""Brand research mixin - scrape site + 1 Claude call with web search"""
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
-from .utils import MODEL_OPUS, MODEL_HAIKU, fetch_page_content, scrape_images
+from .utils import MODEL_SONNET, MODEL_HAIKU, fetch_page_content, scrape_images
 
 if TYPE_CHECKING:
     from .base import Generator
 
 
 class ResearchMixin:
-    """Mixin for brand research - finds real colors + inspiration sites"""
+    """Mixin for brand research - scrape + 1 Claude call"""
 
     def research_brand(self: "Generator") -> dict:
         """
-        Research the brand and find inspiration sites.
+        Research the brand: scrape site (no AI) + 1 Claude call (with web search).
 
         Steps:
-        1. Find company's ACTUAL website
-        2. Extract REAL colors from their site
-        3. Search for 6 beautiful inspiration websites in same industry
-        4. Pick 3 best inspiration sites
+        A. Scrape company site (no AI, fast)
+        B. ONE Claude call with web search — finds inspiration, picks colors/fonts, writes markdown
 
         Returns:
-            dict with brand_colors, fonts, and 3 inspiration_sites
+            dict with brand_colors, fonts, inspiration_sites, company_url
         """
         from ..models import ProjectStatus
 
@@ -34,414 +31,117 @@ class ResearchMixin:
         # Initialize filesystem early (needed for saving scraped images)
         self.fs.init_project()
 
+        # Set status to RESEARCHING
+        self.project.status = ProjectStatus.RESEARCHING
+        self.db.commit()
+
         # Get clarification data if available
         clarification = self.project.clarification or {}
         user_answer = clarification.get("answer", "")
 
-        # Build search context
+        self.log("research", "Starting brand research...")
+
+        # Resolve research model from config
+        research_model_key = self.get_config("research_model", "haiku")
+        research_model = {"haiku": MODEL_HAIKU, "sonnet": MODEL_SONNET}.get(research_model_key, MODEL_HAIKU)
+        print(f"[RESEARCH] Using model: {research_model}", flush=True)
+
+        # ── Step A: Get company URL ──
+        company_url = self._get_company_url()
+        print(f"[RESEARCH] Company URL: {company_url}", flush=True)
+
+        # ── Step B: Scrape (no AI) ──
+        company_content = None
+        company_images = []
+        raw_colors = []
+
+        if company_url and self.get_config("scrape_company_site", True):
+            print(f"[RESEARCH] Scraping {company_url}...", flush=True)
+
+            try:
+                company_content = fetch_page_content(company_url)
+                raw_colors = company_content.get("colors_found", [])
+                print(f"[RESEARCH] Raw colors found: {raw_colors[:10]}", flush=True)
+            except Exception as e:
+                print(f"[RESEARCH] Error fetching page content: {e}", flush=True)
+
+            # Scrape hero image
+            try:
+                print(f"[RESEARCH] Scraping hero image from {company_url}...", flush=True)
+                scraped = scrape_images(company_url, max_images=1)
+                print(f"[RESEARCH] Found {len(scraped)} candidate images", flush=True)
+
+                if scraped:
+                    best_url, best_bytes = scraped[0]
+                    lower_url = best_url.lower()
+                    if lower_url.endswith(".png"):
+                        media_type, ext = "image/png", ".png"
+                    elif lower_url.endswith(".webp"):
+                        media_type, ext = "image/webp", ".webp"
+                    else:
+                        media_type, ext = "image/jpeg", ".jpg"
+
+                    filename = f"hero{ext}"
+                    save_path = f"public/images/company/{filename}"
+                    self.fs.write_binary(save_path, best_bytes)
+
+                    company_images = [{
+                        "path": f"images/company/{filename}",
+                        "description": "Hero image from company website",
+                        "source_url": best_url,
+                        "size_kb": len(best_bytes) // 1024
+                    }]
+                    print(f"[RESEARCH] Saved hero image: {best_url[:80]} ({len(best_bytes) // 1024}KB)", flush=True)
+                    self.log("research", f"Scraped hero image from {company_url} ({len(best_bytes) // 1024}KB)")
+
+            except Exception as e:
+                print(f"[RESEARCH] Image scraping error: {e}", flush=True)
+
+        print(f"[TIMING] Scrape phase: {time.time() - phase_start:.1f}s", flush=True)
+
+        # ── Step C: ONE Claude call (with web search) ──
+        claude_start = time.time()
+        print("[RESEARCH] Making ONE Claude call with web search...", flush=True)
+
+        site_text = ""
+        site_title = ""
+        if company_content:
+            site_text = company_content.get("text", "")[:3000]
+            site_title = company_content.get("title", "Unknown")
+
+        # Build context for Claude
         search_context = self.project.brief
         if user_answer:
             search_context = f"{self.project.brief}\n\nUser clarification: {user_answer}"
-            print(f"[RESEARCH] Using clarification: {user_answer}", flush=True)
 
-        self.log("research", "Starting brand research...")
+        inspiration_count = self.get_config("inspiration_site_count", 3)
 
-        # ============================================
-        # STEP 1: Find company's official website
-        # ============================================
-        step1_start = time.time()
-        print("[STEP 1] Finding company's official website...", flush=True)
-
-        web_search_tool = {
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": 3
-        }
-
-        find_site_response = self.client.beta.messages.create(
-            model=MODEL_HAIKU,
-            max_tokens=800,
-            betas=["web-search-2025-03-05"],
-            tools=[web_search_tool],
-            messages=[{
-                "role": "user",
-                "content": f"""Find the OFFICIAL website for this company/brand:
-
-"{search_context}"
-
-IMPORTANT: Search for the company's ACTUAL official website domain (e.g., "forex.se", "saltsjobadengk.se").
-We need to find their real site to extract their actual brand colors.
-
-Do 1-2 searches to find the official company website."""
-            }]
-        )
-        self.track_usage(find_site_response)
-
-        # Extract company website URL
-        company_urls = []
-        for block in find_site_response.content:
-            if block.type == "web_search_tool_result":
-                content = getattr(block, 'content', [])
-                if isinstance(content, list):
-                    for item in content[:3]:
-                        url = getattr(item, 'url', '')
-                        title = getattr(item, 'title', '')
-                        if url:
-                            company_urls.append({"url": url, "title": title})
-                            print(f"[STEP 1] Found: {url[:60]}", flush=True)
-
-        print(f"[TIMING] Step 1 (find company site): {time.time() - step1_start:.1f}s", flush=True)
-
-        # Log to database for app visibility
-        if company_urls:
-            self.log("research", f"Found company site: {company_urls[0]['url']}", {"urls": company_urls})
-
-        # ============================================
-        # STEP 2: Analyze website for brand colors + scrape images
-        # ============================================
-        step2_start = time.time()
-        print("[STEP 2] Analyzing website for brand colors...", flush=True)
-
-        brand_colors = []
-        company_content = None
-        company_images = []
-
-        if company_urls:
-            main_url = company_urls[0]["url"]
-            print(f"[STEP 2] Fetching: {main_url}", flush=True)
-
-            try:
-                company_content = fetch_page_content(main_url)
-                raw_colors = company_content.get("colors_found", [])
-                print(f"[STEP 2] Raw colors found on page: {raw_colors[:10]}", flush=True)
-
-                # Also check Brandfetch for structured brand colors
-                brandfetch_colors = []
-                try:
-                    from urllib.parse import urlparse
-                    domain = urlparse(main_url).netloc.replace("www.", "")
-                    brandfetch_url = f"https://brandfetch.com/{domain}"
-                    print(f"[STEP 2] Checking Brandfetch: {brandfetch_url}", flush=True)
-                    bf_content = fetch_page_content(brandfetch_url)
-                    brandfetch_colors = bf_content.get("brand_colors", [])
-                    if brandfetch_colors:
-                        print(f"[STEP 2] Brandfetch colors: {brandfetch_colors}", flush=True)
-                    else:
-                        print("[STEP 2] No Brandfetch colors found", flush=True)
-                except Exception as e:
-                    print(f"[STEP 2] Brandfetch lookup failed: {e}", flush=True)
-
-                # Have Haiku analyze and pick the REAL brand colors
-                color_tool = {
-                    "name": "identify_brand_colors",
-                    "description": "Identify the real brand colors from the website",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "primary": {"type": "string", "description": "Primary brand color hex (usually from logo or headers)"},
-                            "secondary": {"type": "string", "description": "Secondary color hex (backgrounds, cards)"},
-                            "accent": {"type": "string", "description": "Accent color hex (CTAs, buttons, links)"}
-                        },
-                        "required": ["primary", "secondary", "accent"]
-                    }
-                }
-
-                color_analysis = self.client.messages.create(
-                    model=MODEL_HAIKU,
-                    max_tokens=500,
-                    tools=[color_tool],
-                    tool_choice={"type": "tool", "name": "identify_brand_colors"},
-                    messages=[{
-                        "role": "user",
-                        "content": f"""Analyze this website and identify its REAL brand colors.
-
-WEBSITE: {main_url}
-TITLE: {company_content.get('title', 'Unknown')}
-
-COLORS FOUND ON PAGE: {raw_colors[:15]}
-BRANDFETCH COLORS (structured brand data): {brandfetch_colors if brandfetch_colors else 'None found'}
-
-YOUR TASK: Pick the 3 colors that are the ACTUAL BRAND colors.
-If Brandfetch colors are available, prefer those — they are usually the most accurate.
-
-⚠️ IGNORE THESE (they are from social media widgets, NOT the brand):
-- #1877F2, #4267B2, #3b5998 = Facebook blue
-- #1DA1F2, #1D9BF0 = Twitter/X blue
-- #FF0000, #CC0000, #c4302b = YouTube red
-- #E1306C, #C13584, #833AB4, #F77737 = Instagram colors
-- #0077B5, #0A66C2 = LinkedIn blue
-- #25D366, #128C7E = WhatsApp green
-- #000000 = Pure black (too generic)
-- #ffffff = Pure white (too generic)
-- Very light grays (#f5f5f5, #fafafa, #eeeeee, #e5e5e5)
-
-✅ LOOK FOR COLORS FROM:
-- The company LOGO (most important!)
-- Navigation bar / header background
-- CTA buttons ("Book now", "Contact us", etc.)
-- Section backgrounds with brand personality
-- Footer with brand colors
-
-Pick colors that feel like THIS SPECIFIC BRAND, not generic web colors."""
-                    }]
-                )
-                self.track_usage(color_analysis)
-
-                for block in color_analysis.content:
-                    if block.type == "tool_use" and block.name == "identify_brand_colors":
-                        colors = block.input
-                        brand_colors = [
-                            colors.get("primary", "#1a1a1a"),
-                            colors.get("secondary", "#ffffff"),
-                            colors.get("accent", "#0066cc")
-                        ]
-                        print(f"[STEP 2] Identified brand colors: {brand_colors}", flush=True)
-                        break
-
-            except Exception as e:
-                print(f"[STEP 2] Error analyzing colors: {e}", flush=True)
-
-            # ── Scrape company images ──────────────────────────────────
-            company_images = []
-            try:
-                print(f"[STEP 2] Scraping images from {main_url}...", flush=True)
-                scraped = scrape_images(main_url, max_images=8)
-                print(f"[STEP 2] Scraped {len(scraped)} candidate images", flush=True)
-
-                if scraped:
-                    # Use Haiku vision to filter for relevance
-                    import base64 as _b64
-                    kept = []
-                    for idx, (img_url, img_bytes) in enumerate(scraped):
-                        if len(kept) >= 5:
-                            break
-                        try:
-                            # Determine media type from URL
-                            lower_url = img_url.lower()
-                            if lower_url.endswith(".png"):
-                                media_type = "image/png"
-                            elif lower_url.endswith(".webp"):
-                                media_type = "image/webp"
-                            else:
-                                media_type = "image/jpeg"
-
-                            vision_response = self.client.messages.create(
-                                model=MODEL_HAIKU,
-                                max_tokens=200,
-                                messages=[{
-                                    "role": "user",
-                                    "content": [
-                                        {
-                                            "type": "image",
-                                            "source": {
-                                                "type": "base64",
-                                                "media_type": media_type,
-                                                "data": _b64.b64encode(img_bytes).decode(),
-                                            }
-                                        },
-                                        {
-                                            "type": "text",
-                                            "text": f"""Is this image relevant and useful for a website about: "{self.project.brief}"?
-
-Answer in this exact format (two lines only):
-KEEP or SKIP
-Description of what the image shows (e.g., "conference room with ocean view", "outdoor terrace at sunset")
-
-Rules:
-- KEEP: real photos of the place, venue, products, team, or environment
-- SKIP: stock icons, generic graphics, social media badges, decorative patterns, ads, unrelated content"""
-                                        }
-                                    ]
-                                }]
-                            )
-                            self.track_usage(vision_response)
-
-                            answer = vision_response.content[0].text.strip()
-                            lines = answer.split("\n", 1)
-                            verdict = lines[0].strip().upper()
-                            description = lines[1].strip() if len(lines) > 1 else "Company image"
-
-                            if "KEEP" in verdict:
-                                # Save image to filesystem
-                                ext = ".jpg"
-                                if "png" in media_type:
-                                    ext = ".png"
-                                elif "webp" in media_type:
-                                    ext = ".webp"
-                                filename = f"img_{len(kept) + 1}{ext}"
-                                save_path = f"public/images/company/{filename}"
-                                self.fs.write_binary(save_path, img_bytes)
-                                kept.append({
-                                    "path": f"images/company/{filename}",
-                                    "description": description,
-                                    "source_url": img_url,
-                                    "size_kb": len(img_bytes) // 1024
-                                })
-                                print(f"[STEP 2] KEPT image {len(kept)}: {description[:60]} ({len(img_bytes) // 1024}KB)", flush=True)
-                            else:
-                                print(f"[STEP 2] SKIPPED image: {description[:60]}", flush=True)
-
-                        except Exception as e:
-                            print(f"[STEP 2] Vision filter error for image {idx}: {e}", flush=True)
-
-                    company_images = kept
-                    print(f"[STEP 2] Scraped {len(scraped)} images, kept {len(kept)} relevant", flush=True)
-                    self.log("research", f"Scraped {len(scraped)} images from {main_url}, kept {len(kept)} relevant")
-
-            except Exception as e:
-                print(f"[STEP 2] Image scraping error: {e}", flush=True)
-
-        print(f"[TIMING] Step 2 (analyze colors + scrape images): {time.time() - step2_start:.1f}s", flush=True)
-
-        # ── Start site analysis in background (parallel with Step 3) ──
-        site_analysis_future = None
-        site_analysis_executor = None
-        if company_content and company_images:
-            site_analysis_executor = ThreadPoolExecutor(max_workers=1)
-            site_analysis_future = site_analysis_executor.submit(
-                self._analyze_existing_site, company_content, company_images
-            )
-            print("[STEP 2] Started site analysis (parallel with Step 3)...", flush=True)
-
-        # ============================================
-        # STEP 3: Search for REAL inspiration websites (not template galleries)
-        # ============================================
-        step3_start = time.time()
-        print("[STEP 3] Searching for real inspiration websites...", flush=True)
-
-        inspiration_search_response = self.client.beta.messages.create(
-            model=MODEL_HAIKU,
-            max_tokens=1500,
-            betas=["web-search-2025-03-05"],
-            tools=[{
-                "type": "web_search_20250305",
-                "name": "web_search",
-                "max_uses": 5
-            }],
-            messages=[{
-                "role": "user",
-                "content": f"""Find 6+ REAL, LIVE websites that we can use as design inspiration for this project:
-
-Project: {search_context}
-Company URL: {company_urls[0]['url'] if company_urls else 'unknown'}
-
-YOUR GOAL: Find the most BEAUTIFUL, high-budget websites in this industry and adjacent premium industries. Expensive brands spend more on design — so always look UPMARKET for inspiration, regardless of the client's actual market segment.
-
-SEARCH STRATEGY (do all of these):
-1. Search: "[industry] site:awwwards.com" — find award-winning sites in this industry
-2. Search: "[industry] site:siteinspire.com" — find curated design inspiration
-3. Search: The MOST PREMIUM brands in this industry (e.g., for a hotel → Four Seasons, Aman, Rosewood; for golf → Augusta National, TPC Scottsdale; for fintech → Stripe, Wise)
-4. Search: Luxury/premium brands in ADJACENT industries with overlapping audiences (e.g., for a conference hotel → luxury travel brands, premium event venues, high-end restaurants)
-
-KEY PRINCIPLE: Always aim ABOVE the client's price tier. A budget hotel should be inspired by a luxury hotel's website. A local golf club should look at world-class resorts. Premium brands have bigger design budgets — their websites are simply better designed, and we can adapt that quality for any client.
-
-CRITICAL RULES:
-- We need the ACTUAL website URLs (like "wise.com", "stripe.com", "fourseasons.com")
-- NOT articles about design (no "best X website design 2024" listicles)
-- NOT template marketplaces
-- Think: "What website would I open in a browser to study its design?"
-
-Search now."""
-            }]
-        )
-        self.track_usage(inspiration_search_response)
-
-        # Collect inspiration URLs — aggressively filter out non-website results
-        inspiration_urls = []
-        search_queries = []
-
-        # Domains that are template galleries / articles, NOT real design inspiration
-        skip_domains = [
-            "awwwards.com", "behance.net", "dribbble.com", "pinterest.com",
-            "medium.com", "wordpress.com", "themeforest.net", "templatemonster.com",
-            "99designs.com", "subframe.com", "motocms.com", "instapage.com",
-            "wix.com", "squarespace.com", "hubspot.com", "colorlib.com",
-            "siteinspire.com", "bestwebsite.gallery", "onepagelove.com",
-            "designspiration.com", "webdesign-inspiration.com", "land-book.com",
-            "godaddy.com", "shopify.com/blog", "brandcrowd.com", "flaticon.com",
-            "youtube.com", "wikipedia.org", "reddit.com", "quora.com",
-            "mycodelesswebsite.com", "clubmarketing.com/blog",
-        ]
-
-        for block in inspiration_search_response.content:
-            if block.type == "server_tool_use" and getattr(block, 'name', '') == "web_search":
-                query = getattr(block, 'input', {}).get('query', '')
-                if query:
-                    search_queries.append(query)
-                    print(f"[STEP 3] Search: {query}", flush=True)
-
-            if block.type == "web_search_tool_result":
-                content = getattr(block, 'content', [])
-                if isinstance(content, list):
-                    for item in content[:5]:
-                        url = getattr(item, 'url', '')
-                        title = getattr(item, 'title', '')
-                        if url and url not in [u["url"] for u in inspiration_urls]:
-                            if not any(skip in url.lower() for skip in skip_domains):
-                                inspiration_urls.append({"url": url, "title": title})
-                                print(f"[STEP 3] Found: {url[:60]}", flush=True)
-                            else:
-                                print(f"[STEP 3] Skipped (gallery/article): {url[:60]}", flush=True)
-
-        print(f"[STEP 3] Total real sites found: {len(inspiration_urls)}", flush=True)
-        print(f"[TIMING] Step 3 (search inspiration): {time.time() - step3_start:.1f}s", flush=True)
-
-        # ── Collect site analysis result (started in Step 2) ──
-        existing_site_analysis = ""
-        if site_analysis_future:
-            try:
-                existing_site_analysis = site_analysis_future.result(timeout=30)
-                print(f"[STEP 2] Site analysis: {existing_site_analysis[:80]}...", flush=True)
-            except Exception as e:
-                print(f"[STEP 2] Site analysis error: {e}", flush=True)
-            site_analysis_executor.shutdown(wait=False)
-
-        # ============================================
-        # STEP 4: Fetch inspiration sites in parallel
-        # ============================================
-        step4_start = time.time()
-        print("[STEP 4] Fetching inspiration site content...", flush=True)
-
-        inspiration_content = []
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            future_to_url = {executor.submit(fetch_page_content, u["url"]): u for u in inspiration_urls[:8]}
-            for future in as_completed(future_to_url):
-                url_info = future_to_url[future]
-                try:
-                    content = future.result()
-                    content["title"] = url_info.get("title", "Unknown")
-                    inspiration_content.append(content)
-                    print(f"[STEP 4] Fetched: {url_info['url'][:50]}", flush=True)
-                except Exception as e:
-                    print(f"[STEP 4] Error: {url_info['url'][:40]}: {e}", flush=True)
-
-        print(f"[TIMING] Step 4 (fetch inspiration): {time.time() - step4_start:.1f}s", flush=True)
-
-        # ============================================
-        # STEP 5: Opus writes comprehensive markdown research report
-        # ============================================
-        step5_start = time.time()
-        print("[STEP 5] Having Opus write research markdown report...", flush=True)
-
-        # Format fetched content for analysis (2000 chars per site for richer context)
-        sites_for_analysis = "\n\n".join([
-            f"URL: {c.get('url', 'unknown')}\nTitle: {c.get('title', 'unknown')}\nCSS/Styles: {json.dumps(c.get('colors_found', []))}\nContent: {c.get('text', '')[:2000]}"
-            for c in inspiration_content if not c.get("error")
-        ])
-
-        # Tool for Opus to return structured metadata alongside the markdown
+        # Tool for Claude to return structured research data
         save_research_tool = {
-            "name": "save_research_metadata",
-            "description": "Save the research metadata (fonts, site names) alongside the markdown report",
+            "name": "save_research",
+            "description": "Save the complete research results — colors, fonts, inspiration sites, and markdown report",
             "input_schema": {
                 "type": "object",
                 "properties": {
+                    "research_markdown": {
+                        "type": "string",
+                        "description": "Complete design brief in markdown format"
+                    },
+                    "brand_colors": {
+                        "type": "object",
+                        "properties": {
+                            "primary": {"type": "string", "description": "Primary brand color hex"},
+                            "secondary": {"type": "string", "description": "Secondary color hex"},
+                            "accent": {"type": "string", "description": "Accent color hex for CTAs"}
+                        },
+                        "required": ["primary", "secondary", "accent"]
+                    },
                     "heading_font": {"type": "string", "description": "Recommended Google Font for headings"},
                     "body_font": {"type": "string", "description": "Recommended Google Font for body text"},
                     "inspiration_sites": {
                         "type": "array",
-                        "minItems": 3,
-                        "maxItems": 3,
+                        "minItems": inspiration_count,
+                        "maxItems": inspiration_count,
                         "items": {
                             "type": "object",
                             "properties": {
@@ -455,40 +155,47 @@ Search now."""
                         }
                     }
                 },
-                "required": ["heading_font", "body_font", "inspiration_sites"]
+                "required": ["research_markdown", "brand_colors", "heading_font", "body_font", "inspiration_sites"]
             }
         }
 
-        company_url_str = company_urls[0]["url"] if company_urls else "unknown"
+        web_search_tool = {
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": 5
+        }
 
-        research_response = self.client.messages.create(
-            model=MODEL_HAIKU,
+        company_url_str = company_url or "unknown"
+
+        response = self.client.beta.messages.create(
+            model=research_model,
             max_tokens=8000,
-            tools=[save_research_tool],
+            betas=["web-search-2025-03-05"],
+            tools=[web_search_tool, save_research_tool],
             messages=[{
                 "role": "user",
-                "content": f"""You are a senior web designer creating a design brief for a layout developer. Your report will be handed DIRECTLY to the person building the HTML/CSS — so it must be specific and actionable.
+                "content": f"""You are a senior web designer researching a brand to create a design brief.
 
-DESIGN PHILOSOPHY: Always design as if the client has a premium budget. Study the inspiration sites for their high-end design techniques — generous whitespace, elegant typography, refined animations, premium photography treatment — and bring that level of polish to every blueprint, regardless of the client's actual market segment. Beautiful design is universal.
-
-PROJECT BRIEF: {self.project.brief}
+PROJECT BRIEF: {search_context}
 COMPANY URL: {company_url_str}
-BRAND COLORS FOUND: {brand_colors if brand_colors else 'None found — you must suggest appropriate colors'}
+SITE TITLE: {site_title}
+SITE TEXT (first 3000 chars): {site_text}
+RAW COLORS FOUND ON SITE: {raw_colors[:15]}
 
-═══════════════════════════════════════════════════════════════
-INSPIRATION WEBSITES (with their actual content/styles):
-═══════════════════════════════════════════════════════════════
-{sites_for_analysis}
+YOUR TASKS:
+1. Use web search to find {inspiration_count} beautiful, REAL inspiration websites in the same or adjacent premium industry. Search on awwwards.com, siteinspire.com, or for premium brands directly. We need ACTUAL website URLs (like "stripe.com", "fourseasons.com"), NOT articles or template galleries.
 
-═══════════════════════════════════════════════════════════════
-INSTRUCTIONS:
-═══════════════════════════════════════════════════════════════
+2. Analyze the brand identity. Pick 3 brand colors:
+   - The raw HTML colors above may include WordPress/framework defaults (like #cf2e2e, #1877F2 for Facebook, etc.)
+   - Use your judgment to identify the ACTUAL brand colors vs framework noise
+   - If the raw colors don't seem right, pick colors that match the brand's identity
+   - Primary: main brand color (logo, headers)
+   - Secondary: backgrounds, cards, contrast
+   - Accent: CTAs, buttons, links
 
-Write your report as FREE TEXT (markdown), then call the save_research_metadata tool.
+3. Pick a heading font and body font (Google Fonts).
 
-Pick the 3 BEST real websites from above (skip any that are template galleries or design articles — those are useless as inspiration). If fewer than 3 real sites exist, use your knowledge of well-designed sites in this industry.
-
-Use this EXACT structure:
+4. Write a comprehensive design brief in markdown with this structure:
 
 # Brand Research: [Company Name]
 
@@ -504,166 +211,176 @@ Use this EXACT structure:
 
 ## Inspiration Site 1: [Name]
 - **URL:** [actual website url]
-- **What they do well:** [2-3 sentences about their design approach]
-- **Key design patterns:** [bullet list of specific techniques: navigation style, hero layout, section transitions, card styles, etc.]
+- **What they do well:** [2-3 sentences]
+- **Key design patterns:** [bullet list]
 
 ### → Layout Blueprint 1 (inspired by [Name])
-Build a hero section and landing page with these specifics:
-- **Hero structure:** [exact layout — e.g. "full-width background image with centered text overlay" or "split 50/50 with image left, text right"]
-- **Navigation:** [e.g. "sticky transparent nav, becomes solid white on scroll, logo left, links center, CTA button right"]
-- **Hero content:** [what goes in it — headline, subline, CTA button, maybe stats or trust badges]
+- **Hero structure:** [exact layout]
+- **Navigation:** [style]
+- **Hero content:** [what goes in it]
 - **Sections below hero (in order):**
-  1. [Section name] — [layout: e.g. "3-column card grid with icons"] — [content: e.g. "key services/features"]
-  2. [Section name] — [layout] — [content]
-  3. [Section name] — [layout] — [content]
-- **Visual style:** [padding, border-radius, shadows, background colors for sections]
+  1. [Section] — [layout] — [content]
+  2. [Section] — [layout] — [content]
+  3. [Section] — [layout] — [content]
+- **Visual style:** [padding, shadows, etc.]
 - **What makes this layout unique:** [1 sentence]
 
-## Inspiration Site 2: [Name]
-[same structure as above]
-
-### → Layout Blueprint 2 (inspired by [Name])
-[same blueprint structure]
-
-## Inspiration Site 3: [Name]
-[same structure as above]
-
-### → Layout Blueprint 3 (inspired by [Name])
-[same blueprint structure]
+[Repeat for each inspiration site]
 
 ## Design Direction
-[2-3 sentences: overall direction combining brand identity with the best elements]
+[2-3 sentences overall direction]
 
 CRITICAL RULES:
-- The 3 inspiration sites MUST be from 3 DIFFERENT domains (e.g. oanda.com + bloomberg.com + wise.com — NEVER 3 pages from the same site)
-- Each blueprint must describe a DIFFERENT layout approach (e.g. one image-heavy, one minimal/typographic, one bold/dark)
-- Be specific enough that a developer could build the HTML without guessing
-- Include real section names relevant to THIS company (e.g. for a golf club: "Tee Times", "Course Overview", "Membership"; for a bank: "Services", "Rates", "Download App")
-- The 3 layouts must all use the same brand colors but feel distinctly different
+- The {inspiration_count} inspiration sites MUST be from DIFFERENT domains
+- Each blueprint must describe a DIFFERENT layout approach
+- Be specific enough that a developer could build HTML without guessing
+- Include real section names relevant to THIS company
+- Always aim ABOVE the client's price tier for design inspiration
 
-After writing the markdown, call the save_research_metadata tool with fonts + the 3 sites."""
+After writing your analysis, call the save_research tool with ALL findings."""
             }]
         )
-        self.track_usage(research_response)
+        self.track_usage(response)
 
-        # Extract markdown from text blocks and metadata from tool call
+        # Process response — handle agentic loop for web search
+        max_iterations = 10
         research_md = ""
-        selected_sites = []
+        brand_colors = []
         recommended_fonts = {"heading": "Inter", "body": "Inter"}
+        selected_sites = []
 
-        for block in research_response.content:
-            if block.type == "text":
-                research_md += block.text
-            elif block.type == "tool_use" and block.name == "save_research_metadata":
-                metadata = block.input
-                recommended_fonts = {
-                    "heading": metadata.get("heading_font", "Inter"),
-                    "body": metadata.get("body_font", "Inter")
-                }
-                selected_sites = metadata.get("inspiration_sites", [])
+        for iteration in range(max_iterations):
+            print(f"[RESEARCH] Iteration {iteration + 1}, stop_reason: {response.stop_reason}", flush=True)
 
-        print(f"[STEP 5] Research markdown: {len(research_md)} chars", flush=True)
-        print(f"[STEP 5] Selected {len(selected_sites)} inspiration sites", flush=True)
-        for site in selected_sites:
-            print(f"  - {site.get('name')}: {site.get('design_style', '')[:50]}...", flush=True)
-        print(f"[STEP 5] Fonts: {recommended_fonts}", flush=True)
-
-        print(f"[TIMING] Step 5 (research markdown): {time.time() - step5_start:.1f}s", flush=True)
-
-        # ============================================
-        # STEP 6: Finalize brand colors (or create if not found)
-        # ============================================
-        step6_start = time.time()
-
-        # If we didn't find brand colors, have Opus create appropriate ones
-        if not brand_colors or len(brand_colors) < 3:
-            print("[STEP 6] No brand colors found, creating palette...", flush=True)
-
-            color_tool = {
-                "name": "create_colors",
-                "description": "Create a color palette for the brand",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "primary": {"type": "string", "description": "Primary color hex (e.g., #1a1a1a)"},
-                        "secondary": {"type": "string", "description": "Secondary color hex"},
-                        "accent": {"type": "string", "description": "Accent color hex for CTAs"}
-                    },
-                    "required": ["primary", "secondary", "accent"]
-                }
-            }
-
-            color_response = self.client.messages.create(
-                model=MODEL_HAIKU,
-                max_tokens=500,
-                tools=[color_tool],
-                tool_choice={"type": "tool", "name": "create_colors"},
-                messages=[{
-                    "role": "user",
-                    "content": f"""Create a color palette for this project.
-
-PROJECT: {self.project.brief}
-
-INSPIRATION SITES:
-{json.dumps([{"name": s.get("name"), "style": s.get("design_style")} for s in selected_sites], indent=2)}
-
-Create colors that:
-1. Feel appropriate for this industry
-2. Match the mood of the inspiration sites
-3. Work well together (good contrast)"""
-                }]
-            )
-            self.track_usage(color_response)
-
-            for block in color_response.content:
-                if block.type == "tool_use" and block.name == "create_colors":
-                    colors = block.input
-                    brand_colors = [colors.get("primary", "#1a1a1a"), colors.get("secondary", "#ffffff"), colors.get("accent", "#0066cc")]
+            # Check for save_research tool call
+            found_research = False
+            for block in response.content:
+                if block.type == "text":
+                    # Collect any text output (may contain markdown before tool call)
+                    pass
+                if block.type == "tool_use" and block.name == "save_research":
+                    data = block.input
+                    research_md = data.get("research_markdown", "")
+                    colors = data.get("brand_colors", {})
+                    brand_colors = [
+                        colors.get("primary", "#1a1a1a"),
+                        colors.get("secondary", "#ffffff"),
+                        colors.get("accent", "#0066cc")
+                    ]
+                    recommended_fonts = {
+                        "heading": data.get("heading_font", "Inter"),
+                        "body": data.get("body_font", "Inter")
+                    }
+                    selected_sites = data.get("inspiration_sites", [])
+                    found_research = True
+                    print(f"[RESEARCH] Got save_research tool call", flush=True)
                     break
-        else:
-            # Use first 3 colors from the site
-            brand_colors = brand_colors[:3]
-            # Ensure we have 3 colors
-            while len(brand_colors) < 3:
-                brand_colors.append("#0066cc")
 
-        print(f"[STEP 6] Final brand colors: {brand_colors}", flush=True)
-        print(f"[TIMING] Step 6 (finalize colors): {time.time() - step6_start:.1f}s", flush=True)
+            if found_research:
+                break
 
-        # ============================================
-        # Save research results
-        # ============================================
+            # If end_turn without save_research, prompt to use the tool
+            if response.stop_reason == "end_turn":
+                # Collect any text that might be the markdown
+                text_content = ""
+                for block in response.content:
+                    if block.type == "text":
+                        text_content += block.text
+
+                if text_content and not research_md:
+                    research_md = text_content
+
+                # Serialize assistant content for continuation
+                serialized = []
+                for block in response.content:
+                    if block.type in ("server_tool_use", "web_search_tool_result"):
+                        continue
+                    dumped = block.model_dump()
+                    if block.type == "tool_use" and "caller" in dumped:
+                        del dumped["caller"]
+                    if block.type == "text" and "citations" in dumped:
+                        del dumped["citations"]
+                    serialized.append(dumped)
+
+                print("[RESEARCH] End turn without save_research — prompting to use tool", flush=True)
+                response = self.client.beta.messages.create(
+                    model=research_model,
+                    max_tokens=8000,
+                    betas=["web-search-2025-03-05"],
+                    tools=[web_search_tool, save_research_tool],
+                    messages=[
+                        {"role": "user", "content": f"Research this brand and write a design brief.\n\nBrief: {search_context}\nCompany URL: {company_url_str}"},
+                        {"role": "assistant", "content": serialized},
+                        {"role": "user", "content": "Great research! Now please call the save_research tool with all your findings."}
+                    ]
+                )
+                self.track_usage(response)
+                continue
+
+            # If tool_use for web_search, just let the API handle it (it auto-continues)
+            if response.stop_reason == "tool_use":
+                # Check if there's a non-web-search tool call we need to handle
+                has_pending = False
+                for block in response.content:
+                    if block.type == "tool_use" and block.name != "web_search":
+                        has_pending = True
+                if not has_pending:
+                    # Web search auto-continues, just wait
+                    break
+
+        print(f"[TIMING] Claude call: {time.time() - claude_start:.1f}s", flush=True)
+        print(f"[RESEARCH] Markdown: {len(research_md)} chars", flush=True)
+        print(f"[RESEARCH] Colors: {brand_colors}", flush=True)
+        print(f"[RESEARCH] Fonts: {recommended_fonts}", flush=True)
+        print(f"[RESEARCH] Sites: {[s.get('name') for s in selected_sites]}", flush=True)
+
+        # Ensure we have 3 colors
+        while len(brand_colors) < 3:
+            brand_colors.append("#0066cc")
+
+        # ── Save results ──
         research_data = {
             "brand_colors": brand_colors,
             "fonts": recommended_fonts,
             "inspiration_sites": selected_sites,
-            "company_url": company_urls[0]["url"] if company_urls else None,
-            "search_queries": search_queries
+            "company_url": company_url,
         }
 
-        # Store markdown report on project
         self.project.research_md = research_md
-
-        # Store structured data in moodboard (brand_colors for swatches, fonts for inject_google_fonts)
         self.project.moodboard = {
             "research": research_data,
             "brand_colors": brand_colors,
             "fonts": recommended_fonts,
             "inspiration_sites": selected_sites,
-            "company_images": company_images if company_urls else [],
-            "existing_site_analysis": existing_site_analysis,
+            "company_images": company_images,
         }
-        self.project.selected_moodboard = 1  # Not used anymore, but keep for compatibility
-        self.project.status = ProjectStatus.MOODBOARD
+        self.project.selected_moodboard = 1  # Compat
+        self.project.status = ProjectStatus.RESEARCH_DONE
         self.db.commit()
-
-        print(f"[RESEARCH DATA] Markdown saved ({len(research_md)} chars)", flush=True)
-        print(json.dumps(research_data, indent=2, ensure_ascii=False), flush=True)
 
         print(f"[TIMING] TOTAL research: {time.time() - phase_start:.1f}s", flush=True)
         self.log("research", f"Found {len(brand_colors)} colors, {len(selected_sites)} inspiration sites")
 
         return research_data
+
+    def _get_company_url(self: "Generator") -> str | None:
+        """Extract confirmed company URL from clarification answers or initial search."""
+        clarification = self.project.clarification or {}
+
+        # Try to get from initial research URLs
+        initial_research = clarification.get("initial_research", {})
+        urls_found = initial_research.get("urls_found", [])
+        if urls_found:
+            return urls_found[0].get("url")
+
+        # Fallback: check if URL is in the brief
+        import re
+        brief = self.project.brief or ""
+        url_match = re.search(r'https?://[^\s]+', brief)
+        if url_match:
+            return url_match.group(0)
+
+        return None
 
     def _analyze_existing_site(self: "Generator", company_content: dict, company_images: list[dict]) -> str:
         """Analyze the existing website using Haiku vision with scraped images.

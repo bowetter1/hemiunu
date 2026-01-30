@@ -84,8 +84,18 @@ struct DesignView: View {
             case .clarification:
                 GeneratingView(message: "Waiting for your input...")
 
+            case .researching:
+                GeneratingView(message: "Researching brand...")
+
+            case .researchDone:
+                // Research complete — show markdown + generate button
+                ResearchDoneView(
+                    project: project,
+                    appState: appState
+                )
+
             case .moodboard:
-                // Research done — show markdown if available
+                // Legacy — show markdown if available
                 if let md = project.researchMd, !md.isEmpty {
                     ResearchMarkdownView(markdown: md)
                 } else {
@@ -122,6 +132,8 @@ struct DesignView: View {
 struct DesignCommandBar: View {
     @ObservedObject var appState: AppState
     @State private var commandText = ""
+    @State private var showStartSheet = false
+    @State private var pendingBrief = ""
 
     private var client: APIClient { appState.client }
 
@@ -131,6 +143,15 @@ struct DesignCommandBar: View {
             placeholder: placeholderText
         ) {
             processCommand()
+        }
+        .sheet(isPresented: $showStartSheet) {
+            StartProjectSheet(
+                isPresented: $showStartSheet,
+                client: client,
+                initialBrief: pendingBrief
+            ) { projectId in
+                // Project created from sheet
+            }
         }
     }
 
@@ -155,17 +176,9 @@ struct DesignCommandBar: View {
            project.status == .editing || project.status == .done {
             editCurrentPage(instruction: text)
         } else {
-            createProject(brief: text)
-        }
-    }
-
-    private func createProject(brief: String) {
-        Task {
-            do {
-                _ = try await client.projectService.create(brief: brief)
-            } catch {
-                // Project creation failed
-            }
+            // No project — open the start project sheet with typed text as brief
+            pendingBrief = text
+            showStartSheet = true
         }
     }
 
@@ -319,6 +332,87 @@ struct ResearchMarkdownView: View {
     private func copyMarkdown() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(markdown, forType: .string)
+    }
+}
+
+// MARK: - Research Done View (with Generate button)
+
+struct ResearchDoneView: View {
+    let project: Project
+    @ObservedObject var appState: AppState
+    @State private var isGenerating = false
+
+    private var client: APIClient { appState.client }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Research markdown content
+            if let md = project.researchMd, !md.isEmpty {
+                ResearchMarkdownView(markdown: md)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 36))
+                        .foregroundColor(.green)
+                    Text("Research complete")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
+            Divider()
+
+            // Generate Layout button bar
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Research complete")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Review the research above, then generate your layout")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Button(action: generateLayout) {
+                    HStack(spacing: 6) {
+                        if isGenerating {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11))
+                        }
+                        Text(isGenerating ? "Generating..." : "Generate Layout")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(isGenerating ? Color.gray : Color.orange)
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .disabled(isGenerating)
+            }
+            .padding(16)
+            .background(Color(nsColor: .controlBackgroundColor))
+        }
+    }
+
+    private func generateLayout() {
+        isGenerating = true
+        Task {
+            do {
+                let _ = try await client.projectService.generate(projectId: project.id)
+                // WebSocket will notify when layouts are ready
+            } catch {
+                await MainActor.run {
+                    isGenerating = false
+                }
+            }
+        }
     }
 }
 

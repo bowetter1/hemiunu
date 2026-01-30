@@ -4,7 +4,7 @@ import re
 import time
 from typing import TYPE_CHECKING
 
-from .utils import MODEL_SONNET, inject_google_fonts
+from .utils import MODEL_SONNET, MODEL_OPUS, inject_google_fonts
 from .tool_policy import build_layout_tools, resolve_image_source
 
 if TYPE_CHECKING:
@@ -16,17 +16,34 @@ class LayoutsMixin:
 
     def generate_layouts(self: "Generator") -> list[dict]:
         """
-        Generate 3 layout alternatives, each inspired by one of the 3 inspiration sites.
+        Generate layout alternatives, each inspired by an inspiration site.
+        Routes to Anthropic (Claude) or OpenAI based on layout_provider config.
+        """
+        layout_provider = self.get_config("layout_provider", "anthropic")
+        print(f"[GENERATE_LAYOUTS] Provider: {layout_provider}", flush=True)
 
-        Uses:
-        - REAL brand colors from company's actual website
-        - 3 different inspiration sites for 3 different designs
+        if layout_provider == "openai":
+            return self._generate_layouts_openai()
+        else:
+            return self._generate_layouts_anthropic()
+
+    def _generate_layouts_anthropic(self: "Generator") -> list[dict]:
+        """
+        Generate layouts using Anthropic Claude (Sonnet/Opus).
         """
         from ..models import Page, PageVersion, ProjectStatus
 
         layouts_start = time.time()
-        print("[GENERATE_LAYOUTS] Starting...", flush=True)
-        self.log("layouts", "Generating 3 layouts from inspiration sites...")
+        print("[GENERATE_LAYOUTS] Starting (Anthropic)...", flush=True)
+
+        # Resolve layout model from config
+        layout_model_key = self.get_config("layout_model", "sonnet")
+        layout_model = {"sonnet": MODEL_SONNET, "opus": MODEL_OPUS}.get(layout_model_key, MODEL_SONNET)
+        layout_count = self.get_config("layout_count", 1)
+        allow_web_search = self.get_config("web_search_during_layout", True)
+        print(f"[GENERATE_LAYOUTS] Model: {layout_model}, count: {layout_count}, web_search: {allow_web_search}", flush=True)
+
+        self.log("layouts", f"Generating {layout_count} layout(s)...")
 
         # Get research markdown (primary source of design context)
         research_md = self.project.research_md or ""
@@ -114,14 +131,21 @@ Keep what works. Fix what doesn't. Elevate the overall quality.
             layout_tool=layout_tool,
             image_source=image_source,
             has_company_images=bool(company_images),
+            allow_web_search=allow_web_search,
         )
 
         # Build the initial prompt using research markdown as primary context
-        # TODO: Restore to THREE layouts when ready
-        # initial_prompt = f"""Create THREE world-class hero section designs, each inspired by a different reference website.
-        initial_prompt = f"""Create ONE world-class landing page with a hero section, inspired by the BEST reference website from the research report.
+        count_word = {1: "ONE", 2: "TWO", 3: "THREE"}.get(layout_count, str(layout_count))
+        if layout_count == 1:
+            count_intro = f"Create {count_word} world-class landing page with a hero section, inspired by the BEST reference website from the research report."
+            count_scope = "SCOPE: Build ONLY a single hero/start page. This is a ONE-PAGE design — just the hero section and navigation. Keep it focused. We will add more sections later."
+        else:
+            count_intro = f"Create {count_word} world-class hero section designs, each inspired by a different reference website."
+            count_scope = "SCOPE: Build ONLY hero/start pages. Each design is a ONE-PAGE layout — just the hero section and navigation. Keep them focused."
 
-SCOPE: Build ONLY a single hero/start page. This is a ONE-PAGE design — just the hero section and navigation. Keep it focused. We will add more sections later.
+        initial_prompt = f"""{count_intro}
+
+{count_scope}
 
 ═══════════════════════════════════════════════════════════════
 RESEARCH REPORT (from our brand researcher):
@@ -150,17 +174,12 @@ PROJECT BRIEF:
 {self.project.brief}
 
 ═══════════════════════════════════════════════════════════════
-YOUR TASK: Create 1 layout, inspired by the BEST inspiration site from the research report above.
+YOUR TASK: Create {layout_count} layout(s), {"inspired by the BEST inspiration site from the research report above." if layout_count == 1 else "each inspired by a different inspiration site from the research report above."}
 ═══════════════════════════════════════════════════════════════
-Pick the inspiration site with the best design quality and most relevant style.
-Use the DETAILED design analysis from the research report above. The layout should clearly
+{"Pick the inspiration site with the best design quality and most relevant style." if layout_count == 1 else "Each layout should be clearly inspired by a different reference site."}
+Use the DETAILED design analysis from the research report above. {"The layout" if layout_count == 1 else "Each layout"} should clearly
 borrow the design style, layout patterns, typography approach, and key elements described
-for that inspiration site.
-# TODO: Restore to 3 layouts:
-# YOUR TASK: Create 3 layouts, each inspired by one of the 3 inspiration sites described above.
-# Use the DETAILED design analysis from the research report above. Each layout should clearly
-# borrow the design style, layout patterns, typography approach, and key elements described
-# for its corresponding inspiration site.
+for {"that" if layout_count == 1 else "its corresponding"} inspiration site.
 
 You have web_search available as backup if you need to verify something, but the research
 report above should contain everything you need.
@@ -203,13 +222,12 @@ IMPORTANT: Each layout must:
 2. Be clearly inspired by the chosen reference site's design style
 3. Borrow specific design elements mentioned for that site
 4. Be a COMPLETE HTML file with all CSS in <style> tag
-# TODO: Restore for 3 layouts:
-# 5. Be unique and different from the other layouts
+{"5. Be unique and different from the other layouts" if layout_count > 1 else ""}
 
 The layouts should look like they came from a professional design agency."""
 
         response = self.client.beta.messages.create(
-            model=MODEL_SONNET,
+            model=layout_model,
             max_tokens=20000,
             betas=["web-search-2025-03-05"],
             tools=tools_for_layouts,
@@ -232,6 +250,9 @@ The layouts should look like they came from a professional design agency."""
                 # Remove 'caller' field from tool_use blocks (beta artifact)
                 if block.type == "tool_use" and "caller" in dumped:
                     del dumped["caller"]
+                # Remove citations from text blocks — they reference filtered web search results
+                if block.type == "text" and "citations" in dumped:
+                    del dumped["citations"]
                 serialized.append(dumped)
             return serialized
 
@@ -314,12 +335,10 @@ The layouts should look like they came from a professional design agency."""
                 print("[GENERATE_LAYOUTS] End turn without layouts - prompting to continue", flush=True)
                 # Prompt Opus to now create the layouts
                 conversation_messages.append({"role": "assistant", "content": serialize_assistant_content(response.content)})
-                # TODO: Restore for 3 layouts:
-                # conversation_messages.append({"role": "user", "content": "Great! Now that you've studied the inspiration sites, please create the 3 layouts using the save_layouts tool."})
-                conversation_messages.append({"role": "user", "content": "Great! Now please create the 1 layout using the save_layouts tool."})
+                conversation_messages.append({"role": "user", "content": f"Great! Now please create the {layout_count} layout(s) using the save_layouts tool."})
 
                 response = self.client.beta.messages.create(
-                    model=MODEL_SONNET,
+                    model=layout_model,
                     max_tokens=20000,
                     betas=["web-search-2025-03-05"],
                     tools=tools_for_layouts,
@@ -334,7 +353,7 @@ The layouts should look like they came from a professional design agency."""
                 conversation_messages.append({"role": "user", "content": tool_results})
 
                 response = self.client.beta.messages.create(
-                    model=MODEL_SONNET,
+                    model=layout_model,
                     max_tokens=20000,
                     betas=["web-search-2025-03-05"],
                     tools=tools_for_layouts,
@@ -463,6 +482,180 @@ TOOL: "generate_image"
         if image_source == "stock":
             return "IMPORTANT: Use only 1 stock image (the hero)."
         return "IMPORTANT: Generate only 1 image (the hero)."
+
+    def _generate_layouts_openai(self: "Generator") -> list[dict]:
+        """
+        Generate layouts using OpenAI (GPT-4o).
+        Simpler flow: one completion call, extract HTML from response.
+        No web search or image tool support — just layout HTML.
+        """
+        from ..models import Page, PageVersion, ProjectStatus
+        from openai import OpenAI
+        from apex_server.config import get_settings
+
+        settings = get_settings()
+
+        layouts_start = time.time()
+        print("[GENERATE_LAYOUTS] Starting (OpenAI)...", flush=True)
+
+        layout_count = self.get_config("layout_count", 1)
+        print(f"[GENERATE_LAYOUTS] OpenAI, count: {layout_count}", flush=True)
+
+        self.log("layouts", f"Generating {layout_count} layout(s) with OpenAI...")
+
+        # Get research data
+        research_md = self.project.research_md or ""
+        research_data = self.project.moodboard
+        if not research_data:
+            raise ValueError("Research data missing - run research_brand first")
+
+        brand_colors = research_data.get("brand_colors", ["#1a1a1a", "#ffffff", "#0066cc"])
+        while len(brand_colors) < 3:
+            brand_colors.append("#0066cc")
+        primary_color, secondary_color, accent_color = brand_colors[0], brand_colors[1], brand_colors[2]
+
+        fonts = research_data.get("fonts", {"heading": "Inter", "body": "Inter"})
+        company_images = research_data.get("company_images", [])
+
+        # Build image instructions (no tool use, just reference paths)
+        image_instruction = "Do NOT include any <img> tags. Use CSS gradients, shapes, and color blocks for visual interest instead."
+        if company_images:
+            img_path = company_images[0].get("path", "")
+            image_instruction = f'Use this image for the hero: <img src="{img_path}">. Only use this one image.'
+
+        count_word = {1: "ONE", 2: "TWO", 3: "THREE"}.get(layout_count, str(layout_count))
+
+        prompt = f"""Create {count_word} world-class landing page layout(s) as complete HTML files with inline CSS.
+
+RESEARCH REPORT:
+{research_md}
+
+BRAND COLORS:
+PRIMARY: {primary_color}
+SECONDARY: {secondary_color}
+ACCENT: {accent_color}
+
+TYPOGRAPHY:
+Heading font: {fonts.get('heading', 'Inter')}
+Body font: {fonts.get('body', 'Inter')}
+
+PROJECT BRIEF:
+{self.project.brief}
+
+IMAGES:
+{image_instruction}
+
+REQUIREMENTS:
+- Each layout is a COMPLETE HTML file (<!DOCTYPE html> through </html>)
+- All CSS must be in a <style> tag (no external stylesheets except Google Fonts)
+- Include a Google Fonts <link> for the specified fonts
+- Use the EXACT brand colors above
+- Responsive design with clamp() for typography
+- Generous whitespace, elegant micro-interactions (hover effects)
+- Professional agency quality
+
+{"Each layout must be inspired by a different design approach (e.g., one minimal, one bold, one image-heavy)." if layout_count > 1 else ""}
+
+Return your response as a JSON object with this structure:
+{{
+  "layouts": [
+    {{
+      "name": "Layout name",
+      "inspired_by": "Inspiration source",
+      "description": "Short description",
+      "html": "<!DOCTYPE html>..."
+    }}
+  ]
+}}
+
+Return ONLY the JSON. No markdown code fences, no explanation text."""
+
+        # Call OpenAI
+        openai_client = OpenAI(api_key=settings.openai_api_key)
+
+        model_start = time.time()
+        print("[GENERATE_LAYOUTS] Calling OpenAI GPT-4o...", flush=True)
+
+        completion = openai_client.chat.completions.create(
+            model="gpt-4o",
+            max_tokens=16000,
+            temperature=0.7,
+            messages=[
+                {"role": "system", "content": "You are a world-class web designer. You create beautiful, production-ready HTML layouts. Always respond with valid JSON only."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        # Track usage (approximate cost for GPT-4o)
+        usage = completion.usage
+        if usage:
+            self.project.input_tokens += usage.prompt_tokens
+            self.project.output_tokens += usage.completion_tokens
+            cost = (usage.prompt_tokens * 0.0025 + usage.completion_tokens * 0.01) / 1000
+            self.project.cost_usd += cost
+            self.db.commit()
+
+        raw_text = completion.choices[0].message.content or ""
+        print(f"[GENERATE_LAYOUTS] OpenAI response: {len(raw_text)} chars", flush=True)
+        print(f"[TIMING] OpenAI call: {time.time() - model_start:.1f}s", flush=True)
+
+        # Parse JSON response
+        layouts = []
+        try:
+            # Strip markdown code fences if present
+            clean = raw_text.strip()
+            if clean.startswith("```"):
+                clean = re.sub(r'^```(?:json)?\s*', '', clean)
+                clean = re.sub(r'\s*```$', '', clean)
+            parsed = json.loads(clean)
+            layouts = parsed.get("layouts", [])
+        except json.JSONDecodeError as e:
+            print(f"[GENERATE_LAYOUTS] JSON parse failed: {e}, trying HTML extraction fallback", flush=True)
+            layouts = self._extract_layouts_fallback(raw_text)
+
+        if not layouts:
+            raise ValueError("OpenAI returned no layouts")
+
+        print(f"[GENERATE_LAYOUTS] Got {len(layouts)} layouts from OpenAI", flush=True)
+
+        # Initialize filesystem
+        self.fs.init_project()
+
+        # Save layouts as pages
+        for i, layout in enumerate(layouts, 1):
+            html = layout.get("html", "")
+            html = inject_google_fonts(html, fonts)
+
+            page = Page(
+                project_id=self.project.id,
+                name=layout.get("name", f"Layout {i}"),
+                html=html,
+                layout_variant=i
+            )
+            self.db.add(page)
+            self.db.flush()
+
+            file_name = f"layout_{i}.html"
+            self.fs.write_file(f"public/{file_name}", html)
+            self.fs.save_version(str(page.id), 1, html)
+
+            page_version = PageVersion(
+                page_id=page.id,
+                version=1,
+                html=html,
+                instruction=f"Generated by OpenAI — {layout.get('inspired_by', 'AI design')}"
+            )
+            self.db.add(page_version)
+
+            print(f"[GENERATE_LAYOUTS] Saved {file_name} (OpenAI)", flush=True)
+
+        self.fs.git_commit("Generated layouts (OpenAI)")
+        self.project.status = ProjectStatus.LAYOUTS
+        self.db.commit()
+
+        print(f"[TIMING] TOTAL OpenAI layout generation: {time.time() - layouts_start:.1f}s", flush=True)
+        self.log("layouts", f"Created {len(layouts)} layouts (OpenAI)", {"count": len(layouts), "provider": "openai"})
+        return layouts
 
     def _extract_layouts_fallback(self: "Generator", text: str) -> list[dict]:
         """Fallback: extract HTML blocks when JSON parsing fails"""

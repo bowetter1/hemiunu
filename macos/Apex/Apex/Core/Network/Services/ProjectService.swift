@@ -5,7 +5,7 @@ struct ProjectService {
     let client: APIClient
 
     /// Create a new project
-    func create(brief: String, imageSource: String? = nil) async throws -> Project {
+    func create(brief: String, imageSource: String? = nil, config: GenerationConfig? = nil) async throws -> Project {
         let url = client.baseURL.appendingPathComponent("/api/v1/projects")
         var request = client.authorizedRequest(url: url)
         request.httpMethod = "POST"
@@ -15,14 +15,16 @@ struct ProjectService {
         struct CreateProjectRequest: Codable {
             let brief: String
             let imageSource: String?
+            let config: GenerationConfig?
 
             enum CodingKeys: String, CodingKey {
                 case brief
                 case imageSource = "image_source"
+                case config
             }
         }
 
-        request.httpBody = try JSONEncoder().encode(CreateProjectRequest(brief: brief, imageSource: imageSource))
+        request.httpBody = try JSONEncoder().encode(CreateProjectRequest(brief: brief, imageSource: imageSource, config: config))
         let (data, response) = try await NetworkSession.aiGeneration.data(for: request)
         return try client.decodeResponse(Project.self, data: data, response: response)
     }
@@ -85,7 +87,18 @@ struct ProjectService {
         return try client.decodeResponse(Project.self, data: data, response: response)
     }
 
-    /// Generate 3 layout alternatives
+    /// Trigger layout generation after research is done
+    func generate(projectId: String) async throws -> Project {
+        let url = client.baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate")
+        var request = client.authorizedRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 300
+
+        let (data, response) = try await NetworkSession.aiGeneration.data(for: request)
+        return try client.decodeResponse(Project.self, data: data, response: response)
+    }
+
+    /// Generate 3 layout alternatives (legacy)
     func generateLayouts(projectId: String) async throws -> Project {
         let url = client.baseURL.appendingPathComponent("/api/v1/projects/\(projectId)/generate-layouts")
         var request = client.authorizedRequest(url: url)

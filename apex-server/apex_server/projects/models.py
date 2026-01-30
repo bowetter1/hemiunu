@@ -14,7 +14,9 @@ class ProjectStatus(str, enum.Enum):
     """Project generation status"""
     BRIEF = "brief"           # User entered brief
     CLARIFICATION = "clarification"  # Waiting for user clarification
-    MOODBOARD = "moodboard"   # Generating/showing moodboard
+    RESEARCHING = "researching"      # Research in progress
+    RESEARCH_DONE = "research_done"  # Research complete, waiting for user to trigger layout generation
+    MOODBOARD = "moodboard"   # Generating/showing moodboard (legacy)
     LAYOUTS = "layouts"       # Generating/showing 3 layouts
     EDITING = "editing"       # User is editing
     DONE = "done"
@@ -61,6 +63,9 @@ class Project(Base, TimestampMixin):
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+
+    # Generation configuration (JSON) - toggleable tools/phases
+    generation_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Error info
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

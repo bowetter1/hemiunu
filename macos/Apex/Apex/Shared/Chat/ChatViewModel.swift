@@ -130,6 +130,23 @@ class ChatViewModel: ObservableObject {
             )
             addMessage(response, for: selectedPageId)
 
+        case .researchReady:
+            clarificationQuestions = []
+            clarificationAnswers = []
+            let response = ChatMessage(
+                role: .assistant,
+                content: "Research complete! Review the brand report, then click 'Generate Layout' when ready.",
+                timestamp: Date()
+            )
+            addMessage(response, for: selectedPageId)
+            // Refresh project data
+            Task {
+                if let projectId = appState.currentProject?.id {
+                    let project = try? await client.projectService.get(id: projectId)
+                    appState.currentProject = project
+                }
+            }
+
         case .moodboardReady:
             clarificationQuestions = []
             clarificationAnswers = []

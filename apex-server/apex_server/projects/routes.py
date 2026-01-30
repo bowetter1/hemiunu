@@ -18,7 +18,7 @@ from apex_server.shared.dependencies import get_current_user
 from apex_server.auth.models import User
 from .models import Project, Variant, Page, PageVersion, ProjectLog, ProjectStatus
 from .generator import Generator
-from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error, notify_clarification_needed
+from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error, notify_clarification_needed, notify_research_ready
 from .structured_edit import generate_structured_edit, StructuredEditResponse
 from .filesystem import FileSystemService
 
@@ -133,9 +133,27 @@ async def websocket_endpoint(websocket: WebSocket, project_id: uuid.UUID):
 
 # === Request/Response Models ===
 
+class GenerationConfig(BaseModel):
+    """User-configurable generation options (stored as JSON on project)"""
+    # Research phase
+    skip_clarification: bool = False
+    web_search_company: bool = True
+    scrape_company_site: bool = True
+    find_inspiration_sites: bool = True
+    inspiration_site_count: int = 3
+    # Layout generation
+    web_search_during_layout: bool = True
+    layout_count: int = 1
+    # Quality controls
+    research_model: str = "haiku"   # "haiku" or "sonnet"
+    layout_model: str = "sonnet"    # "sonnet" or "opus"
+    layout_provider: str = "anthropic"  # "anthropic" or "openai"
+
+
 class CreateProjectRequest(BaseModel):
     brief: str
     image_source: str = "ai"
+    config: Optional[GenerationConfig] = None
 
 
 class ProjectResponse(BaseModel):
@@ -271,11 +289,16 @@ def create_project(
     if image_source not in {"none", "existing_images", "img2img", "ai", "stock"}:
         image_source = "ai"
 
+    # Build generation config dict
+    gen_config = request.config.model_dump() if request.config else {}
+    gen_config["image_source"] = image_source  # sync image_source into config
+
     project = Project(
         id=project_id,
         brief=request.brief,
         project_dir=project_dir,
         image_source=image_source,
+        generation_config=gen_config,
         user_id=current_user.id
     )
     db.add(project)
@@ -289,8 +312,10 @@ def create_project(
         pass
 
     # Start PHASE 1 in background: search and check if clarification needed
-    def phase1_search_bg(project_id: uuid.UUID):
-        print(f"[PHASE1] Starting background search for {project_id}", flush=True)
+    skip_clarification = gen_config.get("skip_clarification", False)
+
+    def phase1_search_bg(project_id: uuid.UUID, skip_clarification: bool = False):
+        print(f"[PHASE1] Starting background search for {project_id} (skip_clarification={skip_clarification})", flush=True)
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         db_url = str(settings.database_url)
@@ -302,16 +327,23 @@ def create_project(
         try:
             project = db.query(Project).filter_by(id=project_id).first()
             if project:
-                print(f"[PHASE1] Found project, calling search_and_clarify", flush=True)
                 gen = Generator(project, db)
-                result = gen.search_and_clarify()
-                print(f"[PHASE1] search_and_clarify result: {result}", flush=True)
 
-                # Always asks 3 questions (brand/scope/style)
-                notify_from_thread(notify_clarification_needed(
-                    str(project_id),
-                    result.get("questions", [])
-                ))
+                if skip_clarification:
+                    # Skip clarification — go straight to research (STOP after research)
+                    print(f"[PHASE1] Skipping clarification, going straight to research", flush=True)
+                    research_data = gen.research_brand()
+                    notify_from_thread(notify_research_ready(str(project_id), research_data))
+                else:
+                    print(f"[PHASE1] Found project, calling search_and_clarify", flush=True)
+                    result = gen.search_and_clarify()
+                    print(f"[PHASE1] search_and_clarify result: {result}", flush=True)
+
+                    # Always asks 3 questions (brand/scope/style)
+                    notify_from_thread(notify_clarification_needed(
+                        str(project_id),
+                        result.get("questions", [])
+                    ))
         except Exception as e:
             print(f"[ERROR] Phase 1 failed: {e}", flush=True)
             import traceback
@@ -325,7 +357,7 @@ def create_project(
         finally:
             db.close()
 
-    run_in_background(phase1_search_bg, project.id)
+    run_in_background(phase1_search_bg, project.id, skip_clarification)
 
     return project_to_response(project)
 
@@ -360,7 +392,7 @@ def clarify_project(
 
     print(f"[CLARIFY] Received answer for {project_id}: {request.answer}", flush=True)
 
-    # Continue to Phase 2 in background
+    # Continue to Phase 2 in background (research only — STOP after research)
     def phase2_research_bg(project_id: uuid.UUID):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
@@ -375,13 +407,9 @@ def clarify_project(
             if project:
                 gen = Generator(project, db)
                 research_data = gen.research_brand()
-                notify_from_thread(notify_moodboard_ready(str(project_id), research_data))
-
-                print(f"[PHASE3] Auto-continuing to layout generation...", flush=True)
-                layouts = gen.generate_layouts()
-                notify_from_thread(notify_layouts_ready(str(project_id), layouts))
+                notify_from_thread(notify_research_ready(str(project_id), research_data))
         except Exception as e:
-            print(f"[ERROR] Phase 2/3 failed: {e}", flush=True)
+            print(f"[ERROR] Phase 2 (research) failed: {e}", flush=True)
             import traceback
             traceback.print_exc()
             project = db.query(Project).filter_by(id=project_id).first()
@@ -394,6 +422,58 @@ def clarify_project(
             db.close()
 
     run_in_background(phase2_research_bg, project.id)
+
+    return project_to_response(project)
+
+
+@router.post("/{project_id}/generate", response_model=ProjectResponse)
+def generate_project(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Trigger layout generation after research is done."""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.status != ProjectStatus.RESEARCH_DONE:
+        raise HTTPException(status_code=400, detail=f"Research not complete (current: {project.status})")
+
+    def generate_bg(project_id: uuid.UUID):
+        print(f"[GENERATE] Starting layout generation for {project_id}", flush=True)
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        db_url = str(settings.database_url)
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        engine = create_engine(db_url)
+        SessionLocal = sessionmaker(bind=engine)
+        db = SessionLocal()
+        try:
+            project = db.query(Project).filter_by(id=project_id).first()
+            if project:
+                gen = Generator(project, db)
+                layouts = gen.generate_layouts()
+                notify_from_thread(notify_layouts_ready(str(project_id), layouts))
+        except Exception as e:
+            print(f"[ERROR] Layout generation failed: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            project = db.query(Project).filter_by(id=project_id).first()
+            if project:
+                project.status = ProjectStatus.FAILED
+                project.error_message = str(e)
+                db.commit()
+                notify_from_thread(notify_error(str(project_id), str(e)))
+        finally:
+            db.close()
+
+    run_in_background(generate_bg, project.id)
 
     return project_to_response(project)
 

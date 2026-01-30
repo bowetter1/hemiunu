@@ -124,6 +124,13 @@ async def notify_error(project_id: str, message: str):
     await _telegram_notify(project_id, f"❌ Fel: {message[:200]}")
 
 
+async def notify_research_ready(project_id: str, research_data: dict):
+    """Notify clients that research is complete and ready for review"""
+    print(f"[WS] Sending research_ready to {project_id}", flush=True)
+    await manager.broadcast(str(project_id), "research_ready", research_data)
+    await _telegram_notify(project_id, "🔍 Research klar! Granska varumärkesfärger och inspiration.")
+
+
 async def notify_clarification_needed(project_id: str, questions: list):
     """Notify clients that clarification is needed (3 questions)"""
     print(f"[WS] Sending clarification_needed ({len(questions)} questions) to {project_id}", flush=True)

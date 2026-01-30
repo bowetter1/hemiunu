@@ -157,11 +157,15 @@ def _run_migrations():
         ("users", "status", "ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'approved'"),
         # Add telegram_chat_id to users table for Telegram bot linking
         ("users", "telegram_chat_id", "ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR(50)"),
+        # Add generation_config JSON column for configurable tools/phases
+        ("projects", "generation_config", "ALTER TABLE projects ADD COLUMN generation_config JSON"),
     ]
 
     # Add new enum values (PostgreSQL specific)
     enum_migrations = [
         ("projectstatus", "CLARIFICATION", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'CLARIFICATION'"),
+        ("projectstatus", "RESEARCHING", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'RESEARCHING'"),
+        ("projectstatus", "RESEARCH_DONE", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'RESEARCH_DONE'"),
     ]
 
     for enum_type, value, sql in enum_migrations:

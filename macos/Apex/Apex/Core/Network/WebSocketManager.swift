@@ -4,6 +4,7 @@ import Combine
 /// Events received from the WebSocket server
 enum WebSocketEvent: Equatable {
     case moodboardReady
+    case researchReady
     case layoutsReady(count: Int)
     case statusChanged(status: String)
     case pageUpdated(pageId: String)
@@ -208,6 +209,9 @@ class WebSocketManager: ObservableObject {
             switch event {
             case "moodboard_ready":
                 self?.lastEvent = .moodboardReady
+
+            case "research_ready":
+                self?.lastEvent = .researchReady
 
             case "layouts_ready":
                 let count = eventData["count"] as? Int ?? 0

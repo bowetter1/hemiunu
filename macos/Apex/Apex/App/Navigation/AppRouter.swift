@@ -196,6 +196,12 @@ struct AppRouter: View {
                 title: "Moodboard Ready",
                 body: "Brand research and color palette are done."
             )
+        case .researchReady:
+            appState.scheduleLoadProject(id: projectId)
+            NotificationService.shared.notify(
+                title: "Research Complete",
+                body: "Brand research is done. Review and generate your layout."
+            )
         case .layoutsReady(let count):
             appState.scheduleLoadProject(id: projectId)
             NotificationService.shared.notify(

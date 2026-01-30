@@ -4,7 +4,9 @@ import Foundation
 enum ProjectStatus: String, Codable {
     case brief = "brief"
     case clarification = "clarification"  // Waiting for user clarification
-    case moodboard = "moodboard"
+    case researching = "researching"      // Research in progress
+    case researchDone = "research_done"   // Research complete, waiting for user to generate layouts
+    case moodboard = "moodboard"          // Legacy
     case layouts = "layouts"
     case editing = "editing"
     case done = "done"
