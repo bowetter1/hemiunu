@@ -4,6 +4,7 @@ import Foundation
 protocol BossCoordinatorDelegate: AnyObject {
     func localProjectName(from id: String) -> String?
     func loadProject(id: String) async
+    func clearCurrentProject()
     func setSelectedProjectId(_ id: String?)
     func refreshLocalProjects()
     var selectedProjectId: String? { get }

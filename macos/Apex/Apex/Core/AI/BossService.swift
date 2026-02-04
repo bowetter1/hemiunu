@@ -765,10 +765,17 @@ class BossService {
                     self?.runningProcess = process
                 }
 
+                // Track last output time for idle detection (agents that forget apex_done)
+                let lastOutputLock = NSLock()
+                var lastOutputTime = Date()
+
                 let handle = stdout.fileHandleForReading
                 handle.readabilityHandler = { fileHandle in
                     let data = fileHandle.availableData
                     guard !data.isEmpty else { return }
+                    lastOutputLock.lock()
+                    lastOutputTime = Date()
+                    lastOutputLock.unlock()
                     if let text = String(data: data, encoding: .utf8) {
                         let lines = text.components(separatedBy: .newlines)
                         for line in lines where !line.isEmpty {
@@ -784,6 +791,9 @@ class BossService {
                 errHandle.readabilityHandler = { fileHandle in
                     let data = fileHandle.availableData
                     guard !data.isEmpty else { return }
+                    lastOutputLock.lock()
+                    lastOutputTime = Date()
+                    lastOutputLock.unlock()
                     if let text = String(data: data, encoding: .utf8) {
                         stderrLock.lock()
                         stderrChunks.append(text)
@@ -799,15 +809,39 @@ class BossService {
                     return
                 }
 
-                // Poll for process exit OR done.signal from the agent
+                // Poll for process exit, done.signal, or idle+checklist-complete
                 let doneSignalPath = cwd?.appendingPathComponent("done.signal").path
+                let checklistPath = cwd?.appendingPathComponent("checklist.md")
+                let idleTimeout: TimeInterval = 15
+
                 while process.isRunning {
+                    // 1. Explicit done signal from apex_done tool
                     if let path = doneSignalPath,
                        FileManager.default.fileExists(atPath: path) {
                         process.terminate()
                         process.waitUntilExit()
                         break
                     }
+
+                    // 2. Fallback: agent idle + checklist fully complete
+                    lastOutputLock.lock()
+                    let idle = Date().timeIntervalSince(lastOutputTime)
+                    lastOutputLock.unlock()
+
+                    if idle > idleTimeout,
+                       let clPath = checklistPath,
+                       let checklist = try? String(contentsOf: clPath, encoding: .utf8),
+                       !checklist.isEmpty {
+                        let unchecked = checklist.components(separatedBy: .newlines)
+                            .filter { $0.contains("- [ ]") }
+                        if unchecked.isEmpty {
+                            // All checklist items done — agent forgot apex_done
+                            process.terminate()
+                            process.waitUntilExit()
+                            break
+                        }
+                    }
+
                     Thread.sleep(forTimeInterval: 0.5)
                 }
 

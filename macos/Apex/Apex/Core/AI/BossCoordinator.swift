@@ -157,9 +157,7 @@ class BossCoordinator {
         } else {
             // Solo mode: clear previous project on first message
             if bosses.first?.workspace == nil {
-                delegate?.setPages([])
-                delegate?.setLocalPreviewURL(nil)
-                delegate?.setSelectedProjectId(nil)
+                delegate?.clearCurrentProject()
             }
             for boss in bosses {
                 sendToBoss(boss, text: text, setLoading: setLoading)
@@ -174,9 +172,9 @@ class BossCoordinator {
         let workspaceURL = ws.projectPath(projectName)
         guard FileManager.default.fileExists(atPath: workspaceURL.path) else { return }
 
-        // If we already have an active boss for this workspace, keep it (preserves session)
+        // If we already have an active boss for this exact workspace, keep it (preserves session)
         let bossId = (projectName as NSString).lastPathComponent
-        if isActive, let existing = bosses.first(where: { $0.id == bossId }) {
+        if isActive, let existing = bosses.first(where: { $0.id == bossId && $0.workspace == workspaceURL }) {
             selectedBossId = existing.id
             return
         }
@@ -206,13 +204,15 @@ class BossCoordinator {
         guard let projectId, projectId.hasPrefix("local:") else { return }
         let name = String(projectId.dropFirst(6))
         let bossId = (name as NSString).lastPathComponent
+        let expectedWorkspace = LocalWorkspaceService.shared.projectPath(name)
 
-        if let research = researchBoss, research.id == bossId {
+        if let research = researchBoss, research.id == bossId,
+           research.workspace == expectedWorkspace {
             selectedBossId = research.id
-        } else if bosses.contains(where: { $0.id == bossId }) {
+        } else if bosses.contains(where: { $0.id == bossId && $0.workspace == expectedWorkspace }) {
             selectedBossId = bossId
         } else {
-            // No active boss for this layout — resume it (loads workspace + messages)
+            // No active boss for this workspace — resume it (loads workspace + messages)
             resumeForLocalProject(projectId)
         }
     }
@@ -261,10 +261,8 @@ class BossCoordinator {
         phase = .researching
         selectedBossId = research.id
 
-        // Clear previous project state so the user sees a fresh canvas
-        delegate?.setPages([])
-        delegate?.setLocalPreviewURL(nil)
-        delegate?.setSelectedProjectId(nil)
+        // Fully clear the previous project so the sidebar falls back to the project list
+        delegate?.clearCurrentProject()
 
         // Build research prompt with config-driven instructions
         var researchInstructions = [String]()
@@ -473,6 +471,7 @@ class BossCoordinator {
         Task {
             if boss.workspace == nil {
                 boss.workspace = createWorkspace(for: boss, role: researchBoss == nil ? .solo : .builder)
+                delegate?.refreshLocalProjects()
             }
 
             // Save inspiration image for solo mode (first message only)

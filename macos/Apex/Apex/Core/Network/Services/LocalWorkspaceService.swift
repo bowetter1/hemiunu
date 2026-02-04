@@ -148,7 +148,10 @@ class LocalWorkspaceService {
                       subValues.isDirectory == true else { continue }
 
                 let relativeName = "\(topName)/\(sub.lastPathComponent)"
-                if findMainHTML(project: relativeName) != nil {
+                let hasHTML = findMainHTML(project: relativeName) != nil
+                let isAgentWorkspace = fm.fileExists(atPath: sub.appendingPathComponent("agent-name.txt").path)
+
+                if hasHTML || isAgentWorkspace {
                     let agentName = try? String(
                         contentsOf: sub.appendingPathComponent("agent-name.txt"),
                         encoding: .utf8

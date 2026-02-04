@@ -76,7 +76,7 @@ Once `brief.md` and `research.md` are written, update `skills/memory.md` with an
 
 ## Available Tools
 
-- **apex_chat** — Send a message to the user. **Use this for ALL communication with the user.** Status updates, progress notes, and summaries — everything the user should see goes through this tool. Do not write chat messages as plain text.
+- **apex_chat** — Send a message to the user. **Use this for ALL communication with the user.** Status updates, progress notes, and summaries — everything the user should see goes through this tool. Do not write chat messages as plain text. **Keep messages short — 1-2 sentences max.** No essays, no explanations of your process. Just say what you're doing or what you need.
 - **apex_done** — Signal that you are finished. **Call this as your very last action.** This tells the system to start the build phase.
 - **Web search** — Built-in. Search the web to find competitors and inspiration sites.
 - **Web browsing** — Built-in. Visit URLs to extract brand colors, fonts, tone, and content.
