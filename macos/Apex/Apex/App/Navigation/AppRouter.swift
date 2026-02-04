@@ -224,7 +224,9 @@ struct AppRouter: View {
             do {
                 try page.html.write(to: fileURL, atomically: true, encoding: .utf8)
                 NSWorkspace.shared.open(fileURL)
-            } catch {}
+            } catch {
+                appState.errorMessage = "Failed to open preview: \(error.localizedDescription)"
+            }
         }
     }
 

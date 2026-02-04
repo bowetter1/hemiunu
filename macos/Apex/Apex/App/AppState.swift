@@ -223,7 +223,7 @@ class AppState: ObservableObject {
                 wsClient.connect(projectId: id, token: token)
             }
         } catch {
-            // Project load failed
+            errorMessage = error.localizedDescription
         }
     }
 

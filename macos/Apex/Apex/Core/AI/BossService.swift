@@ -197,8 +197,14 @@ class BossService {
             ]
         ]
         let data = try JSONSerialization.data(withJSONObject: json)
-        stdinPipe?.fileHandleForWriting.write(data)
-        stdinPipe?.fileHandleForWriting.write("\n".data(using: .utf8)!)
+        guard let stdinHandle = stdinPipe?.fileHandleForWriting,
+              persistentProcess?.isRunning == true else {
+            isProcessing = false
+            currentOnLine = nil
+            throw BossError.launchFailed("Claude process is not running")
+        }
+        stdinHandle.write(data)
+        stdinHandle.write(Data([0x0A])) // newline
 
         // Wait for "result" event from stdout handler
         do {
@@ -600,15 +606,19 @@ class BossService {
             extraEnv: keys,
             onLine: { [weak self] line in
                 // Stdout goes to log only — chat messages come from chat.jsonl
-                guard let self else { return }
-                if let logData = (line + "\n").data(using: .utf8) {
-                    self.logHandle?.write(logData)
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if let logData = (line + "\n").data(using: .utf8) {
+                        self.logHandle?.write(logData)
+                    }
                 }
             },
             onStderr: { [weak self] text in
-                guard let self else { return }
-                if let logData = ("[stderr] " + text + "\n").data(using: .utf8) {
-                    self.logHandle?.write(logData)
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if let logData = ("[stderr] " + text + "\n").data(using: .utf8) {
+                        self.logHandle?.write(logData)
+                    }
                 }
             }
         )
@@ -768,13 +778,16 @@ class BossService {
                 }
 
                 // Collect stderr for error reporting and optional logging
+                let stderrLock = NSLock()
                 var stderrChunks: [String] = []
                 let errHandle = stderr.fileHandleForReading
                 errHandle.readabilityHandler = { fileHandle in
                     let data = fileHandle.availableData
                     guard !data.isEmpty else { return }
                     if let text = String(data: data, encoding: .utf8) {
+                        stderrLock.lock()
                         stderrChunks.append(text)
+                        stderrLock.unlock()
                         onStderr?(text)
                     }
                 }
@@ -806,7 +819,9 @@ class BossService {
                 if status == 0 || status == 15 || status == -15 || status == 2 {
                     continuation.resume()
                 } else {
+                    stderrLock.lock()
                     let errText = stderrChunks.joined()
+                    stderrLock.unlock()
                     continuation.resume(throwing: BossError.exitCode(Int(status), errText.isEmpty ? "Process exited with code \(status)" : errText))
                 }
             }

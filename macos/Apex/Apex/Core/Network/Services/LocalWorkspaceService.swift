@@ -84,12 +84,11 @@ class LocalWorkspaceService {
         }
 
         let process = Process()
-        let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         process.arguments = ["-m", "http.server", "\(port)", "--bind", "127.0.0.1"]
         process.currentDirectoryURL = projectDir
-        process.standardOutput = pipe
-        process.standardError = pipe
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
 
         try process.run()
         serverProcess = process
@@ -292,7 +291,9 @@ class LocalWorkspaceService {
     func gitCommit(project: String, message: String) async throws -> ShellResult {
         let dir = projectPath(project)
         _ = try await exec("git add -A", cwd: dir)
-        return try await exec("git commit -m \"\(message)\" --allow-empty-message", cwd: dir)
+        // Escape message for shell safety (single-quote wrapping with internal quote escaping)
+        let escaped = message.replacingOccurrences(of: "'", with: "'\\''")
+        return try await exec("git commit -m '\(escaped)' --allow-empty-message", cwd: dir)
     }
 
     /// Git log — returns commits as PageVersion objects (oldest first, version 1-based)

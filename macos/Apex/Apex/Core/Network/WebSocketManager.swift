@@ -18,6 +18,7 @@ enum WebSocketEvent: Equatable {
 /// WebSocket manager for real-time project updates with automatic reconnection
 class WebSocketManager: ObservableObject {
     private var webSocketTask: URLSessionWebSocketTask?
+    private var currentSession: URLSession?
     private var pingTimer: Timer?
     private var reconnectTask: Task<Void, Never>?
     private let baseURL: String
@@ -73,7 +74,9 @@ class WebSocketManager: ObservableObject {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
+        currentSession?.invalidateAndCancel()
         let session = URLSession(configuration: .default)
+        currentSession = session
         webSocketTask = session.webSocketTask(with: request)
         webSocketTask?.resume()
 
@@ -98,6 +101,8 @@ class WebSocketManager: ObservableObject {
         reconnectTask = nil
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
+        currentSession?.invalidateAndCancel()
+        currentSession = nil
 
         if clearCredentials {
             currentProjectId = nil
@@ -150,37 +155,37 @@ class WebSocketManager: ObservableObject {
 
     private func receiveMessage(forProject projectId: String) {
         webSocketTask?.receive { [weak self] result in
-            guard let self = self else { return }
+            // All self access must happen on the main thread
+            DispatchQueue.main.async {
+                guard let self = self else { return }
 
-            // Stop if we've switched to a different project
-            guard self.currentProjectId == projectId else { return }
+                // Stop if we've switched to a different project
+                guard self.currentProjectId == projectId else { return }
 
-            switch result {
-            case .success(let message):
-                switch message {
-                case .string(let text):
-                    self.handleMessage(text)
-                case .data(let data):
-                    if let text = String(data: data, encoding: .utf8) {
+                switch result {
+                case .success(let message):
+                    switch message {
+                    case .string(let text):
                         self.handleMessage(text)
+                    case .data(let data):
+                        if let text = String(data: data, encoding: .utf8) {
+                            self.handleMessage(text)
+                        }
+                    @unknown default:
+                        break
                     }
-                @unknown default:
-                    break
-                }
-                // Continue receiving only if still same project
-                if self.currentProjectId == projectId {
-                    self.receiveMessage(forProject: projectId)
-                }
+                    // Continue receiving only if still same project
+                    if self.currentProjectId == projectId {
+                        self.receiveMessage(forProject: projectId)
+                    }
 
-            case .failure:
-                // Only handle if we're still supposed to be connected to this project
-                if self.currentProjectId == projectId {
-                    DispatchQueue.main.async {
+                case .failure:
+                    // Only handle if we're still supposed to be connected to this project
+                    if self.currentProjectId == projectId {
                         self.isConnected = false
                         self.lastEvent = .disconnected
+                        self.scheduleReconnect()
                     }
-                    // Try to reconnect
-                    self.scheduleReconnect()
                 }
             }
         }
@@ -269,8 +274,8 @@ class WebSocketManager: ObservableObject {
                 DispatchQueue.main.async {
                     self?.isConnected = false
                     self?.lastEvent = .disconnected
+                    self?.scheduleReconnect()
                 }
-                self?.scheduleReconnect()
             }
         }
     }

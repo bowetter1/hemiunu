@@ -155,7 +155,12 @@ class BossCoordinator {
             // Follow-up goes to the selected builder only
             sendToBoss(selected, text: text, setLoading: setLoading)
         } else {
-            // Solo mode or fallback: send to all
+            // Solo mode: clear previous project on first message
+            if bosses.first?.workspace == nil {
+                delegate?.setPages([])
+                delegate?.setLocalPreviewURL(nil)
+                delegate?.setSelectedProjectId(nil)
+            }
             for boss in bosses {
                 sendToBoss(boss, text: text, setLoading: setLoading)
             }
@@ -256,6 +261,11 @@ class BossCoordinator {
         phase = .researching
         selectedBossId = research.id
 
+        // Clear previous project state so the user sees a fresh canvas
+        delegate?.setPages([])
+        delegate?.setLocalPreviewURL(nil)
+        delegate?.setSelectedProjectId(nil)
+
         // Prepend instructions so research agent doesn't ask questions (--print exits after one turn)
         let researchPrompt = """
         This is the complete project brief from the user. Do NOT ask any questions — write brief.md immediately from this information, then proceed to RESEARCH.
@@ -268,6 +278,9 @@ class BossCoordinator {
         for boss in bosses where boss.workspace == nil {
             boss.workspace = createWorkspace(for: boss, role: .builder)
         }
+
+        // Show the new session in the sidebar immediately
+        delegate?.refreshLocalProjects()
 
         Task {
             // Phase 1: Research
@@ -360,8 +373,9 @@ class BossCoordinator {
             if boss.workspace == nil {
                 boss.workspace = createWorkspace(for: boss, role: .builder)
             }
-            copyResearchFiles(from: researchWorkspace, to: boss.workspace!)
-            saveInspirationImage(to: boss.workspace!)
+            guard let bossWorkspace = boss.workspace else { continue }
+            copyResearchFiles(from: researchWorkspace, to: bossWorkspace)
+            saveInspirationImage(to: bossWorkspace)
         }
 
         // Build message with config instructions
@@ -514,12 +528,17 @@ class BossCoordinator {
         let ws = LocalWorkspaceService.shared
 
         // Session-level directory — generated once per session, shared by all bosses
-        if sessionName == nil {
+        let resolvedSessionName: String
+        if let existing = sessionName {
+            resolvedSessionName = existing
+        } else {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyyMMdd-HHmm"
-            sessionName = "session-\(dateFormatter.string(from: Date()))"
+            let newName = "session-\(dateFormatter.string(from: Date()))"
+            sessionName = newName
+            resolvedSessionName = newName
         }
-        let sessionURL = ws.projectPath(sessionName!)
+        let sessionURL = ws.projectPath(resolvedSessionName)
 
         // Boss subdirectory
         let bossURL = sessionURL.appendingPathComponent(boss.id)
