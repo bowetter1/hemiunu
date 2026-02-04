@@ -20,7 +20,7 @@ from .models import Project, Variant, Page, PageVersion, ProjectLog, ProjectStat
 from .generator import Generator
 from .websocket import manager, notify_moodboard_ready, notify_layouts_ready, notify_error, notify_clarification_needed, notify_research_ready
 from .structured_edit import generate_structured_edit, StructuredEditResponse
-from .filesystem import FileSystemService
+from .filesystem import FileSystemService, get_filesystem
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 settings = get_settings()
@@ -170,6 +170,10 @@ class ProjectResponse(BaseModel):
     output_tokens: int = 0
     cost_usd: float = 0.0
     error_message: Optional[str] = None
+    # Daytona sandbox
+    sandbox_id: Optional[str] = None
+    sandbox_status: Optional[str] = None
+    sandbox_preview_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -241,20 +245,31 @@ class SelectLayoutRequest(BaseModel):
 # === Helper Functions ===
 
 def project_to_response(project: Project) -> ProjectResponse:
+    # Read research_md from pipeline file
+    research_md = None
+    try:
+        fs = get_filesystem(str(project.id), project.sandbox_id)
+        research_md = fs.read_pipeline_file("03-research.md")
+    except Exception:
+        pass
+
     return ProjectResponse(
         id=str(project.id),
         brief=project.brief,
         status=project.status.value,
         moodboard=project.moodboard,
         clarification=project.clarification,
-        research_md=project.research_md,
+        research_md=research_md,
         selected_moodboard=project.selected_moodboard,
         selected_layout=project.selected_layout,
         created_at=project.created_at.isoformat(),
         input_tokens=project.input_tokens,
         output_tokens=project.output_tokens,
         cost_usd=project.cost_usd,
-        error_message=project.error_message
+        error_message=project.error_message,
+        sandbox_id=project.sandbox_id,
+        sandbox_status=project.sandbox_status,
+        sandbox_preview_url=project.sandbox_preview_url,
     )
 
 
@@ -267,7 +282,7 @@ def run_in_background(func, *args):
 # === Routes ===
 
 @router.post("", response_model=ProjectResponse)
-def create_project(
+async def create_project(
     request: CreateProjectRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -305,11 +320,30 @@ def create_project(
     db.commit()
     db.refresh(project)
 
-    # Create directory (may fail on Railway - that's OK)
-    try:
-        Path(project_dir).mkdir(parents=True, exist_ok=True)
-    except Exception:
-        pass
+    # Create Daytona sandbox if enabled
+    if settings.daytona_enabled:
+        from apex_server.integrations.daytona_service import daytona_service
+        if daytona_service.is_available:
+            try:
+                sandbox_info = await asyncio.to_thread(
+                    lambda: daytona_service.create_sandbox(
+                        project_id=str(project_id),
+                        project_type="html",
+                    )
+                )
+                project.sandbox_id = sandbox_info["sandbox_id"]
+                project.sandbox_status = "running"
+                db.commit()
+                print(f"[CREATE] Daytona sandbox created: {sandbox_info['sandbox_id']}", flush=True)
+            except Exception as e:
+                print(f"[CREATE] Daytona sandbox creation failed: {e}", flush=True)
+
+    # Create local directory as fallback (may fail on Railway - that's OK)
+    if not project.sandbox_id:
+        try:
+            Path(project_dir).mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     # Start PHASE 1 in background: search and check if clarification needed
     skip_clarification = gen_config.get("skip_clarification", False)
@@ -359,7 +393,7 @@ def create_project(
 
     run_in_background(phase1_search_bg, project.id, skip_clarification)
 
-    return project_to_response(project)
+    return await asyncio.to_thread(project_to_response, project)
 
 
 @router.post("/{project_id}/clarify", response_model=ProjectResponse)
@@ -968,7 +1002,7 @@ class RestoreVersionRequest(BaseModel):
 
 
 @router.post("/{project_id}/pages/{page_id}/restore", response_model=PageResponse)
-def restore_page_version(
+async def restore_page_version(
     project_id: uuid.UUID,
     page_id: uuid.UUID,
     request: RestoreVersionRequest,
@@ -989,8 +1023,11 @@ def restore_page_version(
         raise HTTPException(status_code=404, detail="Page not found")
 
     # Try to get version from filesystem first
-    fs = FileSystemService(str(project_id))
-    html = fs.get_version(str(page_id), request.version)
+    fs = get_filesystem(str(project_id), project.sandbox_id)
+    if hasattr(fs, "exec_command"):
+        html = await asyncio.to_thread(fs.get_version, str(page_id), request.version)
+    else:
+        html = fs.get_version(str(page_id), request.version)
 
     if not html:
         # Fallback to PostgreSQL
@@ -1009,7 +1046,10 @@ def restore_page_version(
 
     # Update file in filesystem
     file_name = page.name.lower().replace(" ", "-") + ".html"
-    fs.write_file(f"public/{file_name}", html)
+    if hasattr(fs, "exec_command"):
+        await asyncio.to_thread(fs.write_page_html, str(page_id), html, file_name)
+    else:
+        fs.write_file(f"public/{file_name}", html)
 
     return PageResponse(
         id=str(page.id),
@@ -1247,7 +1287,7 @@ class CloneRepoResponse(BaseModel):
 
 
 @router.post("/clone", response_model=CloneRepoResponse)
-def clone_github_repo(
+async def clone_github_repo(
     request: CloneRepoRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1274,41 +1314,154 @@ def clone_github_repo(
     db.add(project)
     db.flush()
 
-    # Clone repository
-    fs = FileSystemService(str(project.id))
-    result = fs.clone_repo(request.github_url)
+    # Create Daytona sandbox if enabled
+    if settings.daytona_enabled:
+        from apex_server.integrations.daytona_service import daytona_service
+        if daytona_service.is_available:
+            try:
+                sandbox_info = await asyncio.to_thread(daytona_service.create_sandbox, str(project.id))
+                project.sandbox_id = sandbox_info["sandbox_id"]
+                project.sandbox_status = "running"
+                db.flush()
+            except Exception as e:
+                print(f"[CLONE] Daytona sandbox creation failed: {e}", flush=True)
 
-    if not result["success"]:
+    # Clone repository
+    fs = get_filesystem(str(project.id), project.sandbox_id)
+    if hasattr(fs, "exec_command"):
+        result = await asyncio.to_thread(fs.clone_repo, request.github_url)
+    else:
+        result = fs.clone_repo(request.github_url)
+
+    if not result.get("success", False):
         db.rollback()
         raise HTTPException(status_code=400, detail=result.get("error", "Clone failed"))
 
     # Update project with path
-    project.project_dir = str(fs.base_dir)
+    project.project_dir = str(project.id)
     db.commit()
 
     # Scan for HTML files and create pages
-    html_files = list(fs.base_dir.rglob("*.html"))
-    for html_file in html_files[:10]:  # Limit to 10 files
-        try:
-            content = html_file.read_text(encoding="utf-8")
-            name = html_file.stem.replace("-", " ").replace("_", " ").title()
-            page = Page(
-                project_id=project.id,
-                name=name,
-                html=content
-            )
-            db.add(page)
-        except Exception as e:
-            print(f"[CLONE] Could not read {html_file}: {e}", flush=True)
+    html_files_data = []
+    if hasattr(fs, "base_dir"):
+        # Legacy local filesystem
+        for html_file in list(fs.base_dir.rglob("*.html"))[:10]:
+            try:
+                content = html_file.read_text(encoding="utf-8")
+                name = html_file.stem.replace("-", " ").replace("_", " ").title()
+                html_files_data.append((name, content))
+            except Exception as e:
+                print(f"[CLONE] Could not read {html_file}: {e}", flush=True)
+    else:
+        # Daytona sandbox — list public dir for HTML files
+        public_files = await asyncio.to_thread(fs.list_files, "public")
+        for f in public_files[:10]:
+            if f["name"].endswith(".html"):
+                try:
+                    content = await asyncio.to_thread(fs.read_file, f"public/{f['name']}")
+                    name = f["name"].replace(".html", "").replace("-", " ").replace("_", " ").title()
+                    if content:
+                        html_files_data.append((name, content))
+                except Exception as e:
+                    print(f"[CLONE] Could not read {f['name']}: {e}", flush=True)
+
+    for name, content in html_files_data:
+        page = Page(
+            project_id=project.id,
+            name=name,
+            html=content
+        )
+        db.add(page)
 
     db.commit()
-    print(f"[CLONE] Done! {result['files']} files cloned", flush=True)
+    print(f"[CLONE] Done! Files cloned into {'sandbox' if project.sandbox_id else 'local'}", flush=True)
 
     return CloneRepoResponse(
         project_id=str(project.id),
-        path=str(fs.base_dir),
+        path=str(project.id),
         files_count=result.get("files", 0),
         success=True
+    )
+
+
+# ==========================================
+# Boss Agent Deploy Endpoint
+# ==========================================
+
+class BossDeployRequest(BaseModel):
+    brief: str = "Boss Agent Project"
+    project_type: str = "html"
+
+
+class BossDeployResponse(BaseModel):
+    project_id: str
+    sandbox_id: Optional[str] = None
+    sandbox_status: Optional[str] = None
+
+
+@router.post("/boss-deploy", response_model=BossDeployResponse)
+async def boss_deploy(
+    request: BossDeployRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a project for boss agent deployment — skips research/moodboard pipeline.
+
+    Sets status directly to EDITING so the boss can immediately upload files
+    via the sandbox/exec endpoint and get a live preview.
+    """
+    print(f"[BOSS-DEPLOY] Creating project: {request.brief[:50]}...", flush=True)
+    project_id = uuid.uuid4()
+    project_dir = str(Path(settings.storage_path) / str(project_id))
+
+    project = Project(
+        id=project_id,
+        brief=request.brief,
+        project_dir=project_dir,
+        status=ProjectStatus.EDITING,
+        user_id=current_user.id
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    # Create Daytona sandbox if enabled
+    sandbox_id = None
+    sandbox_status = None
+    if settings.daytona_enabled:
+        from apex_server.integrations.daytona_service import daytona_service
+        if daytona_service.is_available:
+            try:
+                sandbox_info = await asyncio.to_thread(
+                    lambda: daytona_service.create_sandbox(
+                        project_id=str(project_id),
+                        project_type=request.project_type,
+                    )
+                )
+                project.sandbox_id = sandbox_info["sandbox_id"]
+                project.sandbox_status = "running"
+                db.commit()
+                sandbox_id = project.sandbox_id
+                sandbox_status = "running"
+                print(f"[BOSS-DEPLOY] Daytona sandbox created: {sandbox_id}", flush=True)
+            except Exception as e:
+                print(f"[BOSS-DEPLOY] Daytona sandbox creation failed: {e}", flush=True)
+    else:
+        print(f"[BOSS-DEPLOY] Daytona not enabled, sandbox_id will be null", flush=True)
+
+    # Create local directory as fallback
+    if not project.sandbox_id:
+        try:
+            Path(project_dir).mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+    print(f"[BOSS-DEPLOY] Project created: {project_id} (sandbox: {sandbox_id})", flush=True)
+
+    return BossDeployResponse(
+        project_id=str(project_id),
+        sandbox_id=sandbox_id,
+        sandbox_status=sandbox_status,
     )
 
 
@@ -1317,7 +1470,7 @@ def clone_github_repo(
 # ==========================================
 
 @router.get("/{project_id}/files")
-def list_project_files(
+async def list_project_files(
     project_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1331,46 +1484,73 @@ def list_project_files(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    fs = FileSystemService(project_id)
+    fs = get_filesystem(project_id, project.sandbox_id)
 
-    # Check if base directory exists
-    if not fs.base_dir.exists():
-        return {
-            "project_id": project_id,
-            "base_dir": str(fs.base_dir),
-            "exists": False,
-            "files": []
-        }
+    # Check if we have a Daytona sandbox or local dir
+    if hasattr(fs, "base_dir"):
+        if not fs.base_dir.exists():
+            return {
+                "project_id": project_id,
+                "exists": False,
+                "backend": "local",
+                "files": []
+            }
 
-    # Recursively list all files
-    all_files = []
-    for path in fs.base_dir.rglob("*"):
-        if path.is_file():
-            all_files.append({
-                "path": str(path.relative_to(fs.base_dir)),
-                "size": path.stat().st_size
-            })
+        all_files = []
+        for path in fs.base_dir.rglob("*"):
+            if path.is_file():
+                all_files.append({
+                    "path": str(path.relative_to(fs.base_dir)),
+                    "size": path.stat().st_size
+                })
+    else:
+        # Daytona sandbox
+        if hasattr(fs, "exec_command"):
+            all_files = await asyncio.to_thread(fs.list_files)
+        else:
+            all_files = fs.list_files()
 
     return {
         "project_id": project_id,
-        "base_dir": str(fs.base_dir),
         "exists": True,
-        "files": sorted(all_files, key=lambda x: x["path"]),
+        "backend": "daytona" if project.sandbox_id else "local",
+        "sandbox_id": project.sandbox_id,
+        "files": sorted(all_files, key=lambda x: x.get("path", x.get("name", ""))),
         "total_files": len(all_files)
     }
 
 
 @router.get("/{project_id}/assets/{file_path:path}")
-def serve_project_asset(
+async def serve_project_asset(
     project_id: str,
-    file_path: str
+    file_path: str,
+    db: Session = Depends(get_db)
 ):
     """Serve static files (images, etc) from project's public directory.
 
     Note: No auth required - project_id is a UUID (hard to guess) and
     files are only served from the public directory. Can add signed URLs later.
     """
+    from fastapi.responses import Response
 
+    # Check if project has a Daytona sandbox
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if project and project.sandbox_id and settings.daytona_enabled:
+        # Serve from Daytona sandbox
+        fs = get_filesystem(project_id, project.sandbox_id)
+        if hasattr(fs, "exec_command"):
+            content = await asyncio.to_thread(fs.read_binary, f"public/{file_path}")
+        else:
+            content = fs.read_binary(f"public/{file_path}")
+        if content is None:
+            raise HTTPException(status_code=404, detail="File not found in sandbox")
+        content_type, _ = mimetypes.guess_type(file_path)
+        if not content_type:
+            content_type = "application/octet-stream"
+        print(f"[ASSETS] Serving {file_path} from sandbox ({content_type})", flush=True)
+        return Response(content=content, media_type=content_type)
+
+    # Legacy: serve from local disk
     fs = FileSystemService(project_id)
 
     # Only serve files from public directory for security
@@ -1399,3 +1579,147 @@ def serve_project_asset(
         media_type=content_type,
         filename=full_path.name
     )
+
+
+# ==========================================
+# Sandbox Endpoints (Daytona)
+# ==========================================
+
+class SandboxResponse(BaseModel):
+    sandbox_id: Optional[str] = None
+    sandbox_status: Optional[str] = None
+    preview_url: Optional[str] = None
+
+
+class ExecCommandRequest(BaseModel):
+    command: str
+    cwd: str = "/workspace"
+
+
+@router.get("/{project_id}/sandbox", response_model=SandboxResponse)
+async def get_sandbox_status(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get sandbox status and preview URL for a project."""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    return SandboxResponse(
+        sandbox_id=project.sandbox_id,
+        sandbox_status=project.sandbox_status,
+        preview_url=project.sandbox_preview_url,
+    )
+
+
+@router.post("/{project_id}/sandbox/start", response_model=SandboxResponse)
+async def start_sandbox(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Start a stopped sandbox."""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+    if not project or not project.sandbox_id:
+        raise HTTPException(status_code=404, detail="Project or sandbox not found")
+
+    from apex_server.integrations.daytona_service import daytona_service
+    await asyncio.to_thread(daytona_service.start_sandbox, str(project.id), project.sandbox_id)
+    project.sandbox_status = "running"
+    db.commit()
+
+    return SandboxResponse(
+        sandbox_id=project.sandbox_id,
+        sandbox_status="running",
+    )
+
+
+@router.post("/{project_id}/sandbox/stop", response_model=SandboxResponse)
+async def stop_sandbox(
+    project_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Stop a running sandbox."""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+    if not project or not project.sandbox_id:
+        raise HTTPException(status_code=404, detail="Project or sandbox not found")
+
+    from apex_server.integrations.daytona_service import daytona_service
+    await asyncio.to_thread(daytona_service.stop_sandbox, str(project.id), project.sandbox_id)
+    project.sandbox_status = "stopped"
+    db.commit()
+
+    return SandboxResponse(
+        sandbox_id=project.sandbox_id,
+        sandbox_status="stopped",
+    )
+
+
+@router.get("/{project_id}/sandbox/preview")
+async def get_preview_url(
+    project_id: uuid.UUID,
+    port: int = 8000,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a live preview URL from Daytona."""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+    if not project or not project.sandbox_id:
+        raise HTTPException(status_code=404, detail="Project or sandbox not found")
+
+    from apex_server.integrations.daytona_service import daytona_service
+    preview = await asyncio.to_thread(
+        lambda: daytona_service.get_preview_url(
+            project_id=str(project.id),
+            sandbox_id=project.sandbox_id,
+            port=port,
+        )
+    )
+
+    project.sandbox_preview_url = preview["url"]
+    db.commit()
+
+    return {"preview_url": preview["url"], "token": preview["token"], "port": port}
+
+
+@router.post("/{project_id}/sandbox/exec")
+async def exec_in_sandbox(
+    project_id: uuid.UUID,
+    request: ExecCommandRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Execute a command in the project's Daytona sandbox."""
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == current_user.id
+    ).first()
+    if not project or not project.sandbox_id:
+        raise HTTPException(status_code=404, detail="Project or sandbox not found")
+
+    from apex_server.integrations.daytona_service import daytona_service
+    result = await asyncio.to_thread(
+        lambda: daytona_service.exec_command(
+            project_id=str(project.id),
+            sandbox_id=project.sandbox_id,
+            command=request.command,
+            cwd=request.cwd,
+        )
+    )
+
+    return result

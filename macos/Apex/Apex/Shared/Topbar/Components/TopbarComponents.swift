@@ -43,7 +43,7 @@ struct ModeSelector: View {
                     .foregroundColor(selectedMode == mode ? .white : .secondary)
                     .padding(.horizontal, 12)
                     .frame(height: itemHeight)
-                    .background(selectedMode == mode ? Color.orange : Color.clear)
+                    .background(selectedMode == mode ? Color.blue : Color.clear)
                     .cornerRadius(5)
                 }
                 .buttonStyle(.plain)

@@ -45,8 +45,8 @@ class LayoutsMixin:
 
         self.log("layouts", f"Generating {layout_count} layout(s)...")
 
-        # Get research markdown (primary source of design context)
-        research_md = self.project.research_md or ""
+        # Get research markdown from pipeline file
+        research_md = self.fs.read_pipeline_file("03-research.md") or ""
 
         # Get structured data from moodboard (for colors, fonts, site names)
         research_data = self.project.moodboard
@@ -68,8 +68,14 @@ class LayoutsMixin:
         # Get inspiration site names (for layout naming)
         inspiration_sites = research_data.get("inspiration_sites", [])
 
-        # Get company images scraped from their website (for img2img)
-        company_images = research_data.get("company_images", [])
+        # Get company images from 04-design-brief.md
+        company_images = []
+        design_brief_md = self.fs.read_pipeline_file("04-design-brief.md")
+        if design_brief_md and "## Company Images" in design_brief_md:
+            import re as _re
+            paths = _re.findall(r'\*\*Path:\*\*\s*(.+)', design_brief_md)
+            for p in paths:
+                company_images.append({"path": p.strip(), "description": "Company image"})
 
         image_source, did_fallback = resolve_image_source(self.project.image_source, bool(company_images))
         if did_fallback:
@@ -294,9 +300,8 @@ The layouts should look like they came from a professional design agency."""
                         if ref_path and company_images:
                             # img2img: read reference bytes from filesystem and use edit endpoint
                             ref_full = f"public/{ref_path}"
-                            ref_file = self.fs.base_dir / ref_full
-                            if ref_file.exists():
-                                ref_bytes = ref_file.read_bytes()
+                            ref_bytes = self.fs.read_binary(ref_full)
+                            if ref_bytes:
                                 edit_result = self.edit_image_from_reference(
                                     reference_bytes=ref_bytes,
                                     prompt=block.input.get("prompt", ""),
@@ -503,8 +508,8 @@ TOOL: "generate_image"
 
         self.log("layouts", f"Generating {layout_count} layout(s) with OpenAI...")
 
-        # Get research data
-        research_md = self.project.research_md or ""
+        # Get research data from pipeline file
+        research_md = self.fs.read_pipeline_file("03-research.md") or ""
         research_data = self.project.moodboard
         if not research_data:
             raise ValueError("Research data missing - run research_brand first")
@@ -515,7 +520,15 @@ TOOL: "generate_image"
         primary_color, secondary_color, accent_color = brand_colors[0], brand_colors[1], brand_colors[2]
 
         fonts = research_data.get("fonts", {"heading": "Inter", "body": "Inter"})
-        company_images = research_data.get("company_images", [])
+
+        # Company images from 04-design-brief.md
+        company_images = []
+        design_brief_md = self.fs.read_pipeline_file("04-design-brief.md")
+        if design_brief_md and "## Company Images" in design_brief_md:
+            import re as _re
+            paths = _re.findall(r'\*\*Path:\*\*\s*(.+)', design_brief_md)
+            for p in paths:
+                company_images.append({"path": p.strip(), "description": "Company image"})
 
         # Build image instructions (no tool use, just reference paths)
         image_instruction = "Do NOT include any <img> tags. Use CSS gradients, shapes, and color blocks for visual interest instead."

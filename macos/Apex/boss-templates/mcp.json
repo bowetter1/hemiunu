@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "apex-tools": {
+      "command": "uv",
+      "args": ["run", "--with", "mcp", "--with", "httpx", "--with", "openai", "--with", "anthropic", "--with", "playwright", "./mcp_tools.py"],
+      "env": {}
+    },
+    "screenshot": {
+      "command": "npx",
+      "args": ["-y", "@just-every/mcp-screenshot-website-fast"],
+      "env": {}
+    }
+  }
+}

@@ -50,9 +50,17 @@ async def lifespan(app: FastAPI):
         from apex_server.integrations.telegram import telegram_bot
         await telegram_bot.start()
 
+    # Start Daytona service if enabled
+    if settings.daytona_enabled:
+        from apex_server.integrations.daytona_service import daytona_service
+        await daytona_service.start()
+
     yield
 
     # Shutdown
+    if settings.daytona_enabled:
+        from apex_server.integrations.daytona_service import daytona_service
+        await daytona_service.stop()
     if settings.telegram_enabled:
         from apex_server.integrations.telegram import telegram_bot
         await telegram_bot.stop()
@@ -88,7 +96,8 @@ def health():
         "status": "ok",
         "version": "0.1.0",
         "storage": settings.storage_path,
-        "telegram_enabled": settings.telegram_enabled
+        "telegram_enabled": settings.telegram_enabled,
+        "daytona_enabled": settings.daytona_enabled
     }
 
 

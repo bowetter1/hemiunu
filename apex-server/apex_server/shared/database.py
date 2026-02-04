@@ -159,6 +159,10 @@ def _run_migrations():
         ("users", "telegram_chat_id", "ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR(50)"),
         # Add generation_config JSON column for configurable tools/phases
         ("projects", "generation_config", "ALTER TABLE projects ADD COLUMN generation_config JSON"),
+        # Daytona sandbox columns
+        ("projects", "sandbox_id", "ALTER TABLE projects ADD COLUMN sandbox_id VARCHAR(100)"),
+        ("projects", "sandbox_status", "ALTER TABLE projects ADD COLUMN sandbox_status VARCHAR(20)"),
+        ("projects", "sandbox_preview_url", "ALTER TABLE projects ADD COLUMN sandbox_preview_url VARCHAR(500)"),
     ]
 
     # Add new enum values (PostgreSQL specific)
@@ -166,6 +170,8 @@ def _run_migrations():
         ("projectstatus", "CLARIFICATION", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'CLARIFICATION'"),
         ("projectstatus", "RESEARCHING", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'RESEARCHING'"),
         ("projectstatus", "RESEARCH_DONE", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'RESEARCH_DONE'"),
+        ("projectstatus", "BUILDING", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'BUILDING'"),
+        ("projectstatus", "RUNNING", "ALTER TYPE projectstatus ADD VALUE IF NOT EXISTS 'RUNNING'"),
     ]
 
     for enum_type, value, sql in enum_migrations:

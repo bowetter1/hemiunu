@@ -19,6 +19,8 @@ class ProjectStatus(str, enum.Enum):
     MOODBOARD = "moodboard"   # Generating/showing moodboard (legacy)
     LAYOUTS = "layouts"       # Generating/showing 3 layouts
     EDITING = "editing"       # User is editing
+    BUILDING = "building"     # Sandbox is building/installing
+    RUNNING = "running"       # App is running in sandbox
     DONE = "done"
     FAILED = "failed"
 
@@ -69,6 +71,11 @@ class Project(Base, TimestampMixin):
 
     # Error info
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Daytona sandbox
+    sandbox_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    sandbox_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    sandbox_preview_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Relationships
     variants: Mapped[List["Variant"]] = relationship("Variant", back_populates="project", cascade="all, delete-orphan")

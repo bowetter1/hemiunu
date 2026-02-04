@@ -13,7 +13,6 @@ struct FloatingChatWindow: View {
     let onClose: () -> Void
 
     @State private var inputText = ""
-    @State private var isSending = false
     @State private var position: CGPoint = .zero
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
@@ -52,7 +51,7 @@ struct FloatingChatWindow: View {
                         .font(.system(size: 14))
                         .onSubmit { sendMessage() }
 
-                    if isSending {
+                    if chatViewModel.isLoading {
                         ProgressView()
                             .scaleEffect(0.7)
                     } else {

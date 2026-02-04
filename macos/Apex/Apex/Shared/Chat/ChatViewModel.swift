@@ -16,6 +16,10 @@ class ChatViewModel: ObservableObject {
     @Published var clarificationQuestions: [ClarificationQuestion] = []
     @Published var clarificationAnswers: [String] = []
 
+    // MARK: - Boss Coordinator
+
+    let boss: BossCoordinator
+
     private let appState: AppState
     private var cancellables = Set<AnyCancellable>()
 
@@ -37,6 +41,9 @@ class ChatViewModel: ObservableObject {
 
     /// Get messages for a specific page (or global if nil)
     func messages(for pageId: String?) -> [ChatMessage] {
+        if boss.isActive {
+            return boss.messages
+        }
         if let pageId = pageId {
             return messagesByPage[pageId] ?? []
         }
@@ -55,6 +62,7 @@ class ChatViewModel: ObservableObject {
 
     init(appState: AppState) {
         self.appState = appState
+        self.boss = BossCoordinator(appState: appState)
     }
 
     // MARK: - Message Management
@@ -75,6 +83,19 @@ class ChatViewModel: ObservableObject {
     /// Main send action — routes to the appropriate handler
     func sendMessage(_ text: String, selectedPageId: String?, onProjectCreated: ((String) -> Void)?) {
         guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+
+        // Boss mode: route all messages to the boss coordinator
+        if boss.isActive {
+            boss.send(text, setLoading: { [weak self] loading in self?.isLoading = loading })
+            return
+        }
+
+        // Local project: auto-resume boss mode and send through agent
+        if let project = appState.currentProject, project.id.hasPrefix("local:") {
+            boss.resumeForLocalProject(project.id)
+            boss.send(text, setLoading: { [weak self] loading in self?.isLoading = loading })
+            return
+        }
 
         // If answering a multi-question flow, treat as answer
         if currentQuestion != nil {
@@ -204,6 +225,8 @@ class ChatViewModel: ObservableObject {
     /// Poll for clarification updates when Phase 1 completes before WebSocket connects.
     func pollClarificationIfNeeded(selectedPageId: String?, onProjectCreated: ((String) -> Void)?) {
         guard let project = appState.currentProject else { return }
+        // Local projects don't use the API server
+        guard !project.id.hasPrefix("local:") else { return }
         guard project.status != .clarification else {
             checkForClarification()
             return
@@ -370,4 +393,5 @@ class ChatViewModel: ObservableObject {
             }
         }
     }
+
 }

@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex — Build Software at the Speed of Thought</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* === V2: Synthesized from Gemini + Codex review feedback === */
+:root {
+  --bg: #0A0D12;
+  --surface: #111827;
+  --surface-hover: #1a2332;
+  --primary: #30F2A2;
+  --secondary: #5B7CFF;
+  --alert: #FF2E63;
+  --text: #E6E9EF;
+  --muted: #94A3B8;
+  --border: #1E293B;
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* === GRID BACKGROUND === */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 60px 60px;
+  opacity: 0.3;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 20%, transparent 70%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* === NOISE OVERLAY === */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* === AURORA AMBIENT LIGHTS (Gemini v2: depth) === */
+.ambient-light {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  filter: blur(100px);
+  z-index: 0;
+  pointer-events: none;
+  animation: ambientFloat 12s infinite alternate ease-in-out;
+}
+
+.light-1 {
+  top: -200px;
+  left: -100px;
+  background: radial-gradient(circle, rgba(48, 242, 162, 0.12), transparent 70%);
+}
+
+.light-2 {
+  bottom: 20%;
+  right: -150px;
+  background: radial-gradient(circle, rgba(91, 124, 255, 0.10), transparent 70%);
+  animation-delay: -6s;
+}
+
+@keyframes ambientFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(30px, 50px) scale(1.1); }
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* === NAV === */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 16px 0;
+  background: rgba(10, 13, 18, 0.8);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+nav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.4rem;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.logo span { color: var(--primary); }
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.status {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* === BUTTONS === */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 10px 20px;
+  border: 1px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  background: rgba(48, 242, 162, 0.1);
+  box-shadow: 0 0 20px rgba(48, 242, 162, 0.3);
+}
+
+.btn::before { content: '[ '; }
+.btn::after { content: ' ]'; }
+
+.btn-filled {
+  background: var(--primary);
+  color: var(--bg);
+  border-color: var(--primary);
+  font-weight: 500;
+}
+
+.btn-filled:hover {
+  background: #2ad991;
+  box-shadow: 0 0 30px rgba(48, 242, 162, 0.4);
+}
+
+.btn-filled::before { content: ''; }
+.btn-filled::after { content: ' \2192'; transition: transform 0.2s; }
+.btn-filled:hover::after { transform: translateX(3px); }
+
+/* === HERO === */
+.hero {
+  padding: 160px 0 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.hero-content { animation: fadeUp 0.8s ease-out; }
+
+/* Gradient heading (Gemini v2: premium feel) */
+.hero h1 {
+  font-family: var(--font-heading);
+  font-size: clamp(2.5rem, 5vw, 3.8rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  margin-bottom: 20px;
+  text-wrap: balance;
+  background: linear-gradient(to bottom, #fff 30%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero h1 .scramble {
+  display: inline;
+  -webkit-text-fill-color: var(--primary);
+}
+
+.hero .subtitle {
+  font-size: 1.1rem;
+  color: var(--muted);
+  max-width: 480px;
+  margin-bottom: 20px;
+  line-height: 1.7;
+}
+
+/* Hero bullets (Codex v2: use cases) */
+.hero-bullets {
+  list-style: none;
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.hero-bullets li {
+  margin: 6px 0;
+  padding-left: 18px;
+  position: relative;
+}
+
+.hero-bullets li::before {
+  content: '>';
+  color: var(--primary);
+  position: absolute;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.cta-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 12px;
+  font-family: var(--font-mono);
+}
+
+/* === HERO VISUAL (Codex v2: terminal + artifact cards) === */
+.hero-visual {
+  position: relative;
+  animation: fadeUp 0.8s ease-out 0.2s both;
+}
+
+/* Glow behind terminal (Codex v2) */
+.hero-visual::before {
+  content: '';
+  position: absolute;
+  inset: -40px -20px;
+  background: radial-gradient(400px circle at 70% 30%, rgba(48, 242, 162, 0.10), transparent 60%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Terminal with glassmorphism (Gemini v2) */
+.terminal {
+  background: rgba(17, 24, 39, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 20px 60px -10px rgba(0, 0, 0, 0.5);
+}
+
+.terminal-bar {
+  background: rgba(30, 41, 59, 0.5);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.terminal-dot:nth-child(1) { background: var(--alert); }
+.terminal-dot:nth-child(2) { background: #F2C94C; }
+.terminal-dot:nth-child(3) { background: var(--primary); }
+
+.terminal-title {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+.terminal-body {
+  padding: 24px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.8;
+  min-height: 320px;
+}
+
+.terminal-line {
+  opacity: 0;
+  animation: typeLine 0.3s ease-out forwards;
+}
+
+.terminal-line .prompt { color: var(--primary); }
+.terminal-line .cmd { color: var(--text); }
+.terminal-line .output { color: var(--muted); }
+.terminal-line .success { color: var(--primary); }
+.terminal-line .info { color: var(--secondary); }
+.terminal-line .file { color: #F2C94C; }
+
+/* Floating artifact cards (Codex v2) */
+.artifact-card {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+  animation: artifactFloat 6s ease-in-out infinite;
+}
+
+.artifact-title {
+  color: var(--text);
+  font-weight: 500;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+}
+
+.artifact-filetree {
+  top: -12px;
+  right: -16px;
+}
+
+.artifact-preview {
+  bottom: -12px;
+  right: 20px;
+  animation-delay: 0.8s;
+}
+
+.artifact-pill { color: var(--primary); }
+
+.artifact-line {
+  padding: 1px 0;
+  opacity: 0.8;
+}
+
+@keyframes artifactFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes typeLine {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cursor-blink::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+  color: var(--primary);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* === TECH MARQUEE (Gemini v2: social proof) === */
+.marquee-section {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+  padding: 20px 0;
+}
+
+.marquee-content {
+  display: inline-flex;
+  gap: 48px;
+  animation: marqueeScroll 25s linear infinite;
+}
+
+.tech-chip {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.6;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+
+.tech-chip:hover { opacity: 1; }
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+@keyframes marqueeScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* === STATS STRIP (Codex v2: metrics) === */
+.stats-strip {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  padding: 32px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.stat {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+
+.stat-value span { color: var(--primary); }
+
+/* === SECTIONS === */
+.section {
+  padding: 100px 0;
+  position: relative;
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-family: var(--font-heading);
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+  text-wrap: balance;
+}
+
+.section-subtitle {
+  color: var(--muted);
+  max-width: 600px;
+  margin-bottom: 48px;
+}
+
+/* === PIPELINE with animated beam (Gemini v2) === */
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  position: relative;
+}
+
+.pipeline::before {
+  content: '';
+  position: absolute;
+  top: 40px;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: var(--border);
+}
+
+/* Animated beam (Gemini v2) */
+.pipeline::after {
+  content: '';
+  position: absolute;
+  top: 40px;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--border) 0%,
+    var(--border) 42%,
+    var(--primary) 48%,
+    var(--secondary) 52%,
+    var(--border) 58%,
+    var(--border) 100%
+  );
+  background-size: 200% 100%;
+  animation: beamFlow 3s linear infinite;
+}
+
+@keyframes beamFlow {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.step {
+  text-align: center;
+  position: relative;
+}
+
+.step-number {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--bg);
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s;
+}
+
+.step:hover .step-number {
+  border-color: var(--primary);
+  box-shadow: 0 0 30px rgba(48, 242, 162, 0.2);
+}
+
+.step h3 {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+}
+
+.step p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* === FEATURE GRID with spotlight hover === */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s, transform 0.3s;
+}
+
+.feature-card:hover {
+  border-color: rgba(48, 242, 162, 0.3);
+  transform: translateY(-2px);
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(48, 242, 162, 0.06), transparent 40%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.feature-card:hover::before { opacity: 1; }
+
+.feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(48, 242, 162, 0.1);
+  border: 1px solid rgba(48, 242, 162, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+}
+
+.feature-card h3 {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.feature-card p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* === CASE STUDY (Codex v2: proof section) === */
+.case-section {
+  padding: 100px 0;
+  position: relative;
+}
+
+.case-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.case-prompt {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.case-prompt-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+
+.case-prompt p {
+  font-size: 1.05rem;
+  color: var(--text);
+  font-style: italic;
+  line-height: 1.6;
+}
+
+.case-metrics {
+  display: flex;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+.case-metric {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.case-metric strong {
+  color: var(--primary);
+  font-size: 1.1rem;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.case-output {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.case-output-bar {
+  padding: 10px 16px;
+  background: rgba(30, 41, 59, 0.5);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.case-output-body {
+  padding: 20px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+.diff-add { color: var(--primary); }
+.diff-file { color: #F2C94C; }
+.diff-info { color: var(--secondary); }
+
+/* === DIAGONAL SECTION === */
+.diagonal-section {
+  background: var(--surface);
+  clip-path: polygon(0 5%, 100% 0, 100% 95%, 0 100%);
+  padding: 140px 0;
+  margin: -40px 0;
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.code-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+
+.code-block .keyword { color: var(--secondary); }
+.code-block .string { color: var(--primary); }
+.code-block .comment { color: var(--muted); }
+.code-block .func { color: #F2C94C; }
+
+/* === CTA SECTION === */
+.cta-section {
+  text-align: center;
+  padding: 120px 0;
+}
+
+.cta-section h2 {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+  text-wrap: balance;
+}
+
+.cta-section p {
+  color: var(--muted);
+  margin-bottom: 36px;
+  font-size: 1.1rem;
+}
+
+/* === FOOTER === */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 0;
+  text-align: center;
+}
+
+.footer-prompt {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.footer-prompt span { color: var(--primary); }
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding: 120px 0 60px;
+    min-height: auto;
+  }
+  .artifact-card { display: none; }
+  .pipeline { grid-template-columns: 1fr; }
+  .pipeline::before, .pipeline::after { display: none; }
+  .features-grid { grid-template-columns: 1fr; }
+  .tech-grid { grid-template-columns: 1fr; }
+  .case-grid { grid-template-columns: 1fr; }
+  .diagonal-section { clip-path: none; padding: 80px 0; }
+  .stats-strip { gap: 24px; flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<!-- Aurora ambient lights (Gemini v2) -->
+<div class="ambient-light light-1"></div>
+<div class="ambient-light light-2"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <div class="logo"><span>&gt;</span> apex</div>
+    <div class="nav-right">
+      <div class="status">
+        <div class="status-dot"></div>
+        Systems Operational
+      </div>
+      <a href="#cta" class="btn">Start Building</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero container">
+  <div class="hero-content">
+    <h1>
+      Build Software<br>at the
+      <span class="scramble" id="scramble-target">Speed of Thought</span>
+    </h1>
+    <p class="subtitle">
+      Autonomous AI agents that architect, code, and deploy full-stack
+      applications inside isolated cloud sandboxes.
+    </p>
+    <ul class="hero-bullets">
+      <li>Ship MVPs, internal tools, and landing pages in one workflow</li>
+      <li>Full stack: database + API + frontend, real environments</li>
+      <li>Keep real code. Export anytime. No lock-in.</li>
+    </ul>
+    <div class="hero-cta">
+      <a href="#cta" class="btn btn-filled">Generate a Live URL</a>
+      <a href="#case" class="btn">See It Work</a>
+    </div>
+    <p class="cta-note">No credit card required</p>
+  </div>
+
+  <!-- Terminal with artifact cards (Codex v2) -->
+  <div class="hero-visual">
+    <div class="artifact-card artifact-filetree">
+      <div class="artifact-title">/workspace</div>
+      <div class="artifact-line">public/index.html</div>
+      <div class="artifact-line">src/auth.py</div>
+      <div class="artifact-line">db/schema.sql</div>
+      <div class="artifact-line">requirements.txt</div>
+    </div>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot"></div>
+        <div class="terminal-dot"></div>
+        <div class="terminal-dot"></div>
+        <span class="terminal-title">apex -- sandbox</span>
+      </div>
+      <div class="terminal-body" id="terminal"></div>
+    </div>
+    <div class="artifact-card artifact-preview">
+      <div class="artifact-title">Live Preview</div>
+      <div class="artifact-pill">https://8000-227c.proxy.daytona.works</div>
+    </div>
+  </div>
+</section>
+
+<!-- TECH MARQUEE (Gemini v2: social proof) -->
+<section class="marquee-section">
+  <div class="marquee-container">
+    <div class="marquee-content" id="marquee">
+      <span class="tech-chip"><span class="chip-dot"></span>Python</span>
+      <span class="tech-chip"><span class="chip-dot"></span>FastAPI</span>
+      <span class="tech-chip"><span class="chip-dot"></span>React</span>
+      <span class="tech-chip"><span class="chip-dot"></span>Node.js</span>
+      <span class="tech-chip"><span class="chip-dot"></span>PostgreSQL</span>
+      <span class="tech-chip"><span class="chip-dot"></span>Redis</span>
+      <span class="tech-chip"><span class="chip-dot"></span>Docker</span>
+      <span class="tech-chip"><span class="chip-dot"></span>Daytona.io</span>
+      <span class="tech-chip"><span class="chip-dot"></span>Railway</span>
+      <span class="tech-chip"><span class="chip-dot"></span>Git</span>
+      <span class="tech-chip"><span class="chip-dot"></span>Claude</span>
+      <span class="tech-chip"><span class="chip-dot"></span>GPT</span>
+    </div>
+  </div>
+</section>
+
+<!-- STATS (Codex v2: metrics) -->
+<section class="stats-strip container">
+  <div class="stat">
+    <span class="stat-value">2.1<span>s</span></span>
+    Sandbox creation
+  </div>
+  <div class="stat">
+    <span class="stat-value"><span>&lt;</span>1<span>s</span></span>
+    File operations
+  </div>
+  <div class="stat">
+    <span class="stat-value">0</span>
+    Environment setup
+  </div>
+  <div class="stat">
+    <span class="stat-value">1</span>
+    Click to preview
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how">
+  <div class="container">
+    <div class="section-label">// How it works</div>
+    <h2 class="section-title">Three Steps to Autonomy</h2>
+    <p class="section-subtitle">
+      Describe your project. Apex handles the rest -- from architecture
+      decisions to live deployment.
+    </p>
+    <div class="pipeline">
+      <div class="step">
+        <div class="step-number">01</div>
+        <h3>Describe</h3>
+        <p>Tell Apex what you want to build. A landing page, an API, a full-stack app. Plain language.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">02</div>
+        <h3>Build &amp; Test</h3>
+        <p>AI agents research, write code, and test in isolated Daytona cloud sandboxes. Real environments, not simulations.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">03</div>
+        <h3>Deploy</h3>
+        <p>Get a live preview URL instantly. Iterate with feedback. Ship when ready.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">// Capabilities</div>
+    <h2 class="section-title">Built for Developers Who Ship</h2>
+    <p class="section-subtitle">
+      Not another no-code tool. Apex writes real code in real environments.
+    </p>
+    <div class="features-grid" id="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">&#x2630;</div>
+        <h3>Isolated Sandboxes</h3>
+        <p>Every project runs in its own Daytona cloud sandbox. Full Linux, full isolation, files persist across sessions.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x21BB;</div>
+        <h3>Autonomous Pipeline</h3>
+        <p>Research, design, code, test, deploy. The AI handles the full loop without manual intervention.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x26A1;</div>
+        <h3>Live Preview</h3>
+        <p>Every sandbox gets a public URL. See your project live as it's being built. Iterate in real-time.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F504;</div>
+        <h3>Version History</h3>
+        <p>Git-backed versions of every change. Roll back to any point. Full audit trail of AI decisions.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F4E6;</div>
+        <h3>Real Stack</h3>
+        <p>PostgreSQL, Redis, Python, Node.js, FastAPI, React. Not toy environments -- production-grade infrastructure.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F9E0;</div>
+        <h3>Project Memory</h3>
+        <p>AI remembers your preferences, past decisions, and project context across sessions. Smarter with every iteration.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CASE STUDY (Codex v2: proof) -->
+<section class="case-section" id="case">
+  <div class="container">
+    <div class="section-label">// Real output</div>
+    <h2 class="section-title">From Prompt to Live URL</h2>
+    <p class="section-subtitle">
+      A real session. One prompt, full-stack output, live preview.
+    </p>
+    <div class="case-grid">
+      <div>
+        <div class="case-prompt">
+          <div class="case-prompt-label">User prompt</div>
+          <p>"Build a SaaS landing page with hero section, feature grid, pricing table, and user authentication using FastAPI + PostgreSQL"</p>
+        </div>
+        <div class="case-metrics">
+          <div class="case-metric">
+            <strong>12</strong>
+            Files generated
+          </div>
+          <div class="case-metric">
+            <strong>1</strong>
+            Database
+          </div>
+          <div class="case-metric">
+            <strong>1</strong>
+            Live URL
+          </div>
+          <div class="case-metric">
+            <strong>0</strong>
+            Manual config
+          </div>
+        </div>
+      </div>
+      <div class="case-output">
+        <div class="case-output-bar">
+          <span>build.log</span>
+        </div>
+        <div class="case-output-body">
+          <div class="diff-info">Researching SaaS design patterns...</div>
+          <div class="diff-info">Selecting layout: hero + features + pricing</div>
+          <div class="diff-add">+ public/index.html (4.2 KB)</div>
+          <div class="diff-add">+ public/styles.css (2.8 KB)</div>
+          <div class="diff-add">+ src/main.py (FastAPI app)</div>
+          <div class="diff-add">+ src/auth.py (JWT + bcrypt)</div>
+          <div class="diff-add">+ src/models.py (SQLAlchemy)</div>
+          <div class="diff-add">+ db/schema.sql (users, plans)</div>
+          <div class="diff-file">Installing: fastapi uvicorn psycopg2</div>
+          <div class="diff-file">Starting PostgreSQL...</div>
+          <div class="diff-add">Build complete. 0 errors.</div>
+          <div style="margin-top: 8px; color: var(--primary);">Live at: https://8000-227c.proxy.daytona.works</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECHNICAL (diagonal) -->
+<section class="diagonal-section">
+  <div class="container">
+    <div class="tech-grid">
+      <div>
+        <div class="section-label">// Under the hood</div>
+        <h2 class="section-title">Real Infrastructure,<br>Not Abstractions</h2>
+        <p style="color: var(--muted); margin-bottom: 24px; line-height: 1.7;">
+          Each project gets an ephemeral Linux environment powered by
+          Daytona.io. Install packages, run databases, execute arbitrary
+          commands. The AI works in the same environment a developer would.
+        </p>
+        <p style="color: var(--muted); line-height: 1.7;">
+          Apex runs on Railway with a FastAPI backend and PostgreSQL.
+          Sandboxes run on Daytona Cloud. The AI orchestrates everything
+          through the Daytona SDK.
+        </p>
+      </div>
+      <div class="code-block">
+<span class="comment"># What happens when you create a project</span>
+sandbox = client.<span class="func">create</span>(<span class="func">CreateSandboxFromImageParams</span>(
+    image=<span class="string">"python:3.12-slim-bookworm"</span>,
+    name=<span class="string">"apex-my-project"</span>,
+))
+
+<span class="comment"># Full filesystem access</span>
+sandbox.fs.<span class="func">upload_file</span>(
+    html.<span class="func">encode</span>(<span class="string">"utf-8"</span>),
+    <span class="string">"/workspace/public/index.html"</span>,
+)
+
+<span class="comment"># Run any command</span>
+result = sandbox.process.<span class="func">exec</span>(
+    <span class="string">"pip install fastapi uvicorn"</span>
+)
+
+<span class="comment"># Install databases</span>
+sandbox.process.<span class="func">exec</span>(
+    <span class="string">"apt-get install -y postgresql"</span>
+)
+
+<span class="comment"># Get live preview URL</span>
+preview = sandbox.<span class="func">get_preview_link</span>(<span class="keyword">8000</span>)
+<span class="comment"># https://8000-abc123.proxy.daytona.works</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="cta">
+  <div class="container">
+    <h2>Stop Configuring.<br>Start Building.</h2>
+    <p>Describe your project. Get a live URL.</p>
+    <a href="#" class="btn btn-filled" style="font-size: 1rem; padding: 14px 32px;">Generate a Live URL</a>
+    <p class="cta-note">No credit card required</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <p class="footer-prompt">
+      <span>user@apex:~$</span> Built with Apex + Daytona.io
+      <span class="cursor-blink"></span>
+    </p>
+  </div>
+</footer>
+
+<script>
+// === SCRAMBLE TEXT (Gemini) ===
+function scrambleText(el, final, dur = 1500) {
+  const chars = '!@#$%^&*()_+{}|:<>?0123456789ABCDEFabcdef';
+  const steps = 24;
+  const interval = dur / steps;
+  let step = 0;
+  const timer = setInterval(() => {
+    step++;
+    const progress = step / steps;
+    let result = '';
+    for (let i = 0; i < final.length; i++) {
+      if (final[i] === ' ') result += ' ';
+      else if (i / final.length < progress) result += final[i];
+      else result += chars[Math.floor(Math.random() * chars.length)];
+    }
+    el.textContent = result;
+    if (step >= steps) { clearInterval(timer); el.textContent = final; }
+  }, interval);
+}
+
+window.addEventListener('load', () => {
+  const t = document.getElementById('scramble-target');
+  if (t) scrambleText(t, 'Speed of Thought', 1200);
+});
+
+// === TERMINAL ANIMATION ===
+const lines = [
+  { type: 'input', text: 'apex create my-saas-app' },
+  { type: 'output', text: 'Creating sandbox (python:3.12-slim)...' },
+  { type: 'success', text: 'Sandbox ready in 2.1s' },
+  { type: 'info', text: 'ID: 227c511b-6463-4643-a2b0' },
+  { type: 'blank' },
+  { type: 'input', text: 'apex build "SaaS landing with auth"' },
+  { type: 'output', text: 'Researching design patterns...' },
+  { type: 'output', text: 'Generating layout + components...' },
+  { type: 'file', text: 'Written: public/index.html (4.2 KB)' },
+  { type: 'file', text: 'Written: src/auth.py (1.1 KB)' },
+  { type: 'file', text: 'Written: db/schema.sql (0.8 KB)' },
+  { type: 'success', text: 'Build complete. 12 files, 0 errors.' },
+  { type: 'blank' },
+  { type: 'input', text: 'apex preview my-saas-app' },
+  { type: 'success', text: 'Live at: https://8000-227c.proxy.daytona.works' },
+];
+
+function renderTerminal() {
+  const el = document.getElementById('terminal');
+  if (!el) return;
+  el.innerHTML = '';
+  lines.forEach((line, i) => {
+    const div = document.createElement('div');
+    div.className = 'terminal-line';
+    div.style.animationDelay = `${0.5 + i * 0.18}s`;
+    if (line.type === 'blank') div.innerHTML = '&nbsp;';
+    else if (line.type === 'input') div.innerHTML = `<span class="prompt">$ </span><span class="cmd">${line.text}</span>`;
+    else div.innerHTML = `<span class="${line.type}">  ${line.text}</span>`;
+    el.appendChild(div);
+  });
+  const cursor = document.createElement('div');
+  cursor.className = 'terminal-line';
+  cursor.style.animationDelay = `${0.5 + lines.length * 0.18}s`;
+  cursor.innerHTML = '<span class="prompt">$ </span><span class="cursor-blink"></span>';
+  el.appendChild(cursor);
+}
+renderTerminal();
+
+// === MARQUEE DUPLICATION (for infinite scroll) ===
+const marquee = document.getElementById('marquee');
+if (marquee) {
+  marquee.innerHTML += marquee.innerHTML;
+}
+
+// === SPOTLIGHT HOVER ON CARDS (Gemini) ===
+document.querySelectorAll('.feature-card').forEach(card => {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+    card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+  });
+});
+
+// === SCROLL REVEAL ===
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.animation = 'fadeUp 0.6s ease-out forwards';
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.step, .feature-card, .tech-grid, .case-grid, .stat').forEach(el => {
+  el.style.opacity = '0';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>

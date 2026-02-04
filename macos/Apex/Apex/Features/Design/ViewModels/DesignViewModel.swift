@@ -4,8 +4,17 @@ import Combine
 /// DesignViewModel — owns version tracking state for the design view
 @MainActor
 class DesignViewModel: ObservableObject {
-    @Published var pageVersions: [PageVersion] = []
-    @Published var lastKnownVersion: Int = 0
+    @Published var pageVersions: [PageVersion] = [] {
+        didSet { appState.pageVersions = pageVersions }
+    }
+    @Published var lastKnownVersion: Int = 1 {
+        didSet { appState.currentVersionNumber = lastKnownVersion }
+    }
+
+    /// Set during restore to prevent loadLocalVersions from overwriting lastKnownVersion
+    private var restoredVersion: Int? = nil
+    /// Prevent concurrent/redundant version loads
+    private var isLoadingVersions = false
 
     private let appState: AppState
     private var client: APIClient { appState.client }
@@ -17,6 +26,12 @@ class DesignViewModel: ObservableObject {
     // MARK: - Version Management
 
     func loadVersions(projectId: String, pageId: String) {
+        // Local projects: load from git history
+        if projectId.hasPrefix("local:") {
+            loadLocalVersions(projectId: projectId)
+            return
+        }
+
         Task {
             do {
                 let versions = try await client.pageService.getVersions(projectId: projectId, pageId: pageId)
@@ -31,6 +46,12 @@ class DesignViewModel: ObservableObject {
     }
 
     func restoreVersion(project: Project, pageId: String, version: Int) {
+        // Local projects: restore from git
+        if project.id.hasPrefix("local:") {
+            restoreLocalVersion(projectId: project.id, version: version)
+            return
+        }
+
         Task {
             do {
                 let updated = try await client.pageService.restoreVersion(
@@ -64,9 +85,73 @@ class DesignViewModel: ObservableObject {
         guard let pageId = selectedPageId,
               let page = newPages.first(where: { $0.id == pageId }) else { return }
 
+        // For local projects, reload versions when pages update (new commit may exist)
+        if projectId.hasPrefix("local:") {
+            loadLocalVersions(projectId: projectId)
+            return
+        }
+
         if page.currentVersion != lastKnownVersion {
             lastKnownVersion = page.currentVersion
             loadVersions(projectId: projectId, pageId: pageId)
+        }
+    }
+
+    // MARK: - Local Versioning (Git)
+
+    private func loadLocalVersions(projectId: String) {
+        guard !isLoadingVersions else { return }
+        guard let projectName = appState.localProjectName(from: projectId) else {
+            pageVersions = []
+            return
+        }
+
+        isLoadingVersions = true
+        Task {
+            defer { isLoadingVersions = false }
+            do {
+                let versions = try await LocalWorkspaceService.shared.gitVersions(project: projectName)
+                pageVersions = versions
+                if let restored = restoredVersion {
+                    lastKnownVersion = restored
+                    restoredVersion = nil
+                } else if let latest = versions.last {
+                    lastKnownVersion = latest.version
+                }
+            } catch {
+                pageVersions = []
+            }
+        }
+    }
+
+    private func restoreLocalVersion(projectId: String, version: Int) {
+        guard let projectName = appState.localProjectName(from: projectId),
+              let target = pageVersions.first(where: { $0.version == version }) else { return }
+
+        Task {
+            do {
+                try await LocalWorkspaceService.shared.gitRestore(project: projectName, commitHash: target.id)
+
+                // Reload pages from disk
+                let ws = LocalWorkspaceService.shared
+                let htmlFiles = ws.listFiles(project: projectName).filter { !$0.isDirectory && $0.path.hasSuffix(".html") }
+                var newPages: [Page] = []
+                for file in htmlFiles {
+                    let filePath = ws.projectPath(projectName).appendingPathComponent(file.path)
+                    if let html = try? String(contentsOf: filePath, encoding: .utf8) {
+                        newPages.append(Page.local(
+                            id: "local-page-\(projectName)/\(file.path)",
+                            name: file.name,
+                            html: html
+                        ))
+                    }
+                }
+                restoredVersion = version
+                appState.pages = newPages
+                appState.previewRefreshToken = UUID()
+            } catch {
+                // Restore failed
+            }
         }
     }
 }

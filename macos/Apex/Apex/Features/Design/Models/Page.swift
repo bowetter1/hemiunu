@@ -41,6 +41,11 @@ struct Page: Identifiable, Codable, Equatable {
         self.currentVersion = currentVersion
     }
 
+    /// Create a synthetic Page for local filesystem projects
+    static func local(id: String, name: String, html: String) -> Page {
+        Page(id: id, name: name, html: html)
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)

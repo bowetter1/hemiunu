@@ -57,6 +57,12 @@ class AppState: ObservableObject {
     @Published var showSidebar: Bool = true
     @Published var showFloatingChat: Bool = false
 
+    // MARK: - Preview
+
+    @Published var selectedDevice: PreviewDevice = .desktop
+    @Published var pageVersions: [PageVersion] = []
+    @Published var currentVersionNumber: Int = 1
+
     // MARK: - Auth
 
     @Published var isConnected: Bool = false
@@ -77,11 +83,15 @@ class AppState: ObservableObject {
     @Published var projectLogs: [LogEntry] = []
     @Published var variants: [Variant] = []
     @Published var pages: [Page] = []
+    @Published var localFiles: [LocalFileInfo] = []
+    @Published var localProjects: [LocalProject] = []
 
     // MARK: - Services
 
     let client = APIClient()
     let wsClient = WebSocketManager()
+    let workspace = LocalWorkspaceService.shared
+    let cli = CLIService.shared
 
     // MARK: - View Models
 
@@ -94,6 +104,9 @@ class AppState: ObservableObject {
     // MARK: - Auth
 
     func connect() async {
+        // Scan local workspaces (available even before sign-in)
+        refreshLocalProjects()
+
         // Try to restore existing Firebase session
         if client.auth.isSignedIn {
             do {
@@ -104,6 +117,11 @@ class AppState: ObservableObject {
             await didSignIn()
         }
         // Otherwise: show LoginView (no auto-connect)
+    }
+
+    /// Scan ~/Apex/projects/ for workspaces with HTML files
+    func refreshLocalProjects() {
+        localProjects = workspace.listHTMLWorkspaces()
     }
 
     /// Called after a successful Google Sign-In
@@ -151,7 +169,24 @@ class AppState: ObservableObject {
     private var connectedProjectId: String?
     private var loadProjectTask: Task<Void, Never>?
 
+    /// Check if a project ID refers to a local project
+    var isLocalProject: Bool {
+        selectedProjectId?.hasPrefix("local:") == true
+    }
+
+    /// Extract the local project name from a "local:name" ID
+    func localProjectName(from id: String) -> String? {
+        guard id.hasPrefix("local:") else { return nil }
+        return String(id.dropFirst(6))
+    }
+
     func loadProject(id: String) async {
+        // Handle local projects (local:projectName)
+        if let localName = localProjectName(from: id) {
+            await loadLocalProject(name: localName, id: id)
+            return
+        }
+
         do {
             let project = try await client.projectService.get(id: id)
             currentProject = project
@@ -192,6 +227,50 @@ class AppState: ObservableObject {
         }
     }
 
+    /// Load a local project from ~/Apex/projects/<name>
+    private func loadLocalProject(name: String, id: String) async {
+        let projectPath = workspace.projectPath(name)
+        guard FileManager.default.fileExists(atPath: projectPath.path) else { return }
+
+        currentProject = Project.local(id: id, name: name)
+
+        // Populate file list for code mode sidebar
+        localFiles = workspace.listFiles(project: name)
+
+        // Create pages for all HTML files in the workspace
+        let htmlFiles = localFiles.filter { !$0.isDirectory && $0.path.hasSuffix(".html") }
+        var newPages: [Page] = []
+        for file in htmlFiles {
+            let filePath = workspace.projectPath(name).appendingPathComponent(file.path)
+            if let html = try? String(contentsOf: filePath, encoding: .utf8) {
+                let page = Page.local(
+                    id: "local-page-\(name)/\(file.path)",
+                    name: file.name,
+                    html: html
+                )
+                newPages.append(page)
+            }
+        }
+        pages = newPages
+
+        // Select the main HTML file
+        if let mainFile = workspace.findMainHTML(project: name) {
+            selectedPageId = "local-page-\(name)/\(mainFile)"
+        } else {
+            selectedPageId = newPages.first?.id
+        }
+
+        variants = []
+        projectLogs = []
+        localPreviewURL = workspace.projectPath(name)
+    }
+
+    /// URL for local project preview (set when loading local projects)
+    @Published var localPreviewURL: URL?
+    /// Token to force WebView refresh when file content changes but URL stays the same
+    @Published var previewRefreshToken: UUID = UUID()
+
+
     func scheduleLoadProject(id: String, delayMilliseconds: UInt64 = 300) {
         loadProjectTask?.cancel()
         loadProjectTask = Task { [weak self] in
@@ -205,11 +284,16 @@ class AppState: ObservableObject {
         currentProject = nil
         variants = []
         pages = []
+        localFiles = []
         projectLogs = []
         selectedProjectId = nil
         selectedVariantId = nil
         selectedPageId = nil
+        localPreviewURL = nil
+        pageVersions = []
+        currentVersionNumber = 1
         connectedProjectId = nil
         wsClient.disconnect()
     }
+
 }

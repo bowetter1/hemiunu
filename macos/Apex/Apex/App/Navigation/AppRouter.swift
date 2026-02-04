@@ -1,8 +1,10 @@
 import SwiftUI
+import AppKit
 
 /// Main app router - handles navigation between modes
 struct AppRouter: View {
     @StateObject private var appState = AppState.shared
+    @StateObject private var designViewModel = DesignViewModel(appState: AppState.shared)
     @State private var showToolsPanel = true
 
     /// Auth gate — show login when not connected
@@ -41,7 +43,19 @@ struct AppRouter: View {
                             appState.clearCurrentProject()
                         },
                         showModeSelector: false,
-                        inlineTrafficLights: true
+                        inlineTrafficLights: true,
+                        selectedDevice: $appState.selectedDevice,
+                        pageVersions: appState.pageVersions,
+                        currentVersion: appState.currentVersionNumber,
+                        onRestoreVersion: { version in
+                            if let project = appState.currentProject,
+                               let pageId = appState.selectedPageId {
+                                designViewModel.restoreVersion(project: project, pageId: pageId, version: version)
+                            }
+                        },
+                        onOpenInBrowser: {
+                            openPreviewInBrowser()
+                        }
                     )
                     .padding(.horizontal, 0)
 
@@ -51,7 +65,6 @@ struct AppRouter: View {
                         if appState.showSidebar {
                             UnifiedSidebar(
                                 appState: appState,
-                                webSocket: appState.wsClient,
                                 currentMode: appState.currentMode,
                                 selectedProjectId: $appState.selectedProjectId,
                                 selectedVariantId: $appState.selectedVariantId,
@@ -162,6 +175,7 @@ struct AppRouter: View {
             DesignView(
                 appState: appState,
                 wsClient: appState.wsClient,
+                viewModel: designViewModel,
                 sidebarVisible: appState.showSidebar,
                 toolsPanelVisible: showToolsPanel,
                 selectedPageId: appState.selectedPageId,
@@ -174,6 +188,43 @@ struct AppRouter: View {
             )
         case .code:
             CodeModeView(appState: appState, selectedPageId: $appState.selectedPageId)
+        }
+    }
+
+    // MARK: - Open in Browser
+
+    private func openPreviewInBrowser() {
+        // Local file: open directly
+        if let localURL = appState.localPreviewURL {
+            if let projectName = appState.currentProject.flatMap({ appState.localProjectName(from: $0.id) }),
+               let mainHTML = appState.workspace.findMainHTML(project: projectName) {
+                let fileURL = localURL.appendingPathComponent(mainHTML)
+                NSWorkspace.shared.open(fileURL)
+            } else {
+                NSWorkspace.shared.open(localURL)
+            }
+            return
+        }
+
+        // Sandbox preview: open URL
+        if let project = appState.currentProject,
+           let previewUrl = project.sandboxPreviewUrl,
+           let url = URL(string: previewUrl) {
+            NSWorkspace.shared.open(url)
+            return
+        }
+
+        // Inline HTML: write to temp file
+        if let pageId = appState.selectedPageId,
+           let page = appState.pages.first(where: { $0.id == pageId }),
+           !page.html.isEmpty {
+            let tempDir = FileManager.default.temporaryDirectory
+            let fileName = "apex-preview-\(UUID().uuidString.prefix(8)).html"
+            let fileURL = tempDir.appendingPathComponent(fileName)
+            do {
+                try page.html.write(to: fileURL, atomically: true, encoding: .utf8)
+                NSWorkspace.shared.open(fileURL)
+            } catch {}
         }
     }
 

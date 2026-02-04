@@ -4,9 +4,11 @@ import UniformTypeIdentifiers
 struct StartProjectSheet: View {
     @Binding var isPresented: Bool
     let client: APIClient
+    let boss: BossCoordinator?
     let onProjectCreated: (String) -> Void
 
     // Form state
+    @State private var projectName = ""
     @State private var briefText: String
     @State private var websiteURL = ""
     @State private var selectedImage: NSImage?
@@ -16,16 +18,33 @@ struct StartProjectSheet: View {
 
     // Generation config
     @State private var config = GenerationConfig()
-    @State private var selectedImageSource: ImageSource = .ai
+    @State private var selectedImageSource: ImageSource = .auto
 
-    init(isPresented: Binding<Bool>, client: APIClient, initialBrief: String = "", onProjectCreated: @escaping (String) -> Void) {
+    // Model selection (boss mode)
+    @State private var useClaude = true
+    @State private var useGemini = false
+    @State private var useKimi = false
+
+    private var selectedAgents: [AIAgent] {
+        var agents: [AIAgent] = []
+        if useClaude { agents.append(.claude) }
+        if useGemini { agents.append(.gemini) }
+        if useKimi { agents.append(.kimi) }
+        return agents
+    }
+
+    private var useBoss: Bool { !selectedAgents.isEmpty }
+
+    init(isPresented: Binding<Bool>, client: APIClient, boss: BossCoordinator? = nil, initialBrief: String = "", onProjectCreated: @escaping (String) -> Void) {
         self._isPresented = isPresented
         self.client = client
+        self.boss = boss
         self._briefText = State(initialValue: initialBrief)
         self.onProjectCreated = onProjectCreated
     }
 
     private enum ImageSource: String, CaseIterable, Identifiable {
+        case auto = "auto"
         case none = "none"
         case existingImages = "existing_images"
         case img2img = "img2img"
@@ -36,6 +55,7 @@ struct StartProjectSheet: View {
 
         var title: String {
             switch self {
+            case .auto: return "AI chooses"
             case .none: return "No images"
             case .existingImages: return "Existing (from site)"
             case .img2img: return "Img2img (restyle)"
@@ -67,6 +87,15 @@ struct StartProjectSheet: View {
             // Scrollable content
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    // Project name
+                    sectionLabel("Project Name", icon: "tag")
+                    TextField("e.g. Fjällräven", text: $projectName)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .padding(10)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .cornerRadius(8)
+
                     // Brief
                     sectionLabel("Description", icon: "text.alignleft")
                     TextField("What do you want to build?", text: $briefText, axis: .vertical)
@@ -118,20 +147,9 @@ struct StartProjectSheet: View {
                     )
                     toggleRow(
                         title: "Find inspiration sites",
-                        description: "Searches for award-winning sites in the industry",
+                        description: "Finds 2-3 inspiration sites + 2-3 competitors",
                         isOn: $config.findInspirationSites
                     )
-                    if config.findInspirationSites {
-                        HStack {
-                            Text("Inspiration site count")
-                                .font(.system(size: 12))
-                            Spacer()
-                            Stepper("\(config.inspirationSiteCount)", value: $config.inspirationSiteCount, in: 1...6)
-                                .font(.system(size: 11))
-                                .frame(width: 100)
-                        }
-                        .padding(.leading, 4)
-                    }
 
                     Divider()
 
@@ -139,8 +157,8 @@ struct StartProjectSheet: View {
                     sectionLabel("Generation", icon: "sparkles")
 
                     toggleRow(
-                        title: "Skip clarification questions",
-                        description: "Go straight to research without asking questions",
+                        title: "Direct to research",
+                        description: "Skip clarification questions and start building",
                         isOn: $config.skipClarification
                     )
                     toggleRow(
@@ -149,43 +167,49 @@ struct StartProjectSheet: View {
                         isOn: $config.webSearchDuringLayout
                     )
 
-                    // Layout count picker
-                    HStack {
-                        Text("Layout count")
-                            .font(.system(size: 12, weight: .medium))
-                        Spacer()
-                        Picker("", selection: $config.layoutCount) {
-                            Text("1").tag(1)
-                            Text("2").tag(2)
-                            Text("3").tag(3)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 120)
-                    }
-                    .padding(.leading, 4)
 
-                    // Layout provider (Opus vs OpenAI)
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Layout AI")
-                                .font(.system(size: 12, weight: .medium))
-                            Text("Which AI creates the HTML layout")
+                    Divider()
+
+                    // Local build — model selection
+                    sectionLabel("Local Build", icon: "brain")
+
+                    toggleRow(
+                        title: "Claude",
+                        description: "Claude Opus builds locally on your Mac",
+                        isOn: $useClaude
+                    )
+                    .disabled(!BossService.isAvailable(agent: .claude))
+
+                    toggleRow(
+                        title: "Gemini",
+                        description: "Gemini CLI builds in parallel",
+                        isOn: $useGemini
+                    )
+                    .disabled(!BossService.isAvailable(agent: .gemini))
+
+                    toggleRow(
+                        title: "Kimi",
+                        description: "Kimi CLI builds in parallel",
+                        isOn: $useKimi
+                    )
+                    .disabled(!BossService.isAvailable(agent: .kimi))
+
+                    // Two-phase info text
+                    if selectedAgents.count > 1 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 10))
+                                .foregroundColor(.orange)
+                            Text("Claude researches first, then all agents build in parallel")
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                         }
-                        Spacer()
-                        Picker("", selection: $config.layoutProvider) {
-                            Text("Claude").tag("anthropic")
-                            Text("OpenAI").tag("openai")
-                        }
-                        .pickerStyle(.radioGroup)
-                        .horizontalRadioGroupLayout()
-                        .font(.system(size: 11))
+                        .padding(.leading, 4)
+                        .padding(.top, 2)
                     }
-                    .padding(.leading, 4)
 
-                    // Advanced section
-                    if showAdvanced {
+                    // Advanced section (server-side models — only when no local agents selected)
+                    if showAdvanced && !useBoss {
                         Divider()
                         sectionLabel("Models", icon: "cpu")
 
@@ -254,7 +278,7 @@ struct StartProjectSheet: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(canCreate ? Color.orange : Color.gray)
+                    .background(canCreate ? Color.blue : Color.gray)
                     .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
@@ -378,20 +402,37 @@ struct StartProjectSheet: View {
         if !websiteURL.isEmpty {
             enhancedBrief += "\n\nReference website: \(websiteURL)"
         }
-        if selectedImage != nil {
-            enhancedBrief += "\n\n(User provided an inspiration image)"
-        }
 
-        // Sync image source into config
-        var finalConfig = config
-        // Image source is sent as top-level param, config carries the rest
+        if useBoss {
+            createBossProject(brief: enhancedBrief)
+        } else {
+            createServerProject(brief: enhancedBrief)
+        }
+    }
+
+    /// Encode the selected NSImage as a base64 JPEG string
+    private func encodeInspirationImage() -> String? {
+        guard let image = selectedImage,
+              let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let jpegData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
+            return nil
+        }
+        return jpegData.base64EncodedString()
+    }
+
+    /// Server-side project creation (original flow)
+    private func createServerProject(brief: String) {
+        let finalConfig = config
+        let imageBase64 = encodeInspirationImage()
 
         Task {
             do {
                 let project = try await client.projectService.create(
-                    brief: enhancedBrief,
+                    brief: brief,
                     imageSource: selectedImageSource.rawValue,
-                    config: finalConfig
+                    config: finalConfig,
+                    inspirationImageBase64: imageBase64
                 )
                 await MainActor.run {
                     isCreating = false
@@ -403,6 +444,82 @@ struct StartProjectSheet: View {
                     isCreating = false
                 }
             }
+        }
+    }
+
+    /// Boss mode project creation — activates boss coordinator with selected agents
+    private func createBossProject(brief: String) {
+        guard let boss else { return }
+        let agents = selectedAgents
+        let vectors = Array(repeating: nil as String?, count: agents.count)
+
+        // Build enriched prompt with config instructions
+        var prompt = brief
+
+        // Research instructions from toggles
+        var researchNotes: [String] = []
+        if !config.webSearchCompany {
+            researchNotes.append("Do NOT web search for the company — use only the provided URL")
+        }
+        if !config.scrapeCompanySite {
+            researchNotes.append("Do NOT visit or scrape the company website")
+        }
+        if !config.findInspirationSites {
+            researchNotes.append("Skip searching for inspiration sites")
+        }
+        if config.skipClarification {
+            researchNotes.append("Do NOT ask any clarification questions — go straight to work")
+        }
+        if !researchNotes.isEmpty {
+            prompt += "\n\nResearch instructions:\n" + researchNotes.map { "- \($0)" }.joined(separator: "\n")
+        }
+
+        // Image source instruction
+        let imgInstruction = imageSourceInstruction
+
+        // For solo mode, also append build instructions to the prompt
+        if agents.count == 1 {
+            var buildNotes: [String] = []
+            if let img = imgInstruction { buildNotes.append(img) }
+            if !config.webSearchDuringLayout {
+                buildNotes.append("Do NOT search the web while building layouts")
+            }
+            if selectedImage != nil {
+                buildNotes.append("See inspiration.jpg in the workspace for visual reference")
+            }
+            if !buildNotes.isEmpty {
+                prompt += "\n\nBuild instructions:\n" + buildNotes.map { "- \($0)" }.joined(separator: "\n")
+            }
+        }
+
+        boss.activate(count: agents.count, vectors: vectors, agents: agents)
+
+        // Store build-phase config for checklist generation + builder messages
+        let trimmedName = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        boss.configureBuild(
+            config: config,
+            imageInstruction: imgInstruction,
+            inspirationImage: selectedImage,
+            projectName: trimmedName.isEmpty ? nil : trimmedName
+        )
+
+        isPresented = false
+        // Small delay to let the sheet dismiss, then send
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            boss.send(prompt, setLoading: { _ in })
+        }
+    }
+
+    /// Map image source picker to a human-readable instruction for the agent
+    private var imageSourceInstruction: String? {
+        switch selectedImageSource {
+        case .auto: return nil
+        case .none: return "Do not use any images in the design"
+        case .existingImages: return "Download and use images from the existing site"
+        case .img2img: return "Use img2img (apex_img2img) to restyle reference images from the site"
+        case .ai: return "Generate all images with AI (apex_generate_image)"
+        case .stock: return "Use stock photos only (apex_search_photos from Pexels)"
         }
     }
 }

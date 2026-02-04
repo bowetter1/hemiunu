@@ -5,7 +5,7 @@ import AppKit
 struct DesignView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var wsClient: WebSocketManager
-    @StateObject private var viewModel: DesignViewModel
+    @ObservedObject var viewModel: DesignViewModel
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedPageId: String?
@@ -13,17 +13,6 @@ struct DesignView: View {
     var onProjectCreated: ((String) -> Void)? = nil
 
     private var client: APIClient { appState.client }
-
-    init(appState: AppState, wsClient: WebSocketManager, sidebarVisible: Bool = true, toolsPanelVisible: Bool = true, selectedPageId: String? = nil, showResearchJSON: Bool = false, onProjectCreated: ((String) -> Void)? = nil) {
-        self.appState = appState
-        self.wsClient = wsClient
-        _viewModel = StateObject(wrappedValue: DesignViewModel(appState: appState))
-        self.sidebarVisible = sidebarVisible
-        self.toolsPanelVisible = toolsPanelVisible
-        self.selectedPageId = selectedPageId
-        self.showResearchJSON = showResearchJSON
-        self.onProjectCreated = onProjectCreated
-    }
 
     // Find the selected page from sidebar
     var selectedPage: Page? {
@@ -62,6 +51,10 @@ struct DesignView: View {
                 ResearchJSONView(moodboard: moodboard)
             }
         }
+        // Local project: load HTML from file URL
+        else if appState.isLocalProject, let localURL = appState.localPreviewURL {
+            localPreviewContent(project: project, baseURL: localURL)
+        }
         // If a specific page is selected from sidebar, show it
         else if let page = selectedPage {
             WebPreview(
@@ -69,11 +62,7 @@ struct DesignView: View {
                 projectId: project.id,
                 sidebarVisible: sidebarVisible,
                 toolsPanelVisible: toolsPanelVisible,
-                versions: viewModel.pageVersions,
-                currentVersion: page.currentVersion,
-                onRestoreVersion: { version in
-                    viewModel.restoreVersion(project: project, pageId: page.id, version: version)
-                }
+                selectedDevice: appState.selectedDevice
             )
         } else {
             // Otherwise show based on project status
@@ -105,16 +94,26 @@ struct DesignView: View {
             case .layouts:
                 // Show first layout by default, user can select others from sidebar
                 if let firstLayout = appState.pages.first(where: { $0.layoutVariant != nil }) {
-                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
+                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
                 } else {
                     GeneratingView(message: "Loading layouts...")
                 }
 
+            case .building:
+                GeneratingView(message: "Building project...")
+
+            case .running:
+                if let previewUrl = project.sandboxPreviewUrl {
+                    WebPreview(html: "", projectId: project.id, sandboxPreviewUrl: previewUrl, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
+                } else {
+                    GeneratingView(message: "Running...")
+                }
+
             case .editing, .done:
                 if let mainPage = appState.pages.first(where: { $0.layoutVariant == nil }) {
-                    WebPreview(html: mainPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
+                    WebPreview(html: mainPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
                 } else if let firstLayout = appState.pages.first(where: { $0.layoutVariant != nil }) {
-                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible)
+                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
                 } else {
                     GeneratingView(message: "Loading...")
                 }
@@ -125,84 +124,50 @@ struct DesignView: View {
         }
     }
 
-}
+    @ViewBuilder
+    private func localPreviewContent(project: Project, baseURL: URL) -> some View {
+        let projectName = appState.localProjectName(from: project.id) ?? ""
+        let prefix = "local-page-\(projectName)/"
 
-// MARK: - Design Command Bar
-
-struct DesignCommandBar: View {
-    @ObservedObject var appState: AppState
-    @State private var commandText = ""
-    @State private var showStartSheet = false
-    @State private var pendingBrief = ""
-
-    private var client: APIClient { appState.client }
-
-    var body: some View {
-        CommandBar(
-            text: $commandText,
-            placeholder: placeholderText
-        ) {
-            processCommand()
-        }
-        .sheet(isPresented: $showStartSheet) {
-            StartProjectSheet(
-                isPresented: $showStartSheet,
-                client: client,
-                initialBrief: pendingBrief
-            ) { projectId in
-                // Project created from sheet
+        // Use selected page's file path if available, otherwise fall back to main HTML
+        let relativePath: String? = {
+            if let pageId = selectedPageId, pageId.hasPrefix(prefix) {
+                return String(pageId.dropFirst(prefix.count))
             }
-        }
-    }
+            return appState.workspace.findMainHTML(project: projectName)
+        }()
 
-    private var placeholderText: String {
-        if let project = appState.currentProject {
-            switch project.status {
-            case .editing, .done:
-                return "Describe what you want to change..."
-            default:
-                return "Waiting..."
-            }
-        }
-        return "Describe your website..."
-    }
-
-    private func processCommand() {
-        guard !commandText.isEmpty else { return }
-        let text = commandText
-        commandText = ""
-
-        if let project = appState.currentProject,
-           project.status == .editing || project.status == .done {
-            editCurrentPage(instruction: text)
+        if let relativePath {
+            let fileURL = baseURL.appendingPathComponent(relativePath)
+            WebPreview(
+                html: "",
+                localFileURL: fileURL,
+                refreshToken: appState.previewRefreshToken,
+                sidebarVisible: sidebarVisible,
+                toolsPanelVisible: toolsPanelVisible,
+                selectedDevice: appState.selectedDevice
+            )
         } else {
-            // No project — open the start project sheet with typed text as brief
-            pendingBrief = text
-            showStartSheet = true
-        }
-    }
-
-    private func editCurrentPage(instruction: String) {
-        guard let project = appState.currentProject,
-              let page = appState.pages.first(where: { $0.layoutVariant == nil }) else { return }
-
-        Task {
-            do {
-                let updated = try await client.pageService.edit(
-                    projectId: project.id,
-                    pageId: page.id,
-                    instruction: instruction
-                )
-                await MainActor.run {
-                    if let index = appState.pages.firstIndex(where: { $0.id == page.id }) {
-                        appState.pages[index] = updated
-                    }
+            VStack(spacing: 16) {
+                Image(systemName: "folder")
+                    .font(.system(size: 48))
+                    .foregroundColor(.secondary)
+                Text("No HTML file found")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                Text("The local project at \(baseURL.path) has no index.html")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Button("Open in Finder") {
+                    NSWorkspace.shared.open(baseURL)
                 }
-            } catch {
-                // Page edit failed
+                .buttonStyle(.plain)
+                .foregroundColor(.blue)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
+
 }
 
 // MARK: - Design State Views
@@ -390,7 +355,7 @@ struct ResearchDoneView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(isGenerating ? Color.gray : Color.orange)
+                    .background(isGenerating ? Color.gray : Color.blue)
                     .cornerRadius(8)
                 }
                 .buttonStyle(.plain)

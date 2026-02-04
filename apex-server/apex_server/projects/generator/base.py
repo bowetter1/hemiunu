@@ -5,7 +5,7 @@ from anthropic import Anthropic
 
 from apex_server.config import get_settings
 from ..models import Project, ProjectLog
-from ..filesystem import FileSystemService
+from ..filesystem import get_filesystem
 
 from .research import ResearchMixin
 from .layouts import LayoutsMixin
@@ -24,8 +24,13 @@ class Generator(ResearchMixin, LayoutsMixin, EditingMixin, SiteGenerationMixin, 
         self.project = project
         self.db = db
         self.project_dir = Path(project.project_dir)  # Legacy, kept for compatibility
-        self.fs = FileSystemService(str(project.id))  # New filesystem service
+        self.fs = get_filesystem(str(project.id), project.sandbox_id)
         self.client = Anthropic(api_key=settings.anthropic_api_key)
+        self._config = project.generation_config or {}
+
+    def get_config(self, key: str, default=None):
+        """Get a generation config value with fallback default"""
+        return self._config.get(key, default)
 
     def log(self, phase: str, message: str, data: dict = None):
         """Add a log entry"""

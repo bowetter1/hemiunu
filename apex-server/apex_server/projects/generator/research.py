@@ -114,12 +114,10 @@ class ResearchMixin:
         if user_answer:
             search_context = f"{self.project.brief}\n\nUser clarification: {user_answer}"
 
-        inspiration_count = self.get_config("inspiration_site_count", 3)
-
         # Tool for Claude to return structured research data
         save_research_tool = {
             "name": "save_research",
-            "description": "Save the complete research results — colors, fonts, inspiration sites, and markdown report",
+            "description": "Save the complete research results — colors, fonts, inspiration sites, competitors, and markdown report",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -140,8 +138,8 @@ class ResearchMixin:
                     "body_font": {"type": "string", "description": "Recommended Google Font for body text"},
                     "inspiration_sites": {
                         "type": "array",
-                        "minItems": inspiration_count,
-                        "maxItems": inspiration_count,
+                        "minItems": 2,
+                        "maxItems": 3,
                         "items": {
                             "type": "object",
                             "properties": {
@@ -153,9 +151,25 @@ class ResearchMixin:
                             },
                             "required": ["url", "name", "design_style", "why", "key_elements"]
                         }
+                    },
+                    "competitor_sites": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 3,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string"},
+                                "name": {"type": "string"},
+                                "what_they_do": {"type": "string"},
+                                "design_strengths": {"type": "string"},
+                                "design_weaknesses": {"type": "string"}
+                            },
+                            "required": ["url", "name", "what_they_do", "design_strengths", "design_weaknesses"]
+                        }
                     }
                 },
-                "required": ["research_markdown", "brand_colors", "heading_font", "body_font", "inspiration_sites"]
+                "required": ["research_markdown", "brand_colors", "heading_font", "body_font", "inspiration_sites", "competitor_sites"]
             }
         }
 
@@ -183,9 +197,11 @@ SITE TEXT (first 3000 chars): {site_text}
 RAW COLORS FOUND ON SITE: {raw_colors[:15]}
 
 YOUR TASKS:
-1. Use web search to find {inspiration_count} beautiful, REAL inspiration websites in the same or adjacent premium industry. Search on awwwards.com, siteinspire.com, or for premium brands directly. We need ACTUAL website URLs (like "stripe.com", "fourseasons.com"), NOT articles or template galleries.
+1. Use web search to find 2-3 beautiful, REAL inspiration websites in the same or adjacent premium industry. Search on awwwards.com, siteinspire.com, or for premium brands directly. We need ACTUAL website URLs (like "stripe.com", "fourseasons.com"), NOT articles or template galleries.
 
-2. Analyze the brand identity. Pick 3 brand colors:
+2. Use web search to find 2-3 COMPETITOR websites — real companies in the same industry/niche as the client. These help us understand the competitive landscape and what design patterns are standard vs. differentiating.
+
+3. Analyze the brand identity. Pick 3 brand colors:
    - The raw HTML colors above may include WordPress/framework defaults (like #cf2e2e, #1877F2 for Facebook, etc.)
    - Use your judgment to identify the ACTUAL brand colors vs framework noise
    - If the raw colors don't seem right, pick colors that match the brand's identity
@@ -193,9 +209,9 @@ YOUR TASKS:
    - Secondary: backgrounds, cards, contrast
    - Accent: CTAs, buttons, links
 
-3. Pick a heading font and body font (Google Fonts).
+4. Pick a heading font and body font (Google Fonts).
 
-4. Write a comprehensive design brief in markdown with this structure:
+5. Write a comprehensive design brief in markdown with this structure:
 
 # Brand Research: [Company Name]
 
@@ -227,11 +243,21 @@ YOUR TASKS:
 
 [Repeat for each inspiration site]
 
+## Competitor 1: [Name]
+- **URL:** [actual website url]
+- **What they offer:** [1-2 sentences]
+- **Design strengths:** [what works well]
+- **Design weaknesses:** [what could be better]
+
+[Repeat for each competitor]
+
 ## Design Direction
-[2-3 sentences overall direction]
+[2-3 sentences overall direction, informed by both inspiration and competitive analysis]
 
 CRITICAL RULES:
-- The {inspiration_count} inspiration sites MUST be from DIFFERENT domains
+- The 2-3 inspiration sites MUST be from DIFFERENT domains
+- The 2-3 competitor sites MUST be REAL competitors in the same industry
+- Inspiration sites are for design quality; competitor sites are for industry context
 - Each blueprint must describe a DIFFERENT layout approach
 - Be specific enough that a developer could build HTML without guessing
 - Include real section names relevant to THIS company
@@ -248,6 +274,7 @@ After writing your analysis, call the save_research tool with ALL findings."""
         brand_colors = []
         recommended_fonts = {"heading": "Inter", "body": "Inter"}
         selected_sites = []
+        competitor_sites = []
 
         for iteration in range(max_iterations):
             print(f"[RESEARCH] Iteration {iteration + 1}, stop_reason: {response.stop_reason}", flush=True)
@@ -272,6 +299,7 @@ After writing your analysis, call the save_research tool with ALL findings."""
                         "body": data.get("body_font", "Inter")
                     }
                     selected_sites = data.get("inspiration_sites", [])
+                    competitor_sites = data.get("competitor_sites", [])
                     found_research = True
                     print(f"[RESEARCH] Got save_research tool call", flush=True)
                     break
@@ -332,7 +360,8 @@ After writing your analysis, call the save_research tool with ALL findings."""
         print(f"[RESEARCH] Markdown: {len(research_md)} chars", flush=True)
         print(f"[RESEARCH] Colors: {brand_colors}", flush=True)
         print(f"[RESEARCH] Fonts: {recommended_fonts}", flush=True)
-        print(f"[RESEARCH] Sites: {[s.get('name') for s in selected_sites]}", flush=True)
+        print(f"[RESEARCH] Inspiration: {[s.get('name') for s in selected_sites]}", flush=True)
+        print(f"[RESEARCH] Competitors: {[s.get('name') for s in competitor_sites]}", flush=True)
 
         # Ensure we have 3 colors
         while len(brand_colors) < 3:
@@ -343,38 +372,104 @@ After writing your analysis, call the save_research tool with ALL findings."""
             "brand_colors": brand_colors,
             "fonts": recommended_fonts,
             "inspiration_sites": selected_sites,
+            "competitor_sites": competitor_sites,
             "company_url": company_url,
         }
 
-        self.project.research_md = research_md
+        # Write 02-clarify.md with user's answer
+        clarify_md_lines = [
+            "# User Clarification",
+            "",
+            f"**Brief:** {self.project.brief}",
+            "",
+            f"**Answer:** {user_answer}" if user_answer else "*(no answer provided)*",
+        ]
+        self.fs.write_pipeline_file("02-clarify.md", "\n".join(clarify_md_lines))
+        print(f"[RESEARCH] Wrote 02-clarify.md", flush=True)
+
+        # Write 03-research.md (the full research report)
+        self.fs.write_pipeline_file("03-research.md", research_md)
+        print(f"[RESEARCH] Wrote 03-research.md ({len(research_md)} chars)", flush=True)
+
+        # Write 04-design-brief.md with structured design data
+        brief_lines = [
+            "# Design Brief",
+            "",
+            "## Brand Colors",
+            f"- **Primary:** {brand_colors[0]}",
+            f"- **Secondary:** {brand_colors[1]}",
+            f"- **Accent:** {brand_colors[2]}",
+            "",
+            "## Typography",
+            f"- **Heading:** {recommended_fonts.get('heading', 'Inter')}",
+            f"- **Body:** {recommended_fonts.get('body', 'Inter')}",
+            "",
+            "## Inspiration Sites",
+        ]
+        for site in selected_sites:
+            brief_lines.append(f"### {site.get('name', 'Unknown')}")
+            brief_lines.append(f"- **URL:** {site.get('url', '')}")
+            brief_lines.append(f"- **Style:** {site.get('design_style', '')}")
+            brief_lines.append(f"- **Why:** {site.get('why', '')}")
+            elements = site.get("key_elements", [])
+            if elements:
+                brief_lines.append(f"- **Key elements:** {', '.join(elements)}")
+            brief_lines.append("")
+
+        if competitor_sites:
+            brief_lines.append("## Competitor Sites")
+            for site in competitor_sites:
+                brief_lines.append(f"### {site.get('name', 'Unknown')}")
+                brief_lines.append(f"- **URL:** {site.get('url', '')}")
+                brief_lines.append(f"- **What they do:** {site.get('what_they_do', '')}")
+                brief_lines.append(f"- **Design strengths:** {site.get('design_strengths', '')}")
+                brief_lines.append(f"- **Design weaknesses:** {site.get('design_weaknesses', '')}")
+                brief_lines.append("")
+
+        if company_url:
+            brief_lines.append("## Company")
+            brief_lines.append(f"- **URL:** {company_url}")
+            brief_lines.append("")
+
+        if company_images:
+            brief_lines.append("## Company Images")
+            for img in company_images:
+                brief_lines.append(f"- **Path:** {img.get('path', '')}")
+                brief_lines.append(f"  Description: {img.get('description', '')}")
+                brief_lines.append(f"  Source: {img.get('source_url', '')}")
+            brief_lines.append("")
+
+        self.fs.write_pipeline_file("04-design-brief.md", "\n".join(brief_lines))
+        print(f"[RESEARCH] Wrote 04-design-brief.md", flush=True)
+
+        # Slim DB: only what macOS client needs for UI
         self.project.moodboard = {
-            "research": research_data,
             "brand_colors": brand_colors,
             "fonts": recommended_fonts,
             "inspiration_sites": selected_sites,
-            "company_images": company_images,
+            "competitor_sites": competitor_sites,
         }
+        # Don't write research_md to DB — read from file via API
         self.project.selected_moodboard = 1  # Compat
         self.project.status = ProjectStatus.RESEARCH_DONE
         self.db.commit()
 
         print(f"[TIMING] TOTAL research: {time.time() - phase_start:.1f}s", flush=True)
-        self.log("research", f"Found {len(brand_colors)} colors, {len(selected_sites)} inspiration sites")
+        self.log("research", f"Found {len(brand_colors)} colors, {len(selected_sites)} inspiration sites, {len(competitor_sites)} competitors")
 
         return research_data
 
     def _get_company_url(self: "Generator") -> str | None:
-        """Extract confirmed company URL from clarification answers or initial search."""
-        clarification = self.project.clarification or {}
-
-        # Try to get from initial research URLs
-        initial_research = clarification.get("initial_research", {})
-        urls_found = initial_research.get("urls_found", [])
-        if urls_found:
-            return urls_found[0].get("url")
-
-        # Fallback: check if URL is in the brief
+        """Extract confirmed company URL from 01-search.md."""
         import re
+
+        search_md = self.fs.read_pipeline_file("01-search.md")
+        if search_md:
+            md_url_match = re.search(r'\[.*?\]\((https?://[^\)]+)\)', search_md)
+            if md_url_match:
+                return md_url_match.group(1)
+
+        # Check if URL is in the brief
         brief = self.project.brief or ""
         url_match = re.search(r'https?://[^\s]+', brief)
         if url_match:
@@ -395,9 +490,8 @@ After writing your analysis, call the save_research tool with ALL findings."""
         # Add all kept images as base64
         for img in company_images:
             img_path = f"public/{img['path']}"
-            full_path = self.fs.base_dir / img_path
-            if full_path.exists():
-                img_bytes = full_path.read_bytes()
+            img_bytes = self.fs.read_binary(img_path)
+            if img_bytes:
                 path_lower = img["path"].lower()
                 if path_lower.endswith(".png"):
                     media_type = "image/png"
@@ -614,14 +708,36 @@ RULES:
                     print(f"[PHASE 1] Q{i+1}: {q.get('question')} → {q.get('options')}", flush=True)
                 print(f"[TIMING] TOTAL Phase 1: {time.time() - phase1_start:.1f}s", flush=True)
 
+                # Write 01-search.md with full search context
+                self.fs.init_project()
+                search_md_lines = [
+                    f"# Search Results: {decision.get('identified_brand', 'Unknown')}",
+                    "",
+                    "## URLs Found",
+                ]
+                for u in urls_found:
+                    search_md_lines.append(f"- [{u.get('title', '')}]({u.get('url', '')})")
+                search_md_lines.append("")
+                search_md_lines.append("## Analysis")
+                search_md_lines.extend(search_results_text)
+                search_md_lines.append("")
+                search_md_lines.append(f"## Identified Brand")
+                search_md_lines.append(f"- **Brand:** {decision.get('identified_brand', '')}")
+                search_md_lines.append(f"- **Ambiguous:** {decision.get('brand_is_ambiguous', False)}")
+                search_md_lines.append("")
+                search_md_lines.append("## Clarification Questions")
+                for i, q in enumerate(questions, 1):
+                    search_md_lines.append(f"### Q{i}: {q.get('question', '')}")
+                    for opt in q.get("options", []):
+                        search_md_lines.append(f"- {opt}")
+                    search_md_lines.append("")
+
+                self.fs.write_pipeline_file("01-search.md", "\n".join(search_md_lines))
+                print(f"[PHASE 1] Wrote 01-search.md", flush=True)
+
+                # Slim DB: only questions for UI buttons
                 self.project.clarification = {
                     "questions": questions,
-                    "identified_brand": decision.get("identified_brand", ""),
-                    "brand_is_ambiguous": decision.get("brand_is_ambiguous", False),
-                    "initial_research": {
-                        "urls_found": urls_found,
-                        "analysis": search_results_text
-                    }
                 }
                 self.project.status = ProjectStatus.CLARIFICATION
                 self.db.commit()
@@ -638,13 +754,33 @@ RULES:
             {"question": "Primary audience?", "options": ["Consumers", "Businesses", "Both"]},
             {"question": "Design style?", "options": ["Modern & minimal", "Bold & colorful", "Classic & professional", "Warm & friendly"]}
         ]
+
+        # Write 01-search.md with fallback context
+        self.fs.init_project()
+        search_md_lines = [
+            "# Search Results: Unknown Brand",
+            "",
+            "## URLs Found",
+        ]
+        for u in urls_found:
+            search_md_lines.append(f"- [{u.get('title', '')}]({u.get('url', '')})")
+        search_md_lines.append("")
+        search_md_lines.append("## Analysis")
+        search_md_lines.extend(search_results_text)
+        search_md_lines.append("")
+        search_md_lines.append("## Clarification Questions (fallback)")
+        for i, q in enumerate(fallback_questions, 1):
+            search_md_lines.append(f"### Q{i}: {q.get('question', '')}")
+            for opt in q.get("options", []):
+                search_md_lines.append(f"- {opt}")
+            search_md_lines.append("")
+
+        self.fs.write_pipeline_file("01-search.md", "\n".join(search_md_lines))
+        print(f"[PHASE 1] Wrote 01-search.md (fallback)", flush=True)
+
+        # Slim DB: only questions for UI buttons
         self.project.clarification = {
             "questions": fallback_questions,
-            "identified_brand": "",
-            "initial_research": {
-                "urls_found": urls_found,
-                "analysis": search_results_text
-            }
         }
         self.project.status = ProjectStatus.CLARIFICATION
         self.db.commit()

@@ -10,6 +10,7 @@
 		042E7E662F2A09BC00540ED3 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 042E7E652F2A09BC00540ED3 /* FirebaseAuth */; };
 		042E7E692F2A09DE00540ED3 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 042E7E682F2A09DE00540ED3 /* GoogleSignInSwift */; };
 		042E849E2F2A222300540ED3 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 042E849D2F2A222300540ED3 /* GoogleService-Info.plist */; };
+		04BB00012F3E000100000001 /* boss-templates in Resources */ = {isa = PBXBuildFile; fileRef = 04BB00002F3E000100000001 /* boss-templates */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,6 +35,7 @@
 		04925AD82F1FDC8500A4D24A /* Apex.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Apex.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		04925AE52F1FDC8800A4D24A /* ApexTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ApexTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		04925AEF2F1FDC8800A4D24A /* ApexUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ApexUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		04BB00002F3E000100000001 /* boss-templates */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "boss-templates"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -89,6 +91,7 @@
 				04925AF22F1FDC8800A4D24A /* ApexUITests */,
 				04925AD92F1FDC8500A4D24A /* Products */,
 				042E849D2F2A222300540ED3 /* GoogleService-Info.plist */,
+				04BB00002F3E000100000001 /* boss-templates */,
 			);
 			sourceTree = "<group>";
 		};
@@ -229,6 +232,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				042E849E2F2A222300540ED3 /* GoogleService-Info.plist in Resources */,
+				04BB00012F3E000100000001 /* boss-templates in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

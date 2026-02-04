@@ -44,14 +44,11 @@ Respond ONLY with the updated HTML code, nothing else.""",
 
         new_html = new_html.strip()
 
-        # Inject Google Fonts based on moodboard
+        # Inject Google Fonts from moodboard.fonts
         moodboard = self.project.moodboard or {}
         if isinstance(moodboard, dict):
-            # Get fonts from selected moodboard
-            moodboards = moodboard.get("moodboards", [])
-            if moodboards:
-                # Use first moodboard's fonts (or selected one)
-                fonts = moodboards[0].get("fonts", {})
+            fonts = moodboard.get("fonts")
+            if fonts:
                 new_html = inject_google_fonts(new_html, fonts)
 
         # Update page
@@ -86,13 +83,17 @@ Respond ONLY with the updated HTML code, nothing else.""",
         if description:
             prompt += f" Description: {description}"
 
+        # Get design context from pipeline file
+        design_brief_md = self.fs.read_pipeline_file("04-design-brief.md")
+        design_context = f"Design Brief:\n{design_brief_md}" if design_brief_md else ""
+
         def make_request():
             return self.client.messages.create(
                 model=MODEL_SONNET,  # Sonnet for new pages
                 max_tokens=8000,
                 system=f"""You are a web developer. Create a new HTML page that matches the style.
 
-Moodboard: {json.dumps(self.project.moodboard)}
+{design_context}
 
 Existing page for reference:
 ```html
@@ -116,12 +117,11 @@ Respond ONLY with complete HTML code.""",
 
         html = html.strip()
 
-        # Inject Google Fonts based on moodboard
+        # Inject Google Fonts from moodboard.fonts
         moodboard = self.project.moodboard or {}
         if isinstance(moodboard, dict):
-            moodboards = moodboard.get("moodboards", [])
-            if moodboards:
-                fonts = moodboards[0].get("fonts", {})
+            fonts = moodboard.get("fonts")
+            if fonts:
                 html = inject_google_fonts(html, fonts)
 
         # Create page

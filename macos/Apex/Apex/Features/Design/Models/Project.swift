@@ -9,6 +9,8 @@ enum ProjectStatus: String, Codable {
     case moodboard = "moodboard"          // Legacy
     case layouts = "layouts"
     case editing = "editing"
+    case building = "building"          // Sandbox is building/installing
+    case running = "running"            // App is running in sandbox
     case done = "done"
     case failed = "failed"
 }
@@ -45,6 +47,11 @@ struct Project: Identifiable, Codable {
     let costUsd: Double
     let errorMessage: String?
 
+    // Daytona sandbox
+    let sandboxId: String?
+    let sandboxStatus: String?
+    let sandboxPreviewUrl: String?
+
     enum CodingKeys: String, CodingKey {
         case id, brief, status, moodboard, clarification
         case researchMd = "research_md"
@@ -55,10 +62,54 @@ struct Project: Identifiable, Codable {
         case outputTokens = "output_tokens"
         case costUsd = "cost_usd"
         case errorMessage = "error_message"
+        case sandboxId = "sandbox_id"
+        case sandboxStatus = "sandbox_status"
+        case sandboxPreviewUrl = "sandbox_preview_url"
+    }
+
+    init(id: String, brief: String, status: ProjectStatus, moodboard: MoodboardContainer?, clarification: Clarification?, researchMd: String?, selectedMoodboard: Int?, selectedLayout: Int?, createdAt: String, inputTokens: Int, outputTokens: Int, costUsd: Double, errorMessage: String?, sandboxId: String?, sandboxStatus: String?, sandboxPreviewUrl: String?) {
+        self.id = id
+        self.brief = brief
+        self.status = status
+        self.moodboard = moodboard
+        self.clarification = clarification
+        self.researchMd = researchMd
+        self.selectedMoodboard = selectedMoodboard
+        self.selectedLayout = selectedLayout
+        self.createdAt = createdAt
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.costUsd = costUsd
+        self.errorMessage = errorMessage
+        self.sandboxId = sandboxId
+        self.sandboxStatus = sandboxStatus
+        self.sandboxPreviewUrl = sandboxPreviewUrl
     }
 
     /// Get the list of moodboard alternatives
     var moodboards: [Moodboard] {
         moodboard?.moodboards ?? []
+    }
+
+    /// Create a synthetic Project for local filesystem projects
+    static func local(id: String, name: String) -> Project {
+        Project(
+            id: id,
+            brief: name,
+            status: .done,
+            moodboard: nil,
+            clarification: nil,
+            researchMd: nil,
+            selectedMoodboard: nil,
+            selectedLayout: nil,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            inputTokens: 0,
+            outputTokens: 0,
+            costUsd: 0,
+            errorMessage: nil,
+            sandboxId: nil,
+            sandboxStatus: nil,
+            sandboxPreviewUrl: nil
+        )
     }
 }

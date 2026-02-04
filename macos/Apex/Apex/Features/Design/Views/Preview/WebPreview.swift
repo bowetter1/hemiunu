@@ -1,106 +1,55 @@
 import SwiftUI
 import WebKit
 
+enum PreviewDevice: String, CaseIterable {
+    case desktop
+    case tablet
+    case mobile
+}
+
 /// Live preview of HTML content - expands when sidebar hidden
 struct WebPreview: View {
     let html: String
     var projectId: String? = nil
+    var sandboxPreviewUrl: String? = nil
+    var localFileURL: URL? = nil
+    var refreshToken: UUID = UUID()
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
-
-    // Version info (optional)
-    var versions: [PageVersion] = []
-    var currentVersion: Int = 1
-    var onRestoreVersion: ((Int) -> Void)? = nil
+    var selectedDevice: PreviewDevice = .desktop
 
     private let baseWidth: CGFloat = 800
     private let sidebarWidth: CGFloat = 220
     private let toolsPanelWidth: CGFloat = 220
 
     private var previewWidth: CGFloat {
-        var width = baseWidth
-        if !sidebarVisible {
-            width += sidebarWidth
+        switch selectedDevice {
+        case .desktop:
+            var width = baseWidth
+            if !sidebarVisible {
+                width += sidebarWidth
+            }
+            if !toolsPanelVisible {
+                width += toolsPanelWidth
+            }
+            return width
+        case .tablet:
+            return 768
+        case .mobile:
+            return 375
         }
-        if !toolsPanelVisible {
-            width += toolsPanelWidth
-        }
-        return width
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Toolbar
-            previewToolbar
-                .padding(.bottom, 12)
-
-            // Preview - centered, expands when sidebar hidden
-            HTMLWebView(html: html, projectId: projectId)
-                .frame(width: previewWidth)
-                .frame(maxHeight: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
-                .animation(.easeInOut(duration: 0.2), value: previewWidth)
-        }
-        .padding(20)
-    }
-
-    private var previewToolbar: some View {
-        HStack(spacing: 12) {
-            // Width indicator
-            Text("\(Int(previewWidth))px")
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            // Version dots (show if there are any versions)
-            if !versions.isEmpty {
-                VersionDots(
-                    versions: versions,
-                    currentVersion: currentVersion,
-                    onSelect: { version in
-                        onRestoreVersion?(version)
-                    }
-                )
-            }
-
-            // Debug: show version count
-            Text("v\(currentVersion)")
-                .font(.system(size: 10))
-                .foregroundColor(.secondary.opacity(0.5))
-
-            Spacer()
-
-            // Open in browser
-            Button {
-                openInBrowser()
-            } label: {
-                Image(systemName: "safari")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Open in Browser")
-        }
-        .frame(width: previewWidth)
-        .animation(.easeInOut(duration: 0.2), value: previewWidth)
-    }
-
-    private func openInBrowser() {
-        // Create temp file
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "apex-preview-\(UUID().uuidString.prefix(8)).html"
-        let fileURL = tempDir.appendingPathComponent(fileName)
-
-        do {
-            try html.write(to: fileURL, atomically: true, encoding: .utf8)
-            NSWorkspace.shared.open(fileURL)
-        } catch {
-            // Failed to open in browser
-        }
+        HTMLWebView(html: html, projectId: projectId, sandboxPreviewUrl: sandboxPreviewUrl, localFileURL: localFileURL, refreshToken: refreshToken)
+            .frame(width: previewWidth)
+            .frame(maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
+            .animation(.easeInOut(duration: 0.2), value: previewWidth)
+            .padding(20)
     }
 }
 
@@ -135,6 +84,9 @@ struct VersionDots: View {
 struct HTMLWebView: NSViewRepresentable {
     let html: String
     var projectId: String? = nil
+    var sandboxPreviewUrl: String? = nil
+    var localFileURL: URL? = nil
+    var refreshToken: UUID = UUID()
 
     // API base URL for loading assets
     private var assetsBaseURL: URL? {
@@ -146,6 +98,9 @@ struct HTMLWebView: NSViewRepresentable {
 
     final class Coordinator {
         var lastHTML: String?
+        var lastSandboxUrl: String?
+        var lastLocalUrl: String?
+        var lastRefreshToken: UUID?
     }
 
     func makeCoordinator() -> Coordinator {
@@ -156,14 +111,43 @@ struct HTMLWebView: NSViewRepresentable {
         let config = WKWebViewConfiguration()
         // Disable caching
         config.websiteDataStore = .nonPersistent()
+        // Allow file access for local previews
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        // If we have a local file URL, load it directly
+        if let localURL = localFileURL {
+            let urlString = localURL.absoluteString
+            if context.coordinator.lastLocalUrl != urlString || context.coordinator.lastRefreshToken != refreshToken {
+                context.coordinator.lastLocalUrl = urlString
+                context.coordinator.lastRefreshToken = refreshToken
+                context.coordinator.lastHTML = nil
+                context.coordinator.lastSandboxUrl = nil
+                webView.loadFileURL(localURL, allowingReadAccessTo: localURL.deletingLastPathComponent())
+            }
+            return
+        }
+
+        // If we have a sandbox preview URL, load it directly
+        if let previewUrl = sandboxPreviewUrl, let url = URL(string: previewUrl) {
+            if context.coordinator.lastSandboxUrl != previewUrl {
+                context.coordinator.lastSandboxUrl = previewUrl
+                context.coordinator.lastHTML = nil
+                context.coordinator.lastLocalUrl = nil
+                webView.load(URLRequest(url: url))
+            }
+            return
+        }
+
+        // Inline HTML rendering
         guard context.coordinator.lastHTML != html else { return }
         context.coordinator.lastHTML = html
+        context.coordinator.lastSandboxUrl = nil
+        context.coordinator.lastLocalUrl = nil
         // Use assets base URL if available, otherwise fall back to about:blank
         let baseURL = assetsBaseURL ?? URL(string: "about:blank?t=\(Date().timeIntervalSince1970)")
         webView.loadHTMLString(html, baseURL: baseURL)

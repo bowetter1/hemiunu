@@ -14,11 +14,22 @@ struct Topbar: View {
     var showModeSelector: Bool = true
     var inlineTrafficLights: Bool = false
 
+    // Preview controls (shown in design mode with a project)
+    @Binding var selectedDevice: PreviewDevice
+    var pageVersions: [PageVersion] = []
+    var currentVersion: Int = 1
+    var onRestoreVersion: ((Int) -> Void)? = nil
+    var onOpenInBrowser: (() -> Void)? = nil
+
     private let height: CGFloat = 44
     private let itemHeight: CGFloat = 28
     private let topInset: CGFloat = 4
     private let iconSize: CGFloat = 14
     private let trafficLightsWidth: CGFloat = 78
+
+    private var showPreviewControls: Bool {
+        hasProject && selectedMode == .design
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -64,6 +75,11 @@ struct Topbar: View {
 
     private var rightGroup: some View {
         HStack(spacing: 8) {
+            // Preview controls — version, devices, safari — grouped together
+            if showPreviewControls {
+                previewControls
+            }
+
             // Activity indicator
             if hasProject && !logs.isEmpty {
                 ActivityPill(logs: logs)
@@ -93,6 +109,63 @@ struct Topbar: View {
         }
         .frame(height: itemHeight)
     }
+
+    // MARK: - Preview Controls
+
+    private var previewControls: some View {
+        HStack(spacing: 8) {
+            // Version dots + label (only when versions exist)
+            if !pageVersions.isEmpty {
+                VersionDots(
+                    versions: pageVersions,
+                    currentVersion: currentVersion,
+                    onSelect: { version in
+                        onRestoreVersion?(version)
+                    }
+                )
+
+                Text("v\(currentVersion)")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary.opacity(0.5))
+            }
+
+            // Device picker
+            HStack(spacing: 2) {
+                deviceButton(.desktop, icon: "desktopcomputer")
+                deviceButton(.tablet, icon: "ipad")
+                deviceButton(.mobile, icon: "iphone")
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(Color.primary.opacity(0.05))
+            .cornerRadius(6)
+
+            // Open in browser
+            Button {
+                onOpenInBrowser?()
+            } label: {
+                Image(systemName: "safari")
+                    .font(.system(size: iconSize))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Open in Browser")
+        }
+    }
+
+    private func deviceButton(_ device: PreviewDevice, icon: String) -> some View {
+        Button { selectedDevice = device } label: {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundColor(selectedDevice == device ? .blue : .secondary)
+                .frame(width: 28, height: 22)
+                .background(selectedDevice == device ? Color.blue.opacity(0.12) : Color.clear)
+                .cornerRadius(5)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Appearance
 
     private var appearanceIcon: String {
         switch appearanceMode {

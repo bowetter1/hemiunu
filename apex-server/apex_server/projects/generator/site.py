@@ -146,12 +146,11 @@ class SiteGenerationMixin:
             file_name = tool_input.get("name", "")
             content = tool_input.get("content", "")
 
-            # Inject Google Fonts
+            # Inject Google Fonts from moodboard.fonts
             moodboard = self.project.moodboard or {}
             if isinstance(moodboard, dict):
-                moodboards = moodboard.get("moodboards", [])
-                if moodboards:
-                    fonts = moodboards[0].get("fonts", {})
+                fonts = moodboard.get("fonts")
+                if fonts:
                     content = inject_google_fonts(content, fonts)
 
             # Write to filesystem
@@ -266,19 +265,11 @@ class SiteGenerationMixin:
                 filename = page.name.lower().replace(" ", "-") + ".html"
                 current_file_context = f"\n\nCurrently selected file: {filename}\n```html\n{page.html}\n```"
 
-        # Get moodboard info for context
+        # Get design context from 04-design-brief.md
         moodboard_context = ""
-        moodboard = self.project.moodboard or {}
-        if isinstance(moodboard, dict):
-            moodboards = moodboard.get("moodboards", [])
-            if moodboards:
-                mb = moodboards[0]
-                moodboard_context = f"""
-Design system:
-- Colors: {', '.join(mb.get('palette', []))}
-- Fonts: {mb.get('fonts', {})}
-- Mood: {', '.join(mb.get('mood', []))}
-"""
+        design_brief_md = self.fs.read_pipeline_file("04-design-brief.md")
+        if design_brief_md:
+            moodboard_context = f"\nDesign Brief:\n{design_brief_md}\n"
 
         system_prompt = f"""You are a web developer working on a website project.
 
@@ -407,21 +398,11 @@ Complete the user's request using the available tools."""
         existing_children = self.db.query(Page).filter(Page.parent_page_id == parent_page_id).all()
         existing_filenames = [template_filename] + [p.name.lower().replace(" ", "-") + ".html" for p in existing_children]
 
-        # Get moodboard for design context
+        # Get design context from 04-design-brief.md
         moodboard_context = ""
-        moodboard = self.project.moodboard or {}
-        if isinstance(moodboard, dict):
-            moodboards = moodboard.get("moodboards", [])
-            selected_idx = (self.project.selected_moodboard or 1) - 1
-            if 0 <= selected_idx < len(moodboards):
-                mb = moodboards[selected_idx]
-                moodboard_context = f"""
-Design System:
-- Colors: {', '.join(mb.get('palette', []))}
-- Fonts: Heading: {mb.get('fonts', {}).get('heading', 'Inter')}, Body: {mb.get('fonts', {}).get('body', 'Inter')}
-- Mood: {', '.join(mb.get('mood', []))}
-- Style: {mb.get('rationale', '')}
-"""
+        design_brief_md = self.fs.read_pipeline_file("04-design-brief.md")
+        if design_brief_md:
+            moodboard_context = f"\nDesign Brief:\n{design_brief_md}\n"
 
         system_prompt = f"""You are a professional web developer expanding a website.
 

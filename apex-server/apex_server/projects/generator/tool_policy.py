@@ -31,8 +31,11 @@ def resolve_image_source(raw: str | None, has_company_images: bool) -> Tuple[str
     return image_source, False
 
 
-def build_layout_tools(generator, layout_tool: dict, image_source: str, has_company_images: bool) -> list[dict]:
-    tools = [build_web_search_tool(max_uses=2), layout_tool]
+def build_layout_tools(generator, layout_tool: dict, image_source: str, has_company_images: bool, allow_web_search: bool = True) -> list[dict]:
+    tools = []
+    if allow_web_search:
+        tools.append(build_web_search_tool(max_uses=2))
+    tools.append(layout_tool)
 
     if image_source in {"ai", "img2img"}:
         tools.append(

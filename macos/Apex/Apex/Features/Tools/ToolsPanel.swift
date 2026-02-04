@@ -13,9 +13,6 @@ struct ToolsPanel: View {
     let onProjectCreated: (String) -> Void
     var onOpenFloatingChat: (() -> Void)? = nil
 
-    @State private var isGenerating = false
-    @State private var generationResult: GenerateSiteResponse?
-    @State private var errorMessage: String?
     @State private var toolsHeight: CGFloat = 400
     @State private var isDraggingDivider = false
 
@@ -69,38 +66,13 @@ struct ToolsPanel: View {
                 ScrollView {
                     VStack(spacing: 8) {
                         // New Project - always at top
-                        NewProjectCard(appState: appState, onProjectCreated: onProjectCreated)
+                        NewProjectCard(appState: appState, chatViewModel: chatViewModel, onProjectCreated: onProjectCreated)
+
+                        // Build full site from existing page
+                        BuildSiteCard(appState: appState, chatViewModel: chatViewModel)
 
                         Divider()
                             .padding(.vertical, 4)
-
-                        // Generate Site
-                        if isGenerating {
-                            GeneratingCard()
-                        } else if let result = generationResult {
-                            GenerationResultCard(result: result) {
-                                generationResult = nil
-                            }
-                        } else {
-                            ToolCard(
-                                icon: "globe",
-                                title: "Generate Site",
-                                description: "Create full website from layout",
-                                color: .blue,
-                                disabled: appState.currentProject == nil || appState.pages.isEmpty
-                            ) {
-                                generateSite()
-                            }
-                        }
-
-                        if let error = errorMessage {
-                            ErrorCard(message: error) {
-                                errorMessage = nil
-                            }
-                        }
-
-                        // Design
-                        DesignToolCard()
 
                         // Deploy
                         DeployToolCard()
@@ -188,7 +160,7 @@ struct ToolsPanel: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    colors: [.orange, .orange],
+                                    colors: [.blue, .blue],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -202,11 +174,12 @@ struct ToolsPanel: View {
                 }
                 .buttonStyle(.plain)
 
+                // Build site button
+                CollapsedToolButton(icon: "rectangle.stack", color: .purple)
+
                 Divider()
                     .frame(width: 20)
 
-                CollapsedToolButton(icon: "globe", color: .blue)
-                CollapsedToolButton(icon: "paintbrush", color: .purple)
                 CollapsedToolButton(icon: "paperplane", color: .green)
                 CollapsedToolButton(icon: "arrow.triangle.branch", color: .orange)
                 CollapsedToolButton(icon: "cylinder", color: .cyan)
@@ -223,37 +196,6 @@ struct ToolsPanel: View {
         }
     }
 
-    private func generateSite() {
-        guard let projectId = appState.currentProject?.id else { return }
-
-        guard let pageId = selectedPageId else {
-            errorMessage = "Select a layout page first"
-            return
-        }
-
-        isGenerating = true
-        errorMessage = nil
-
-        Task {
-            do {
-                let result = try await client.projectService.generateSite(projectId: projectId, parentPageId: pageId)
-
-                // Refresh pages to show new ones
-                let updatedPages = try await client.pageService.getAll(projectId: projectId)
-
-                await MainActor.run {
-                    isGenerating = false
-                    generationResult = result
-                    appState.pages = updatedPages
-                }
-            } catch {
-                await MainActor.run {
-                    isGenerating = false
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Tools Panel Divider

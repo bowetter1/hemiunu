@@ -1,4 +1,26 @@
+# Environment
 .env
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Database
+*.db
+
+# IDE / tools
 .playwright-mcp/
+.gemini/
+.claude/
+
+# Xcode
 *.xcuserstate
 **/xcuserdata/
+
+# Build artifacts
+workspace/

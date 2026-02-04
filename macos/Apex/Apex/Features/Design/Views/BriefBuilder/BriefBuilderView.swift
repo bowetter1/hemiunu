@@ -14,7 +14,7 @@ struct BriefBuilderView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.orange, .orange],
+                        colors: [.blue, .blue],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )

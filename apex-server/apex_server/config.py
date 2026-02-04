@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_enabled: bool = False
 
+    # Daytona Cloud (sandbox environments)
+    daytona_api_key: str = ""
+    daytona_enabled: bool = False
+    daytona_default_image: str = "python:3.12-slim-bookworm"
+
     class Config:
         env_file = ".env"
 

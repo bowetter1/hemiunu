@@ -85,6 +85,44 @@ class CodeProjectMixin:
             }
         ]
 
+        # Sandbox-only tools (available when running in Daytona)
+        if hasattr(self.fs, "exec_command"):
+            tools.append({
+                "name": "exec_command",
+                "description": "Execute a shell command in the sandbox environment (e.g. pip install, npm install, docker-compose up, python main.py, cat file). Use for installing dependencies, building, running tests, starting servers.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "Shell command to execute"
+                        },
+                        "cwd": {
+                            "type": "string",
+                            "description": "Working directory (default: /workspace)",
+                            "default": "/workspace"
+                        }
+                    },
+                    "required": ["command"]
+                }
+            })
+            tools.append({
+                "name": "get_preview_url",
+                "description": "Get a public URL to preview the running application. Call after starting a server on a port.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "port": {
+                            "type": "integer",
+                            "description": "Port the server is running on (e.g. 3000, 5000, 8000)"
+                        }
+                    },
+                    "required": ["port"]
+                }
+            })
+
+        return tools
+
     def execute_code_file_tool(self: "Generator", tool_name: str, tool_input: dict) -> str:
         """Execute a file tool using filesystem storage"""
         print(f"[CODE_TOOL] Executing {tool_name} with input: {tool_input}", flush=True)
@@ -132,6 +170,28 @@ class CodeProjectMixin:
                 "count": 0,
                 "note": "Search not yet implemented"
             })
+
+        elif tool_name == "exec_command":
+            command = tool_input.get("command", "")
+            cwd = tool_input.get("cwd", "/workspace")
+            if hasattr(self.fs, "exec_command"):
+                result = self.fs.exec_command(command, cwd=cwd)
+                self.log("code", f"Exec: {command} (exit={result['exit_code']})")
+                return json.dumps({
+                    "exit_code": result["exit_code"],
+                    "stdout": result["stdout"][:5000],  # truncate long output
+                })
+            return json.dumps({"error": "Command execution not available (no sandbox)"})
+
+        elif tool_name == "get_preview_url":
+            port = tool_input.get("port", 8000)
+            if hasattr(self.fs, "get_preview_url"):
+                url = self.fs.get_preview_url(port=port)
+                self.project.sandbox_preview_url = url
+                self.db.commit()
+                self.log("code", f"Preview URL: {url}")
+                return json.dumps({"preview_url": url, "port": port})
+            return json.dumps({"error": "Preview not available (no sandbox)"})
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
 

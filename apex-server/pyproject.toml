@@ -39,6 +39,9 @@ dependencies = [
 
     # Telegram
     "python-telegram-bot>=21.0",
+
+    # Daytona (sandbox environments)
+    "daytona>=0.1.0",
 ]
 
 [project.optional-dependencies]

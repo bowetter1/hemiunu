@@ -277,10 +277,19 @@ class ImageGenerationMixin:
             image_file = io.BytesIO(reference_bytes)
             image_file.name = "reference.png"
 
+            # Wrap prompt to keep the output faithful to the reference.
+            # Without this, GPT-image-1 tends to hallucinate new elements.
+            faithful_prompt = (
+                "Recreate this image faithfully. Keep the same subject, composition, "
+                "layout, objects, and overall scene. Do NOT add, remove, or change any "
+                "objects or elements. Only adjust the visual style as follows: "
+                f"{prompt}"
+            )
+
             response = client.images.edit(
                 model=IMAGE_MODEL,
                 image=image_file,
-                prompt=prompt,
+                prompt=faithful_prompt,
                 size=size,
             )
 
