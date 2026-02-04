@@ -82,14 +82,14 @@ class DesignViewModel: ObservableObject {
 
     /// Called when pages array updates — detect version changes
     func handlePagesUpdate(projectId: String, selectedPageId: String?, newPages: [Page]) {
-        guard let pageId = selectedPageId,
-              let page = newPages.first(where: { $0.id == pageId }) else { return }
-
-        // For local projects, reload versions when pages update (new commit may exist)
+        // For local projects, always reload versions (new commit may exist)
         if projectId.hasPrefix("local:") {
             loadLocalVersions(projectId: projectId)
             return
         }
+
+        guard let pageId = selectedPageId,
+              let page = newPages.first(where: { $0.id == pageId }) else { return }
 
         if page.currentVersion != lastKnownVersion {
             lastKnownVersion = page.currentVersion

@@ -15,72 +15,15 @@ struct SidebarSessionRow: View {
     @State private var isExpanded = false
 
     var body: some View {
-        if group.projects.count == 1 {
-            singleProjectRow
-        } else {
-            multiProjectGroup
-        }
-    }
-
-    // MARK: - Single Project
-
-    @ViewBuilder
-    private var singleProjectRow: some View {
-        if let project = group.projects.first {
-            VStack(spacing: 0) {
-                HStack(spacing: 4) {
-                    Button(action: { onSelect(project.name) }) {
-                        HStack(alignment: .top, spacing: 8) {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 8, height: 8)
-                                .padding(.top, 4)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(group.displayName)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-
-                                Text(relativeDate(project.modifiedAt))
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    Menu {
-                        Button(role: .destructive, action: { onDelete?() }) {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .frame(width: 20, height: 20)
-                            .contentShape(Rectangle())
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(isSelected(project) ? Color.blue.opacity(0.15) : Color.clear)
-                .cornerRadius(6)
-
-                // Pages under this project
-                if isSelected(project), pages.count > 1 {
-                    pageRows
+        multiProjectGroup
+            .onAppear {
+                if group.projects.count == 1 {
+                    isExpanded = true
                 }
             }
-        }
     }
 
-    // MARK: - Multi-Project Group
+    // MARK: - Project Group
 
     private var multiProjectGroup: some View {
         VStack(spacing: 0) {
