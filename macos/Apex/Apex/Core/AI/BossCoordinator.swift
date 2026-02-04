@@ -266,9 +266,31 @@ class BossCoordinator {
         delegate?.setLocalPreviewURL(nil)
         delegate?.setSelectedProjectId(nil)
 
-        // Prepend instructions so research agent doesn't ask questions (--print exits after one turn)
+        // Build research prompt with config-driven instructions
+        var researchInstructions = [String]()
+        if buildConfig.skipClarification {
+            researchInstructions.append("Do NOT ask any clarification questions — write brief.md immediately from the user's information, then proceed to RESEARCH.")
+        }
+        if !buildConfig.webSearchCompany {
+            researchInstructions.append("Do NOT web search for the company.")
+        }
+        if !buildConfig.scrapeCompanySite {
+            researchInstructions.append("Do NOT visit or scrape the company website.")
+        }
+        if !buildConfig.findInspirationSites {
+            researchInstructions.append("Skip searching for inspiration sites.")
+        } else if buildConfig.inspirationSiteCount != 3 {
+            researchInstructions.append("Find exactly \(buildConfig.inspirationSiteCount) inspiration sites.")
+        }
+
+        let instructions = researchInstructions.isEmpty
+            ? "Write brief.md from the user's information, then proceed to RESEARCH."
+            : researchInstructions.joined(separator: "\n")
+
         let researchPrompt = """
-        This is the complete project brief from the user. Do NOT ask any questions — write brief.md immediately from this information, then proceed to RESEARCH.
+        This is the complete project brief from the user.
+
+        \(instructions)
 
         User's request:
         \(text)
@@ -654,7 +676,7 @@ class BossCoordinator {
         if c.scrapeCompanySite { researchSteps.append("visit site") }
         if c.webSearchCompany { researchSteps.append("web search") }
         if c.findInspirationSites {
-            researchSteps.append("find 2-3 inspiration sites + 2-3 competitors")
+            researchSteps.append("find \(c.inspirationSiteCount) inspiration sites + \(c.inspirationSiteCount) competitors")
         }
         let researchDesc = researchSteps.isEmpty
             ? "Write research.md"

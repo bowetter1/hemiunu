@@ -14,7 +14,6 @@ struct StartProjectSheet: View {
     @State private var selectedImage: NSImage?
     @State private var isDraggingOver = false
     @State private var isCreating = false
-    @State private var showAdvanced = false
 
     // Generation config
     @State private var config = GenerationConfig()
@@ -147,7 +146,7 @@ struct StartProjectSheet: View {
                     )
                     toggleRow(
                         title: "Find inspiration sites",
-                        description: "Finds 2-3 inspiration sites + 2-3 competitors",
+                        description: "Finds \(config.inspirationSiteCount) inspiration sites + competitors",
                         isOn: $config.findInspirationSites
                     )
 
@@ -208,36 +207,6 @@ struct StartProjectSheet: View {
                         .padding(.top, 2)
                     }
 
-                    // Advanced section (server-side models — only when no local agents selected)
-                    if showAdvanced && !useBoss {
-                        Divider()
-                        sectionLabel("Models", icon: "cpu")
-
-                        HStack {
-                            Text("Research model")
-                                .font(.system(size: 12))
-                            Spacer()
-                            Picker("", selection: $config.researchModel) {
-                                Text("Haiku").tag("haiku")
-                                Text("Sonnet").tag("sonnet")
-                            }
-                            .frame(width: 120)
-                        }
-                        .padding(.leading, 4)
-
-                        HStack {
-                            Text("Layout model")
-                                .font(.system(size: 12))
-                            Spacer()
-                            Picker("", selection: $config.layoutModel) {
-                                Text("Sonnet").tag("sonnet")
-                                Text("Opus").tag("opus")
-                            }
-                            .frame(width: 120)
-                        }
-                        .padding(.leading, 4)
-                    }
-
                     // Image upload
                     sectionLabel("Inspiration", icon: "photo")
                     imageDropZone
@@ -249,17 +218,6 @@ struct StartProjectSheet: View {
 
             // Footer
             HStack {
-                Button(action: { withAnimation { showAdvanced.toggle() } }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: showAdvanced ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 9))
-                        Text("Advanced")
-                            .font(.system(size: 11))
-                    }
-                    .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-
                 Spacer()
 
                 Button(action: createProject) {
