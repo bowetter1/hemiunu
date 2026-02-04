@@ -802,8 +802,8 @@ class BossService {
                 errHandle.readabilityHandler = nil
 
                 let status = process.terminationStatus
-                // Exit 0 = normal, -15 = SIGTERM from stop()/done.signal, 2 = Kimi CLI normal exit
-                if status == 0 || status == -15 || status == 2 {
+                // Exit 0 = normal, 15/-15 = SIGTERM from stop()/done.signal, 2 = Kimi CLI normal exit
+                if status == 0 || status == 15 || status == -15 || status == 2 {
                     continuation.resume()
                 } else {
                     let errText = stderrChunks.joined()

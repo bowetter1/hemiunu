@@ -188,16 +188,6 @@ struct ChatTabContent: View {
 
     private var chatInput: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            // Boss toggle button
-            Button(action: { chatViewModel.boss.toggle() }) {
-                Image(systemName: chatViewModel.boss.isActive ? "brain.head.profile.fill" : "brain.head.profile")
-                    .font(.system(size: 16))
-                    .foregroundColor(chatViewModel.boss.isActive ? .purple : .secondary.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-            .help(chatViewModel.boss.isActive ? "Exit Lab" : "Lab")
-            .disabled(!BossService.isAvailable)
-
             TextField(placeholderText, text: $inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
