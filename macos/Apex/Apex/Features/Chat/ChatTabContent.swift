@@ -15,11 +15,6 @@ struct ChatTabContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Boss tabs (only when multiple agents)
-            if chatViewModel.boss.isActive && chatViewModel.boss.isMultiBoss {
-                bossTabs
-            }
-
             messagesView
             Divider()
             chatInput
@@ -44,72 +39,6 @@ struct ChatTabContent: View {
         }
     }
 
-    // MARK: - Boss Tabs
-
-    private var bossTabs: some View {
-        let boss = chatViewModel.boss
-        return HStack(spacing: 4) {
-            // Research tab (if two-phase mode)
-            if let research = boss.researchBoss {
-                Button(action: { boss.selectedBossId = research.id }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 8))
-                        Text("Research")
-                            .font(.system(size: 10, weight: .medium))
-                        if research.service.isProcessing {
-                            ProgressView()
-                                .scaleEffect(0.4)
-                                .tint(.blue)
-                        } else if boss.phase == .building {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 8))
-                                .foregroundColor(.green)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(boss.selectedBossId == research.id ? Color.blue.opacity(0.12) : Color.clear)
-                    .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(boss.selectedBossId == research.id ? .blue : .secondary)
-            }
-
-            // Builder tabs (appear once building phase starts)
-            if boss.phase == .building {
-                ForEach(boss.bosses) { instance in
-                    Button(action: { boss.selectedBossId = instance.id }) {
-                        HStack(spacing: 4) {
-                            Text(instance.displayName)
-                                .font(.system(size: 10, weight: .medium))
-                            if instance.service.isProcessing {
-                                ProgressView()
-                                    .scaleEffect(0.4)
-                                    .tint(.blue)
-                            } else if instance.messages.contains(where: { $0.role == .assistant }) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.green)
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(boss.selectedBossId == instance.id ? Color.blue.opacity(0.12) : Color.clear)
-                        .cornerRadius(6)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(boss.selectedBossId == instance.id ? .blue : .secondary)
-                }
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-    }
-
     // MARK: - Messages
 
     private var messagesView: some View {
@@ -128,14 +57,6 @@ struct ChatTabContent: View {
                     ForEach(messages) { message in
                         SidebarChatBubble(message: message)
                             .id(message.id)
-                    }
-
-                    // Show workspace file tree after boss messages
-                    if chatViewModel.boss.isActive, !chatViewModel.boss.workspaceFiles.isEmpty {
-                        BossFileTreeView(
-                            files: chatViewModel.boss.workspaceFiles,
-                            workspaceURL: chatViewModel.boss.workspace
-                        )
                     }
 
                     // Show current question if we have unanswered ones (not in boss mode)

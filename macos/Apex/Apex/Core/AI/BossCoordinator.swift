@@ -32,6 +32,9 @@ class BossCoordinator {
     /// Whether we already linked the workspace as a local project
     private var projectLinked = false
 
+    /// Bosses that have been linked as local projects (tracks per-boss to allow incremental linking)
+    private var linkedBossIds: Set<String> = []
+
     /// Build-phase config (stored on first message, used when builders start + checklist generation)
     private var buildConfig = GenerationConfig()
     private var imageInstruction: String?
@@ -237,6 +240,7 @@ class BossCoordinator {
 
         phase = researchBoss != nil ? .idle : .building
         projectLinked = false
+        linkedBossIds = []
         sessionName = nil
         buildConfig = GenerationConfig()
         imageInstruction = nil
@@ -480,9 +484,11 @@ class BossCoordinator {
 
                 if let serverProjectId = extractServerProjectId(from: responseText) {
                     linkServerProject(serverProjectId)
-                } else if !projectLinked {
+                } else if !linkedBossIds.contains(boss.id) {
+                    // First completion for this builder — link it as a project
                     await commitVersion(boss: boss, message: "Initial build")
                     linkWorkspaceAsProject(boss: boss)
+                    linkedBossIds.insert(boss.id)
                 } else {
                     let shortMessage = String(text.prefix(72))
                     await commitVersion(boss: boss, message: shortMessage)
@@ -788,6 +794,7 @@ class BossCoordinator {
 
         guard ws.findMainHTML(project: projectName) != nil else { return }
 
+        let isFirst = !projectLinked
         projectLinked = true
 
         let projectMsg = ChatMessage(
@@ -800,7 +807,10 @@ class BossCoordinator {
         Task {
             let localId = "local:\(projectName)"
             await delegate?.loadProject(id: localId)
-            delegate?.setSelectedProjectId(localId)
+            // Only auto-select the first builder to finish — others appear in sidebar without stealing focus
+            if isFirst {
+                delegate?.setSelectedProjectId(localId)
+            }
             delegate?.refreshLocalProjects()
         }
     }

@@ -68,15 +68,16 @@ Include all relevant URLs in research.md so builders can visit them if they want
 
 ---
 
-## STOP
+## DONE
 
-Once `brief.md` and `research.md` are written, update `skills/memory.md` with any new learnings (tools that worked well, scraping tricks, useful search queries). Then **STOP**. Do not proceed to BUILD or choose a vector. Your job is done. The builder agents will take over from here.
+Once `brief.md` and `research.md` are written, update `skills/memory.md` with any new learnings (tools that worked well, scraping tricks, useful search queries). Then call **`apex_done`** to signal that research is complete. Do not proceed to BUILD or choose a vector. Your job is done. The builder agents will take over from here.
 
 ---
 
 ## Available Tools
 
 - **apex_chat** — Send a message to the user. **Use this for ALL communication with the user.** Status updates, progress notes, and summaries — everything the user should see goes through this tool. Do not write chat messages as plain text.
+- **apex_done** — Signal that you are finished. **Call this as your very last action.** This tells the system to start the build phase.
 - **Web search** — Built-in. Search the web to find competitors and inspiration sites.
 - **Web browsing** — Built-in. Visit URLs to extract brand colors, fonts, tone, and content.
 

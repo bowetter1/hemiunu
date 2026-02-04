@@ -48,6 +48,21 @@ def apex_chat(message: str) -> dict:
     return {"status": "sent"}
 
 
+@mcp.tool()
+def apex_done() -> dict:
+    """Signal that you have completed your task.
+
+    Call this as your VERY LAST action when all your work is finished.
+    This tells the system you are done so the next phase can begin.
+
+    Returns:
+        dict with status "done"
+    """
+    signal_file = Path.cwd() / "done.signal"
+    signal_file.write_text("done")
+    return {"status": "done"}
+
+
 def _load_env():
     """Load .env file from script directory into os.environ."""
     env_path = Path(__file__).resolve().parent / ".env"

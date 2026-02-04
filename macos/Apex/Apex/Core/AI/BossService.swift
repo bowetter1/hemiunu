@@ -786,13 +786,23 @@ class BossService {
                     return
                 }
 
-                process.waitUntilExit()
+                // Poll for process exit OR done.signal from the agent
+                let doneSignalPath = cwd?.appendingPathComponent("done.signal").path
+                while process.isRunning {
+                    if let path = doneSignalPath,
+                       FileManager.default.fileExists(atPath: path) {
+                        process.terminate()
+                        process.waitUntilExit()
+                        break
+                    }
+                    Thread.sleep(forTimeInterval: 0.5)
+                }
 
                 handle.readabilityHandler = nil
                 errHandle.readabilityHandler = nil
 
                 let status = process.terminationStatus
-                // Exit 0 = normal, -15 = SIGTERM from stop(), 2 = Kimi CLI normal exit
+                // Exit 0 = normal, -15 = SIGTERM from stop()/done.signal, 2 = Kimi CLI normal exit
                 if status == 0 || status == -15 || status == 2 {
                     continuation.resume()
                 } else {
