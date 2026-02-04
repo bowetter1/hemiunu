@@ -58,6 +58,27 @@ class BossService {
         self.agent = agent
     }
 
+    deinit {
+        // deinit is nonisolated, but for @MainActor classes deallocation occurs
+        // on the main thread. Use assumeIsolated to access actor-isolated state.
+        MainActor.assumeIsolated {
+            persistentProcess?.terminate()
+            persistentProcess = nil
+            stdinPipe = nil
+            stdoutPipe = nil
+            stderrPipe = nil
+
+            runningProcess?.terminate()
+            runningProcess = nil
+
+            chatPollTimer?.invalidate()
+            chatPollTimer = nil
+
+            try? logHandle?.close()
+            logHandle = nil
+        }
+    }
+
     /// Restore a previously saved session ID from the workspace
     func restoreSession(from workspace: URL) {
         self.workspaceURL = workspace
@@ -507,6 +528,9 @@ class BossService {
     }
 
     /// Read new lines from chat.jsonl starting at the current offset.
+    /// Only advances the offset to the last complete line (last `\n`), so
+    /// incomplete trailing data is re-read on the next poll — preventing
+    /// message loss from partial writes.
     private func pollChatFile(chatURL: URL, onLine: @escaping (String) -> Void) {
         guard FileManager.default.fileExists(atPath: chatURL.path) else { return }
         guard let handle = try? FileHandle(forReadingFrom: chatURL) else { return }
@@ -515,20 +539,28 @@ class BossService {
         handle.seek(toFileOffset: chatFileOffset)
         let data = handle.readDataToEndOfFile()
         guard !data.isEmpty else { return }
-        chatFileOffset += UInt64(data.count)
 
         guard let text = String(data: data, encoding: .utf8) else { return }
-        for line in text.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-            // Parse JSON line to extract the message content
-            if let lineData = trimmed.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-               let content = json["content"] as? String,
-               !content.isEmpty {
-                onLine(content)
+
+        // Only advance offset to last newline — incomplete trailing line re-read next poll
+        if let lastNewline = text.lastIndex(of: "\n") {
+            let completeText = String(text[...lastNewline])
+            let completeBytes = completeText.utf8.count
+            chatFileOffset += UInt64(completeBytes)
+
+            for line in completeText.components(separatedBy: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                // Parse JSON line to extract the message content
+                if let lineData = trimmed.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                   let content = json["content"] as? String,
+                   !content.isEmpty {
+                    onLine(content)
+                }
             }
         }
+        // else: don't advance — entire chunk is one incomplete line, retry next poll
     }
 
     /// Stop the chat.jsonl poll timer.

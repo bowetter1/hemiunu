@@ -10,10 +10,12 @@ import FirebaseCore
 
 @main
 struct ApexApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState.shared
 
     init() {
         FirebaseApp.configure()
+        killOrphanedBossProcesses()
     }
 
     var body: some Scene {
@@ -34,6 +36,61 @@ struct ApexApp: App {
                     }
                 }
                 .pickerStyle(.inline)
+            }
+        }
+    }
+}
+
+// MARK: - AppDelegate
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        let boss = AppState.shared.chatViewModel.boss
+        boss.stopAll()
+    }
+}
+
+// MARK: - Orphaned Process Cleanup
+
+/// Kill any orphaned boss processes from previous runs.
+/// Scans for stale `claude`/`gemini`/`kimi`/`codex` processes whose working directory
+/// matches a `session-*/boss-*` workspace path.
+private func killOrphanedBossProcesses() {
+    let rootPath = LocalWorkspaceService.shared.rootDirectory.path
+    let cliNames = ["claude", "gemini", "kimi", "codex"]
+
+    for name in cliNames {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        process.arguments = ["-f", name]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else { continue }
+
+        for pidStr in output.components(separatedBy: .newlines) {
+            guard let pid = Int32(pidStr.trimmingCharacters(in: .whitespaces)), pid > 0 else { continue }
+
+            // Check if the process's cwd is inside our workspace
+            let cwdProcess = Process()
+            cwdProcess.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+            cwdProcess.arguments = ["-p", "\(pid)", "-Fn", "-d", "cwd"]
+            let cwdPipe = Pipe()
+            cwdProcess.standardOutput = cwdPipe
+            cwdProcess.standardError = FileHandle.nullDevice
+            try? cwdProcess.run()
+            cwdProcess.waitUntilExit()
+
+            let cwdData = cwdPipe.fileHandleForReading.readDataToEndOfFile()
+            if let cwdOutput = String(data: cwdData, encoding: .utf8),
+               cwdOutput.contains(rootPath),
+               cwdOutput.contains("session-") {
+                kill(pid, SIGTERM)
+                print("[Cleanup] Killed orphaned \(name) process (PID \(pid))")
             }
         }
     }

@@ -51,12 +51,25 @@ class BossInstance: Identifiable {
         workspaceFiles = LocalWorkspaceService.shared.listFiles(project: name)
     }
 
-    /// Save messages to workspace as messages.json
+    /// Save messages to workspace as messages.json (atomic write-to-temp-then-rename)
     func persistMessages() {
         guard let workspace else { return }
         let url = workspace.appendingPathComponent("messages.json")
-        if let data = try? JSONEncoder().encode(messages) {
-            try? data.write(to: url)
+        let tmpURL = workspace.appendingPathComponent("messages.json.tmp")
+        guard let data = try? JSONEncoder().encode(messages) else { return }
+
+        do {
+            try data.write(to: tmpURL)
+            // Atomic swap — if the destination already exists, replaceItemAt handles it
+            if FileManager.default.fileExists(atPath: url.path) {
+                _ = try FileManager.default.replaceItemAt(url, withItemAt: tmpURL)
+            } else {
+                try FileManager.default.moveItem(at: tmpURL, to: url)
+            }
+        } catch {
+            print("[Workspace] FAILED to persist messages.json: \(error.localizedDescription)")
+            // Clean up tmp file if swap failed
+            try? FileManager.default.removeItem(at: tmpURL)
         }
     }
 
