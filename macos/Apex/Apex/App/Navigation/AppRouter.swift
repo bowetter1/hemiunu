@@ -63,7 +63,7 @@ struct AppRouter: View {
                     HStack(spacing: 0) {
                         // Left sidebar
                         if appState.showSidebar {
-                            UnifiedSidebar(
+                            SidebarContainer(
                                 appState: appState,
                                 currentMode: appState.currentMode,
                                 selectedProjectId: $appState.selectedProjectId,

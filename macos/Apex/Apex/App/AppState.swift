@@ -297,3 +297,31 @@ class AppState: ObservableObject {
     }
 
 }
+
+// MARK: - BossCoordinatorDelegate
+
+extension AppState: BossCoordinatorDelegate {
+    func setSelectedProjectId(_ id: String?) {
+        selectedProjectId = id
+    }
+
+    func setLocalFiles(_ files: [LocalFileInfo]) {
+        localFiles = files
+    }
+
+    func setPages(_ newPages: [Page]) {
+        pages = newPages
+    }
+
+    func setSelectedPageId(_ id: String?) {
+        selectedPageId = id
+    }
+
+    func setLocalPreviewURL(_ url: URL?) {
+        localPreviewURL = url
+    }
+
+    func refreshPreview() {
+        previewRefreshToken = UUID()
+    }
+}

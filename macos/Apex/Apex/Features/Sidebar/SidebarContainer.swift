@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Left sidebar — project navigation and file listing
-struct UnifiedSidebar: View {
+struct SidebarContainer: View {
     @ObservedObject var appState: AppState
     let currentMode: AppMode
     @Binding var selectedProjectId: String?

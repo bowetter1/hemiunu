@@ -39,10 +39,10 @@ class BossCoordinator {
     private var projectDisplayName: String?
     private var sessionName: String?
 
-    private let appState: AppState
+    weak var delegate: BossCoordinatorDelegate?
 
-    init(appState: AppState) {
-        self.appState = appState
+    init(delegate: BossCoordinatorDelegate) {
+        self.delegate = delegate
     }
 
     // MARK: - Computed
@@ -161,7 +161,7 @@ class BossCoordinator {
 
     /// Resume boss mode for an existing local project workspace (e.g. when user wants to refine a layout)
     func resumeForLocalProject(_ projectId: String) {
-        guard let projectName = appState.localProjectName(from: projectId) else { return }
+        guard let projectName = delegate?.localProjectName(from: projectId) else { return }
         let ws = LocalWorkspaceService.shared
         let workspaceURL = ws.projectPath(projectName)
         guard FileManager.default.fileExists(atPath: workspaceURL.path) else { return }
@@ -799,9 +799,9 @@ class BossCoordinator {
 
         Task {
             let localId = "local:\(projectName)"
-            await appState.loadProject(id: localId)
-            appState.selectedProjectId = localId
-            appState.refreshLocalProjects()
+            await delegate?.loadProject(id: localId)
+            delegate?.setSelectedProjectId(localId)
+            delegate?.refreshLocalProjects()
         }
     }
 
@@ -809,19 +809,20 @@ class BossCoordinator {
         guard let projectName = boss.projectName else { return }
 
         // Always refresh sidebar so new layouts appear
-        appState.refreshLocalProjects()
+        delegate?.refreshLocalProjects()
 
         // Only reload the preview if this boss is the currently selected project
         let localId = "local:\(projectName)"
-        guard appState.selectedProjectId == localId else { return }
+        guard delegate?.selectedProjectId == localId else { return }
 
         let ws = LocalWorkspaceService.shared
 
         // Refresh file listing for code mode sidebar
-        appState.localFiles = ws.listFiles(project: projectName)
+        let files = ws.listFiles(project: projectName)
+        delegate?.setLocalFiles(files)
 
         // Refresh all HTML pages
-        let htmlFiles = appState.localFiles.filter { !$0.isDirectory && $0.path.hasSuffix(".html") }
+        let htmlFiles = files.filter { !$0.isDirectory && $0.path.hasSuffix(".html") }
         var newPages: [Page] = []
         for file in htmlFiles {
             let filePath = ws.projectPath(projectName).appendingPathComponent(file.path)
@@ -835,19 +836,19 @@ class BossCoordinator {
             }
         }
 
-        let previousSelection = appState.selectedPageId
-        appState.pages = newPages
+        let previousSelection = delegate?.selectedPageId
+        delegate?.setPages(newPages)
 
         if newPages.contains(where: { $0.id == previousSelection }) {
             // Keep current selection
         } else if let mainFile = ws.findMainHTML(project: projectName) {
-            appState.selectedPageId = "local-page-\(projectName)/\(mainFile)"
+            delegate?.setSelectedPageId("local-page-\(projectName)/\(mainFile)")
         } else {
-            appState.selectedPageId = newPages.first?.id
+            delegate?.setSelectedPageId(newPages.first?.id)
         }
 
-        appState.localPreviewURL = boss.workspace
-        appState.previewRefreshToken = UUID()
+        delegate?.setLocalPreviewURL(boss.workspace)
+        delegate?.refreshPreview()
     }
 
     // MARK: - Version Tracking (Git)
@@ -891,8 +892,8 @@ class BossCoordinator {
         }
 
         Task {
-            await appState.loadProject(id: projectId)
-            appState.selectedProjectId = projectId
+            await delegate?.loadProject(id: projectId)
+            delegate?.setSelectedProjectId(projectId)
         }
     }
 }

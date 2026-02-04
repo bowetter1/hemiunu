@@ -62,7 +62,7 @@ class ChatViewModel: ObservableObject {
 
     init(appState: AppState) {
         self.appState = appState
-        self.boss = BossCoordinator(appState: appState)
+        self.boss = BossCoordinator(delegate: appState)
     }
 
     // MARK: - Message Management
