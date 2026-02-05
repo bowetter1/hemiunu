@@ -36,11 +36,7 @@ struct SettingsToolCard: View {
 
             if isExpanded {
                 VStack(spacing: 2) {
-                    SettingsRow(icon: "globe", title: "Domain", subtitle: "mysite.com")
-                    SettingsRow(icon: "key", title: "Environment", subtitle: "3 variables")
-                    SettingsRow(icon: "link", title: "Integrations", subtitle: "Supabase, Stripe")
-
-                    // Telegram row
+                    // Telegram
                     Button(action: { showTelegramSheet = true }) {
                         HStack(spacing: 10) {
                             Image(systemName: "paperplane.fill")
@@ -68,8 +64,6 @@ struct SettingsToolCard: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-
-                    SettingsRow(icon: "square.and.arrow.up", title: "Export", subtitle: "Download project")
                 }
                 .padding(.horizontal, 10)
                 .padding(.bottom, 10)
@@ -236,40 +230,3 @@ struct InstructionRow: View {
     }
 }
 
-// MARK: - Settings Row
-
-struct SettingsRow: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        Button(action: {}) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .frame(width: 20)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.primary)
-                    Text(subtitle)
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary.opacity(0.5))
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 6)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}

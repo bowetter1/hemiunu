@@ -72,15 +72,6 @@ struct ToolsPanel: View {
                         Divider()
                             .padding(.vertical, 4)
 
-                        // Deploy
-                        DeployToolCard()
-
-                        // Git
-                        GitToolCard()
-
-                        // Database
-                        DatabaseToolCard()
-
                         // Settings
                         SettingsToolCard(appState: appState)
                     }
@@ -173,9 +164,6 @@ struct ToolsPanel: View {
                 Divider()
                     .frame(width: 20)
 
-                CollapsedToolButton(icon: "paperplane", color: .green)
-                CollapsedToolButton(icon: "arrow.triangle.branch", color: .orange)
-                CollapsedToolButton(icon: "cylinder", color: .cyan)
                 CollapsedToolButton(icon: "gearshape", color: .gray)
 
                 Divider()
