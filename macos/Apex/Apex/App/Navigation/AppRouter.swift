@@ -154,9 +154,6 @@ struct AppRouter: View {
                 }
             }
         }
-        .onChange(of: appState.wsClient.lastEvent) { _, newEvent in
-            handleWebSocketEvent(newEvent)
-        }
     }
 
     // MARK: - Mode Content
@@ -167,7 +164,6 @@ struct AppRouter: View {
         case .design:
             DesignView(
                 appState: appState,
-                wsClient: appState.wsClient,
                 viewModel: designViewModel,
                 sidebarVisible: appState.showSidebar,
                 toolsPanelVisible: showToolsPanel,
@@ -223,67 +219,6 @@ struct AppRouter: View {
         }
     }
 
-    // MARK: - WebSocket
-
-    private func handleWebSocketEvent(_ event: WebSocketEvent?) {
-        guard let event = event,
-              let projectId = appState.currentProject?.id else {
-            if event != nil {
-                print("[WS-Handler] Event received but no currentProject: \(String(describing: event))")
-            }
-            return
-        }
-        print("[WS-Handler] Handling event: \(event) for project: \(projectId)")
-
-        switch event {
-        case .moodboardReady:
-            appState.scheduleLoadProject(id: projectId)
-            NotificationService.shared.notify(
-                title: "Moodboard Ready",
-                body: "Brand research and color palette are done."
-            )
-        case .researchReady:
-            appState.scheduleLoadProject(id: projectId)
-            NotificationService.shared.notify(
-                title: "Research Complete",
-                body: "Brand research is done. Review and generate your layout."
-            )
-        case .layoutsReady(let count):
-            appState.scheduleLoadProject(id: projectId)
-            NotificationService.shared.notify(
-                title: "Layouts Ready",
-                body: "\(count) layout\(count == 1 ? "" : "s") generated. Pick your favorite."
-            )
-        case .statusChanged(let status):
-            appState.scheduleLoadProject(id: projectId)
-            if status == "done" || status == "editing" {
-                NotificationService.shared.notify(
-                    title: "Site Ready",
-                    body: "Your website has been generated."
-                )
-            }
-        case .pageUpdated:
-            appState.scheduleLoadProject(id: projectId)
-            NotificationService.shared.notify(
-                title: "Page Updated",
-                body: "Your edits have been applied."
-            )
-        case .clarificationNeeded:
-            appState.scheduleLoadProject(id: projectId)
-            NotificationService.shared.notify(
-                title: "Input Needed",
-                body: "Apex needs your input to continue."
-            )
-        case .error(let message):
-            appState.errorMessage = message
-            NotificationService.shared.notify(
-                title: "Error",
-                body: message
-            )
-        default:
-            break
-        }
-    }
 }
 
 #Preview {

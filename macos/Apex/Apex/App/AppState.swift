@@ -89,7 +89,6 @@ class AppState: ObservableObject {
     // MARK: - Services
 
     let client = APIClient()
-    let wsClient = WebSocketManager()
     let workspace = LocalWorkspaceService.shared
     let cli = CLIService.shared
 
@@ -166,7 +165,6 @@ class AppState: ObservableObject {
 
     // MARK: - Projects
 
-    private var connectedProjectId: String?
     private var loadProjectTask: Task<Void, Never>?
 
     /// Check if a project ID refers to a local project
@@ -217,11 +215,6 @@ class AppState: ObservableObject {
             let logs = try await client.projectService.getLogs(projectId: id)
             projectLogs = logs
 
-            // Connect WebSocket only if not already connected to this project
-            if connectedProjectId != id, let token = client.authToken {
-                connectedProjectId = id
-                wsClient.connect(projectId: id, token: token)
-            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -279,8 +272,6 @@ class AppState: ObservableObject {
         localPreviewURL = nil
         pageVersions = []
         currentVersionNumber = 1
-        connectedProjectId = nil
-        wsClient.disconnect()
     }
 
 }

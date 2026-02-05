@@ -4,7 +4,6 @@ import AppKit
 /// Main design mode container
 struct DesignView: View {
     @ObservedObject var appState: AppState
-    @ObservedObject var wsClient: WebSocketManager
     @ObservedObject var viewModel: DesignViewModel
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
