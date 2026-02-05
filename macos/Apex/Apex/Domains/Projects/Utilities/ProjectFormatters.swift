@@ -12,14 +12,12 @@ enum ProjectFormatters {
     /// Status color for a project
     static func statusColor(for project: Project) -> Color {
         switch project.status {
-        case .brief, .clarification, .researching, .researchDone, .moodboard, .layouts:
-            return .orange
-        case .building, .running:
-            return .blue
         case .editing, .done:
             return .green
         case .failed:
             return .red
+        default:
+            return .orange
         }
     }
 

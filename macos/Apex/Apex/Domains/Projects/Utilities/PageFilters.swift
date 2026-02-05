@@ -12,13 +12,4 @@ enum PageFilters {
         pages.filter { $0.parentPageId == parentId }
     }
 
-    /// Pages belonging to a specific variant
-    static func pagesForVariant(_ variantId: String, from pages: [Page]) -> [Page] {
-        pages.filter { $0.variantId == variantId }
-    }
-
-    /// Pages that have no variant assigned
-    static func pagesWithoutVariant(from pages: [Page]) -> [Page] {
-        pages.filter { $0.variantId == nil }
-    }
 }

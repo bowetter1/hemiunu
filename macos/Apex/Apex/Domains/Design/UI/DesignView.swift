@@ -64,54 +64,22 @@ struct DesignView: View {
                 selectedDevice: appState.selectedDevice
             )
         } else {
-            // Otherwise show based on project status
+            // Show based on project status
             switch project.status {
-            case .brief:
-                GeneratingView(message: "Searching for brand info...")
-
-            case .clarification:
-                GeneratingView(message: "Waiting for your input...")
-
-            case .researching:
-                GeneratingView(message: "Researching brand...")
-
-            case .researchDone, .moodboard:
-                // Legacy — show markdown if available
-                if let md = project.researchMd, !md.isEmpty {
-                    ResearchMarkdownView(markdown: md)
-                } else {
-                    GeneratingView(message: "Researching brand...")
-                }
-
-            case .layouts:
-                // Show first layout by default, user can select others from sidebar
-                if let firstLayout = appState.pages.first(where: { $0.layoutVariant != nil }) {
-                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
-                } else {
-                    GeneratingView(message: "Loading layouts...")
-                }
-
-            case .building:
-                GeneratingView(message: "Building project...")
-
-            case .running:
-                if let previewUrl = project.sandboxPreviewUrl {
-                    WebPreview(html: "", projectId: project.id, sandboxPreviewUrl: previewUrl, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
-                } else {
-                    GeneratingView(message: "Running...")
-                }
-
             case .editing, .done:
                 if let mainPage = appState.pages.first(where: { $0.layoutVariant == nil }) {
                     WebPreview(html: mainPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
-                } else if let firstLayout = appState.pages.first(where: { $0.layoutVariant != nil }) {
-                    WebPreview(html: firstLayout.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
+                } else if let firstPage = appState.pages.first {
+                    WebPreview(html: firstPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
                 } else {
                     GeneratingView(message: "Loading...")
                 }
 
             case .failed:
                 ErrorView(message: project.errorMessage ?? "An error occurred")
+
+            default:
+                GeneratingView(message: "Loading...")
             }
         }
     }
@@ -163,26 +131,6 @@ struct DesignView: View {
 }
 
 // MARK: - Design State Views
-
-/// Welcome view shown when no project is selected
-struct WelcomeView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-
-            Text("Welcome to Apex")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Describe your website to get started")
-                .font(.body)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
 
 /// Loading view with a message shown during generation
 struct GeneratingView: View {

@@ -140,17 +140,3 @@ struct FileTreeItem: Codable {
     }
 }
 
-/// Response from generate code endpoint
-struct GenerateCodeResponse: Codable {
-    let filesCreated: [String]
-    let summary: String
-    let totalFiles: Int
-    let projectType: String
-
-    enum CodingKeys: String, CodingKey {
-        case filesCreated = "files_created"
-        case summary
-        case totalFiles = "total_files"
-        case projectType = "project_type"
-    }
-}

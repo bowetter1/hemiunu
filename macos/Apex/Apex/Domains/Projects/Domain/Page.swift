@@ -1,18 +1,6 @@
 import Foundation
 
-/// A design variant within a project
-struct Variant: Identifiable, Codable, Equatable {
-    let id: String
-    let name: String
-    let moodboardIndex: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id, name
-        case moodboardIndex = "moodboard_index"
-    }
-}
-
-/// A page in a variant
+/// A page in a project
 struct Page: Identifiable, Codable, Equatable {
     let id: String
     let name: String

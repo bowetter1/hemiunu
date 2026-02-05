@@ -67,7 +67,6 @@ struct AppRouter: View {
                                 appState: appState,
                                 currentMode: appState.currentMode,
                                 selectedProjectId: $appState.selectedProjectId,
-                                selectedVariantId: $appState.selectedVariantId,
                                 selectedPageId: $appState.selectedPageId,
                                 showResearchJSON: $appState.showResearchJSON,
                                 onNewProject: {

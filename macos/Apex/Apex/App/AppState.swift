@@ -72,7 +72,6 @@ class AppState: ObservableObject {
     // MARK: - Selection
 
     @Published var selectedProjectId: String?
-    @Published var selectedVariantId: String?
     @Published var selectedPageId: String?
     @Published var showResearchJSON: Bool = false
 
@@ -81,7 +80,6 @@ class AppState: ObservableObject {
     @Published var projects: [Project] = []
     @Published var currentProject: Project?
     @Published var projectLogs: [LogEntry] = []
-    @Published var variants: [Variant] = []
     @Published var pages: [Page] = []
     @Published var localFiles: [LocalFileInfo] = []
     @Published var localProjects: [LocalProject] = []
@@ -160,7 +158,6 @@ class AppState: ObservableObject {
         projects = []
         projectLogs = []
         pages = []
-        variants = []
     }
 
     // MARK: - Projects
@@ -192,7 +189,6 @@ class AppState: ObservableObject {
             // Load pages
             let loadedPages = try await client.pageService.getAll(projectId: id)
             pages = loadedPages
-            variants = []
 
             // Auto-select first page
             if let firstPage = loadedPages.first {
@@ -228,7 +224,6 @@ class AppState: ObservableObject {
             selectedPageId = pages.first?.id
         }
 
-        variants = []
         projectLogs = []
         localPreviewURL = workspace.projectPath(name)
     }
@@ -250,12 +245,10 @@ class AppState: ObservableObject {
 
     func clearCurrentProject() {
         currentProject = nil
-        variants = []
         pages = []
         localFiles = []
         projectLogs = []
         selectedProjectId = nil
-        selectedVariantId = nil
         selectedPageId = nil
         localPreviewURL = nil
         pageVersions = []
