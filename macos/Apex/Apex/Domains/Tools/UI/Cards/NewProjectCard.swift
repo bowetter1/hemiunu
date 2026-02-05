@@ -5,7 +5,6 @@ import SwiftUI
 struct NewProjectCard: View {
     @ObservedObject var appState: AppState
     var chatViewModel: ChatViewModel
-    private var client: APIClient { appState.client }
     let onProjectCreated: (String) -> Void
 
     @State private var showStartSheet = false
@@ -41,7 +40,6 @@ struct NewProjectCard: View {
         .sheet(isPresented: $showStartSheet) {
             StartProjectSheet(
                 isPresented: $showStartSheet,
-                client: client,
                 boss: chatViewModel.boss,
                 onProjectCreated: onProjectCreated
             )

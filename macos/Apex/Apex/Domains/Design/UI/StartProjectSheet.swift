@@ -3,7 +3,6 @@ import UniformTypeIdentifiers
 
 struct StartProjectSheet: View {
     @Binding var isPresented: Bool
-    let client: APIClient
     let boss: BossCoordinator?
     let onProjectCreated: (String) -> Void
 
@@ -32,11 +31,8 @@ struct StartProjectSheet: View {
         return agents
     }
 
-    private var useBoss: Bool { !selectedAgents.isEmpty }
-
-    init(isPresented: Binding<Bool>, client: APIClient, boss: BossCoordinator? = nil, initialBrief: String = "", onProjectCreated: @escaping (String) -> Void) {
+    init(isPresented: Binding<Bool>, boss: BossCoordinator? = nil, initialBrief: String = "", onProjectCreated: @escaping (String) -> Void) {
         self._isPresented = isPresented
-        self.client = client
         self.boss = boss
         self._briefText = State(initialValue: initialBrief)
         self.onProjectCreated = onProjectCreated
@@ -361,11 +357,7 @@ struct StartProjectSheet: View {
             enhancedBrief += "\n\nReference website: \(websiteURL)"
         }
 
-        if useBoss {
-            createBossProject(brief: enhancedBrief)
-        } else {
-            createServerProject(brief: enhancedBrief)
-        }
+        createBossProject(brief: enhancedBrief)
     }
 
     /// Encode the selected NSImage as a base64 JPEG string
@@ -379,33 +371,7 @@ struct StartProjectSheet: View {
         return jpegData.base64EncodedString()
     }
 
-    /// Server-side project creation (original flow)
-    private func createServerProject(brief: String) {
-        let finalConfig = config
-        let imageBase64 = encodeInspirationImage()
-
-        Task {
-            do {
-                let project = try await client.projectService.create(
-                    brief: brief,
-                    imageSource: selectedImageSource.rawValue,
-                    config: finalConfig,
-                    inspirationImageBase64: imageBase64
-                )
-                await MainActor.run {
-                    isCreating = false
-                    isPresented = false
-                    onProjectCreated(project.id)
-                }
-            } catch {
-                await MainActor.run {
-                    isCreating = false
-                }
-            }
-        }
-    }
-
-    /// Boss mode project creation — activates boss coordinator with selected agents
+    /// Activate boss coordinator with selected agents and start building
     private func createBossProject(brief: String) {
         guard let boss else { return }
         let agents = selectedAgents

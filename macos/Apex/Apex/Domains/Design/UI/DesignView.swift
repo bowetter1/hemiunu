@@ -75,14 +75,7 @@ struct DesignView: View {
             case .researching:
                 GeneratingView(message: "Researching brand...")
 
-            case .researchDone:
-                // Research complete — show markdown + generate button
-                ResearchDoneView(
-                    project: project,
-                    appState: appState
-                )
-
-            case .moodboard:
+            case .researchDone, .moodboard:
                 // Legacy — show markdown if available
                 if let md = project.researchMd, !md.isEmpty {
                     ResearchMarkdownView(markdown: md)
@@ -296,87 +289,6 @@ struct ResearchMarkdownView: View {
     private func copyMarkdown() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(markdown, forType: .string)
-    }
-}
-
-// MARK: - Research Done View (with Generate button)
-
-struct ResearchDoneView: View {
-    let project: Project
-    @ObservedObject var appState: AppState
-    @State private var isGenerating = false
-
-    private var client: APIClient { appState.client }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Research markdown content
-            if let md = project.researchMd, !md.isEmpty {
-                ResearchMarkdownView(markdown: md)
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 36))
-                        .foregroundColor(.green)
-                    Text("Research complete")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-
-            Divider()
-
-            // Generate Layout button bar
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Research complete")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Review the research above, then generate your layout")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Button(action: generateLayout) {
-                    HStack(spacing: 6) {
-                        if isGenerating {
-                            ProgressView()
-                                .scaleEffect(0.6)
-                                .tint(.white)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 11))
-                        }
-                        Text(isGenerating ? "Generating..." : "Generate Layout")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(isGenerating ? Color.gray : Color.blue)
-                    .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
-                .disabled(isGenerating)
-            }
-            .padding(16)
-            .background(Color(nsColor: .controlBackgroundColor))
-        }
-    }
-
-    private func generateLayout() {
-        isGenerating = true
-        Task {
-            do {
-                let _ = try await client.projectService.generate(projectId: project.id)
-                // WebSocket will notify when layouts are ready
-            } catch {
-                await MainActor.run {
-                    isGenerating = false
-                }
-            }
-        }
     }
 }
 
