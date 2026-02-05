@@ -97,6 +97,7 @@ extension BossService {
 
                 do {
                     try process.run()
+                    BossPIDFile.add(process.processIdentifier)
                 } catch {
                     continuation.resume(throwing: BossError.launchFailed(error.localizedDescription))
                     return
@@ -140,6 +141,7 @@ extension BossService {
 
                 handle.readabilityHandler = nil
                 errHandle.readabilityHandler = nil
+                BossPIDFile.remove(process.processIdentifier)
 
                 let status = process.terminationStatus
                 // Exit 0 = normal, 15/-15 = SIGTERM from stop()/done.signal, 2 = Kimi CLI normal exit

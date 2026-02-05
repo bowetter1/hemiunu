@@ -52,47 +52,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - Orphaned Process Cleanup
 
-/// Kill any orphaned boss processes from previous runs.
-/// Scans for stale `claude`/`gemini`/`kimi`/`codex` processes whose working directory
-/// matches a `session-*/boss-*` workspace path.
+/// Kill only boss processes that Apex previously spawned.
+/// PIDs are tracked in `~/Apex/projects/.boss-pids` — written at spawn, cleared here.
 private func killOrphanedBossProcesses() {
-    let rootPath = LocalWorkspaceService.shared.rootDirectory.path
-    let cliNames = ["claude", "gemini", "kimi", "codex"]
+    let pidsFile = BossPIDFile.url
+    guard let content = try? String(contentsOf: pidsFile, encoding: .utf8) else { return }
 
-    for name in cliNames {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        process.arguments = ["-f", name]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { continue }
-
-        for pidStr in output.components(separatedBy: .newlines) {
-            guard let pid = Int32(pidStr.trimmingCharacters(in: .whitespaces)), pid > 0 else { continue }
-
-            // Check if the process's cwd is inside our workspace
-            let cwdProcess = Process()
-            cwdProcess.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-            cwdProcess.arguments = ["-p", "\(pid)", "-Fn", "-d", "cwd"]
-            let cwdPipe = Pipe()
-            cwdProcess.standardOutput = cwdPipe
-            cwdProcess.standardError = FileHandle.nullDevice
-            try? cwdProcess.run()
-            cwdProcess.waitUntilExit()
-
-            let cwdData = cwdPipe.fileHandleForReading.readDataToEndOfFile()
-            if let cwdOutput = String(data: cwdData, encoding: .utf8),
-               cwdOutput.contains(rootPath),
-               cwdOutput.contains("session-") {
-                kill(pid, SIGTERM)
-                print("[Cleanup] Killed orphaned \(name) process (PID \(pid))")
-            }
+    for line in content.components(separatedBy: .newlines) {
+        guard let pid = Int32(line.trimmingCharacters(in: .whitespaces)), pid > 0 else { continue }
+        // Only kill if the process still exists (kill 0 checks without signalling)
+        if kill(pid, 0) == 0 {
+            kill(pid, SIGTERM)
+            print("[Cleanup] Killed orphaned boss process (PID \(pid))")
         }
+    }
+
+    // Clear the file — these PIDs are now handled
+    try? "".write(to: pidsFile, atomically: true, encoding: .utf8)
+}
+
+// MARK: - Boss PID Tracking
+
+/// Shared PID file for tracking boss-spawned processes across app launches.
+enum BossPIDFile {
+    static let url: URL = {
+        let root = LocalWorkspaceService.shared.rootDirectory
+        return root.appendingPathComponent(".boss-pids")
+    }()
+
+    /// Record a PID when a boss process is spawned
+    static func add(_ pid: Int32) {
+        let fileURL = url
+        var existing = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
+        existing += "\(pid)\n"
+        try? existing.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+
+    /// Remove a PID when a boss process exits normally
+    static func remove(_ pid: Int32) {
+        let fileURL = url
+        guard var content = try? String(contentsOf: fileURL, encoding: .utf8) else { return }
+        content = content
+            .components(separatedBy: .newlines)
+            .filter { $0.trimmingCharacters(in: .whitespaces) != "\(pid)" }
+            .joined(separator: "\n")
+        try? content.write(to: fileURL, atomically: true, encoding: .utf8)
     }
 }
 

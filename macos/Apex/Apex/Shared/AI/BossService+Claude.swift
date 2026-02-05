@@ -12,11 +12,14 @@ extension BossService {
         onLine: @escaping (String) -> Void
     ) async throws {
         isProcessing = true
+        lastTurnStats = nil
+        currentToolName = nil
 
         // Ensure isProcessing is always reset, even if ensureProcess() throws
         defer {
             isProcessing = false
             currentOnLine = nil
+            stopChecklistPolling()
         }
 
         // Store callback for the stdout handler
@@ -43,6 +46,11 @@ extension BossService {
             apiURL: apiURL,
             extraEnv: keys
         )
+
+        // Start polling checklist.md for progress
+        if let cwd = workingDirectory {
+            startChecklistPolling(workspace: cwd)
+        }
 
         // On first message, prepend instructions from workspace MD files
         let actualMessage: String
@@ -199,6 +207,7 @@ extension BossService {
 
         // Handle process death
         process.terminationHandler = { proc in
+            BossPIDFile.remove(proc.processIdentifier)
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.persistentProcess = nil
@@ -229,6 +238,7 @@ extension BossService {
         // Launch
         do {
             try process.run()
+            BossPIDFile.add(process.processIdentifier)
         } catch {
             cleanupPersistentProcess()
             throw BossError.launchFailed(error.localizedDescription)
@@ -268,6 +278,14 @@ extension BossService {
                   let content = msg["content"] as? [[String: Any]]
             else { return }
 
+            // Capture the last tool_use name for activity display
+            for block in content {
+                if block["type"] as? String == "tool_use",
+                   let name = block["name"] as? String {
+                    self.currentToolName = name
+                }
+            }
+
             for block in content {
                 guard block["type"] as? String == "tool_use",
                       block["name"] as? String == "mcp__apex-tools__apex_chat",
@@ -279,11 +297,19 @@ extension BossService {
                 self.currentOnLine?(message)
             }
             // Text blocks are intentionally not forwarded
+
+        } else if type == "user" {
+            // Tool results coming back — agent is thinking, clear tool name
+            self.currentToolName = nil
+
         } else if type == "result" {
             // Result is always a conversational summary — forward as fallback
             if let result = json["result"] as? String, !result.isEmpty {
                 self.currentOnLine?(result)
             }
+            // Clear tool name and parse turn stats
+            self.currentToolName = nil
+            self.parseTurnStats(from: json)
             // Write stats.json to workspace for dev visibility
             self.writeStats(from: json)
             // Turn complete — resume the waiting send()
@@ -341,6 +367,25 @@ extension BossService {
             let url = wsURL.appendingPathComponent("stats.json")
             try? data.write(to: url)
         }
+    }
+
+    /// Parse turn stats from a `result` event into `lastTurnStats`.
+    private func parseTurnStats(from json: [String: Any]) {
+        let durationMs = json["duration_ms"] as? Int ?? 0
+        let numTurns = json["num_turns"] as? Int ?? 0
+        let totalCost = json["total_cost_usd"] as? Double ?? 0
+
+        let usage = json["usage"] as? [String: Any] ?? [:]
+        let inputTokens = usage["input_tokens"] as? Int ?? 0
+        let outputTokens = usage["output_tokens"] as? Int ?? 0
+
+        lastTurnStats = TurnStats(
+            durationSeconds: Double(durationMs) / 1000.0,
+            totalCostUSD: totalCost,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            numTurns: numTurns
+        )
     }
 
     /// Clean up persistent process state without terminating
