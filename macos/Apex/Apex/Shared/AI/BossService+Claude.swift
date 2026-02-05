@@ -13,6 +13,12 @@ extension BossService {
     ) async throws {
         isProcessing = true
 
+        // Ensure isProcessing is always reset, even if ensureProcess() throws
+        defer {
+            isProcessing = false
+            currentOnLine = nil
+        }
+
         // Store callback for the stdout handler
         currentOnLine = onLine
 
@@ -68,26 +74,15 @@ extension BossService {
         let data = try JSONSerialization.data(withJSONObject: json)
         guard let stdinHandle = stdinPipe?.fileHandleForWriting,
               persistentProcess?.isRunning == true else {
-            isProcessing = false
-            currentOnLine = nil
             throw BossError.launchFailed("Claude process is not running")
         }
         stdinHandle.write(data)
         stdinHandle.write(Data([0x0A])) // newline
 
         // Wait for "result" event from stdout handler
-        do {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                self.responseCompletion = continuation
-            }
-        } catch {
-            isProcessing = false
-            currentOnLine = nil
-            throw error
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.responseCompletion = continuation
         }
-
-        isProcessing = false
-        currentOnLine = nil
     }
 
     /// Start the persistent Claude process if not already running
