@@ -237,27 +237,14 @@ class AppState: ObservableObject {
         // Populate file list for code mode sidebar
         localFiles = workspace.listFiles(project: name)
 
-        // Create pages for all HTML files in the workspace
-        let htmlFiles = localFiles.filter { !$0.isDirectory && $0.path.hasSuffix(".html") }
-        var newPages: [Page] = []
-        for file in htmlFiles {
-            let filePath = workspace.projectPath(name).appendingPathComponent(file.path)
-            if let html = try? String(contentsOf: filePath, encoding: .utf8) {
-                let page = Page.local(
-                    id: "local-page-\(name)/\(file.path)",
-                    name: file.name,
-                    html: html
-                )
-                newPages.append(page)
-            }
-        }
-        pages = newPages
+        // Create pages from proposal HTML files (research artifacts at root are excluded)
+        pages = workspace.loadPages(project: name)
 
         // Select the main HTML file
         if let mainFile = workspace.findMainHTML(project: name) {
             selectedPageId = "local-page-\(name)/\(mainFile)"
         } else {
-            selectedPageId = newPages.first?.id
+            selectedPageId = pages.first?.id
         }
 
         variants = []
