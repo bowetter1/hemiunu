@@ -4,7 +4,7 @@ import SwiftUI
 
 struct BuildSiteCard: View {
     @ObservedObject var appState: AppState
-    @ObservedObject var chatViewModel: ChatViewModel
+    var chatViewModel: ChatViewModel
     @State private var showSheet = false
 
     var body: some View {

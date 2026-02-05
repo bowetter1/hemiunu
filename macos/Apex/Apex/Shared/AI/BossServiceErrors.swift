@@ -6,6 +6,7 @@ enum BossError: LocalizedError {
     case notInstalled(AIAgent)
     case launchFailed(String)
     case exitCode(Int, String)
+    case alreadyProcessing
 
     var errorDescription: String? {
         switch self {
@@ -15,6 +16,8 @@ enum BossError: LocalizedError {
             return "Failed to launch boss: \(msg)"
         case .exitCode(let code, let msg):
             return "Boss exited with code \(code): \(msg)"
+        case .alreadyProcessing:
+            return "Agent is already processing a message"
         }
     }
 }

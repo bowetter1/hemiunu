@@ -5,7 +5,7 @@ import SwiftUI
 struct BuildSiteSheet: View {
     @Binding var isPresented: Bool
     @ObservedObject var appState: AppState
-    @ObservedObject var chatViewModel: ChatViewModel
+    var chatViewModel: ChatViewModel
 
     /// Nav links parsed from the current index.html
     @State private var navLinks: [NavLink] = []

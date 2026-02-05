@@ -6,7 +6,7 @@ import SwiftUI
 struct ToolsPanel: View {
     @ObservedObject var appState: AppState
     @ObservedObject var webSocket: WebSocketManager
-    @ObservedObject var chatViewModel: ChatViewModel
+    var chatViewModel: ChatViewModel
     private var client: APIClient { appState.client }
     let selectedPageId: String?  // Currently selected page (used as parent for generate site)
     @Binding var isExpanded: Bool

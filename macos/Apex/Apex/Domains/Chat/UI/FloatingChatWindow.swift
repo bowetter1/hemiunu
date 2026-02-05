@@ -5,7 +5,7 @@ import SwiftUI
 struct FloatingChatWindow: View {
     @ObservedObject var appState: AppState
     @ObservedObject var webSocket: WebSocketManager
-    @ObservedObject var chatViewModel: ChatViewModel
+    var chatViewModel: ChatViewModel
 
     private var client: APIClient { appState.client }
     var selectedPageId: String?

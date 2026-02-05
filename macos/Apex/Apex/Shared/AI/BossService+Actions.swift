@@ -10,7 +10,7 @@ extension BossService {
         vector: String? = nil,
         onLine: @escaping (String) -> Void
     ) async throws {
-        guard !isProcessing else { return }
+        guard !isProcessing else { throw BossError.alreadyProcessing }
 
         // Track workspace for session persistence
         if let cwd = workingDirectory {

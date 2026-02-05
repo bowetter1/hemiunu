@@ -4,7 +4,7 @@ import SwiftUI
 
 struct NewProjectCard: View {
     @ObservedObject var appState: AppState
-    @ObservedObject var chatViewModel: ChatViewModel
+    var chatViewModel: ChatViewModel
     private var client: APIClient { appState.client }
     let onProjectCreated: (String) -> Void
 

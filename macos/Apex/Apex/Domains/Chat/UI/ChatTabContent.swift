@@ -5,7 +5,7 @@ import SwiftUI
 struct ChatTabContent: View {
     @ObservedObject var appState: AppState
     @ObservedObject var webSocket: WebSocketManager
-    @ObservedObject var chatViewModel: ChatViewModel
+    var chatViewModel: ChatViewModel
 
     private var client: APIClient { appState.client }
     var selectedPageId: String? = nil
@@ -70,6 +70,8 @@ struct ChatTabContent: View {
 
                     if chatViewModel.isLoading {
                         loadingIndicator
+                    } else if chatViewModel.boss.isActive && chatViewModel.boss.isProcessing {
+                        workingIndicator
                     }
                 }
                 .padding(12)
@@ -128,6 +130,28 @@ struct ChatTabContent: View {
         .padding(.vertical, 6)
         .background(Color(nsColor: .windowBackgroundColor))
         .cornerRadius(10)
+    }
+
+    private var workingIndicator: some View {
+        HStack(spacing: 6) {
+            PulsingDots()
+            Text(workingText)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.purple.opacity(0.06))
+        .cornerRadius(10)
+    }
+
+    private var workingText: String {
+        switch chatViewModel.boss.phase {
+        case .researching: return "Researching..."
+        case .building:    return "Building files..."
+        case .idle:        return "Working..."
+        }
     }
 
     private var loadingText: String {
@@ -332,6 +356,30 @@ struct BossFileTreeView: View {
         case "md": return "doc.richtext"
         case "png", "jpg", "jpeg", "svg", "gif": return "photo"
         default: return "doc"
+        }
+    }
+}
+
+// MARK: - Pulsing Dots Animation
+
+struct PulsingDots: View {
+    @State private var active = 0
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Color.purple.opacity(index == active ? 0.8 : 0.3))
+                    .frame(width: 5, height: 5)
+                    .scaleEffect(index == active ? 1.2 : 1.0)
+            }
+        }
+        .onAppear {
+            Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    active = (active + 1) % 3
+                }
+            }
         }
     }
 }
