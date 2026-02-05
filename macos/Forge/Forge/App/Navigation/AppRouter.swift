@@ -24,111 +24,105 @@ struct AppRouter: View {
                 LoginView(appState: appState)
             } else {
                 GlassEffectContainer {
-                // Main layout - ignore safe area to flow into title bar
-                VStack(spacing: 0) {
-                    // Topbar spanning full width - flows into title bar area
-                    Topbar(
-                        showSidebar: $appState.showSidebar,
-                        selectedMode: $appState.currentMode,
-                        appearanceMode: $appState.appearanceMode,
-                        isConnected: appState.isConnected,
-                        errorMessage: appState.errorMessage,
-                        hasProject: appState.currentProject != nil,
-                        isStreaming: appState.chatViewModel.isStreaming,
-                        onNewProject: {
-                            appState.clearCurrentProject()
-                            appState.currentMode = .design
-                        },
-                        onLogout: {
-                            appState.logout()
-                            appState.clearCurrentProject()
-                        },
-                        showModeSelector: false,
-                        inlineTrafficLights: true,
-                        selectedDevice: $appState.selectedDevice,
-                        pageVersions: appState.pageVersions,
-                        currentVersion: appState.currentVersionNumber,
-                        onRestoreVersion: { version in
-                            if let project = appState.currentProject,
-                               let pageId = appState.selectedPageId {
-                                designViewModel.restoreVersion(project: project, pageId: pageId, version: version)
-                            }
-                        },
-                        onOpenInBrowser: {
-                            openPreviewInBrowser()
-                        }
-                    )
-                    .padding(.horizontal, 0)
-
-                    // Content row: left sidebar + main + right sidebar
-                    HStack(spacing: 0) {
-                        // Left sidebar
-                        if appState.showSidebar {
-                            SidebarContainer(
-                                appState: appState,
-                                currentMode: appState.currentMode,
-                                selectedProjectId: $appState.selectedProjectId,
-                                selectedPageId: $appState.selectedPageId,
-                                showResearchJSON: $appState.showResearchJSON,
-                                onNewProject: {
-                                    appState.clearCurrentProject()
-                                    appState.currentMode = .design
-                                },
-                                onClose: {
-                                    appState.showSidebar = false
-                                }
-                            )
-                            .padding(.leading, 16)
-                            .padding(.trailing, 8)
-                        }
-
-                        // Main content card
-                        modeContent
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xl))
-                            .padding(.leading, appState.showSidebar ? 0 : 16)
-                            .padding(.trailing, 8)
-
-                        // Right tools panel
-                        ToolsPanel(
-                            appState: appState,
-                            chatViewModel: appState.chatViewModel,
-                            selectedPageId: appState.selectedPageId,
-                            isExpanded: $showToolsPanel,
-                            onProjectCreated: { projectId in
-                                appState.selectedProjectId = projectId
+                    // Main layout
+                    VStack(spacing: 0) {
+                        // Topbar
+                        Topbar(
+                            showSidebar: $appState.showSidebar,
+                            selectedMode: $appState.currentMode,
+                            appearanceMode: $appState.appearanceMode,
+                            isConnected: appState.isConnected,
+                            errorMessage: appState.errorMessage,
+                            hasProject: appState.currentProject != nil,
+                            isStreaming: appState.chatViewModel.isStreaming,
+                            onNewProject: {
+                                appState.clearCurrentProject()
                                 appState.currentMode = .design
                             },
-                            onOpenFloatingChat: {
-                                appState.showFloatingChat = true
+                            onLogout: {
+                                appState.logout()
+                                appState.clearCurrentProject()
+                            },
+                            showModeSelector: false,
+                            selectedDevice: $appState.selectedDevice,
+                            pageVersions: appState.pageVersions,
+                            currentVersion: appState.currentVersionNumber,
+                            onRestoreVersion: { version in
+                                if let project = appState.currentProject,
+                                   let pageId = appState.selectedPageId {
+                                    designViewModel.restoreVersion(project: project, pageId: pageId, version: version)
+                                }
+                            },
+                            onOpenInBrowser: {
+                                openPreviewInBrowser()
                             }
                         )
-                        .padding(.trailing, 16)
-                    }
-                    .padding(.bottom, 16)
-                }
-                .ignoresSafeArea(edges: .top)
 
-                // Centered Mode Selector overlay (centered on entire window)
-                VStack {
-                    ModeSelector(selectedMode: $appState.currentMode)
-                        .padding(.top, 8)
-                    Spacer()
-                }
-                .ignoresSafeArea(edges: .top)
-                .zIndex(20)
+                        // Content row: sidebar + main + tools
+                        HStack(spacing: 12) {
+                            // Left sidebar
+                            if appState.showSidebar {
+                                SidebarContainer(
+                                    appState: appState,
+                                    currentMode: appState.currentMode,
+                                    selectedProjectId: $appState.selectedProjectId,
+                                    selectedPageId: $appState.selectedPageId,
+                                    showResearchJSON: $appState.showResearchJSON,
+                                    onNewProject: {
+                                        appState.clearCurrentProject()
+                                        appState.currentMode = .design
+                                    },
+                                    onClose: {
+                                        appState.showSidebar = false
+                                    }
+                                )
+                            }
 
-                // Floating chat window
-                if appState.showFloatingChat {
-                    FloatingChatWindow(
-                        appState: appState,
-                        chatViewModel: appState.chatViewModel,
-                        onClose: {
-                            appState.showFloatingChat = false
+                            // Main content
+                            modeContent
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+
+                            // Right tools panel
+                            ToolsPanel(
+                                appState: appState,
+                                chatViewModel: appState.chatViewModel,
+                                selectedPageId: appState.selectedPageId,
+                                isExpanded: $showToolsPanel,
+                                onProjectCreated: { projectId in
+                                    appState.selectedProjectId = projectId
+                                    appState.currentMode = .design
+                                },
+                                onOpenFloatingChat: {
+                                    appState.showFloatingChat = true
+                                }
+                            )
                         }
-                    )
-                    .zIndex(30)
-                }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                    }
+                    .ignoresSafeArea(edges: .top)
+
+                    // Centered Mode Selector overlay
+                    VStack {
+                        ModeSelector(selectedMode: $appState.currentMode)
+                            .padding(.top, 8)
+                        Spacer()
+                    }
+                    .ignoresSafeArea(edges: .top)
+                    .zIndex(20)
+
+                    // Floating chat window
+                    if appState.showFloatingChat {
+                        FloatingChatWindow(
+                            appState: appState,
+                            chatViewModel: appState.chatViewModel,
+                            onClose: {
+                                appState.showFloatingChat = false
+                            }
+                        )
+                        .zIndex(30)
+                    }
                 } // GlassEffectContainer
             }
 

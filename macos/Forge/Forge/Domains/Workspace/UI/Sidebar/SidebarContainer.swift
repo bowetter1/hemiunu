@@ -43,7 +43,7 @@ struct SidebarContainer: View {
             )
         }
         .frame(width: 240)
+        .background(Theme.Colors.glassFill)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
-        .glassEffect(.regular)
     }
 }

@@ -27,8 +27,8 @@ struct ToolsPanel: View {
             }
         }
         .frame(width: isExpanded ? panelWidth : 44)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
-        .glassEffect(.regular)
+        .background(Theme.Colors.glassFill)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
     }
 
     private var expandedPanel: some View {

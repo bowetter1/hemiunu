@@ -12,7 +12,6 @@ struct Topbar: View {
     var onNewProject: (() -> Void)? = nil
     var onLogout: (() -> Void)? = nil
     var showModeSelector: Bool = true
-    var inlineTrafficLights: Bool = false
 
     // Preview controls (shown in design mode with a project)
     @Binding var selectedDevice: PreviewDevice
@@ -25,7 +24,6 @@ struct Topbar: View {
     private let itemHeight: CGFloat = 28
     private let topInset: CGFloat = 4
     private let iconSize: CGFloat = 14
-    private let trafficLightsWidth: CGFloat = 78
 
     private var showPreviewControls: Bool {
         hasProject && selectedMode == .design
@@ -33,12 +31,6 @@ struct Topbar: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            // Space for traffic lights when inline
-            if inlineTrafficLights {
-                Color.clear
-                    .frame(width: trafficLightsWidth)
-            }
-
             // Left group
             leftGroup
 
@@ -58,7 +50,6 @@ struct Topbar: View {
         .frame(height: height, alignment: .top)
         .padding(.top, topInset)
         .padding(.horizontal, 12)
-        .glassEffect(.regular)
     }
 
     private var leftGroup: some View {

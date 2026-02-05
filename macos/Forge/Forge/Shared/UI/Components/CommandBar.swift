@@ -25,8 +25,8 @@ struct CommandBar: View {
         }
         .padding(.horizontal, 20)
         .frame(width: 500, height: 50)
+        .background(Theme.Colors.glassFill)
         .clipShape(Capsule())
-        .glassEffect(.regular)
     }
 }
 
