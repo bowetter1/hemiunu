@@ -1,0 +1,118 @@
+import SwiftUI
+
+// MARK: - Floating Chat Bar
+
+struct FloatingChatWindow: View {
+    @ObservedObject var appState: AppState
+    var chatViewModel: ChatViewModel
+    let onClose: () -> Void
+
+    @State private var inputText = ""
+    @State private var position: CGPoint = .zero
+    @State private var dragOffset: CGSize = .zero
+    @State private var isDragging = false
+    @State private var hasInitialPosition = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let initialPosition = CGPoint(
+                x: geometry.size.width / 2,
+                y: geometry.size.height - 50
+            )
+
+            HStack(spacing: 0) {
+                // Drag handle
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 12))
+                    .foregroundColor(isDragging ? .blue : .secondary.opacity(0.5))
+                    .frame(width: 30, height: 44)
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        if hovering {
+                            NSCursor.openHand.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
+
+                // Input field
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14))
+                        .foregroundColor(.blue)
+
+                    TextField("Ask anything...", text: $inputText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 14))
+                        .onSubmit { sendMessage() }
+
+                    if chatViewModel.isStreaming {
+                        Button(action: { chatViewModel.stopStreaming() }) {
+                            Image(systemName: "stop.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(.plain)
+                    } else if chatViewModel.isLoading {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    } else {
+                        Button(action: sendMessage) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(inputText.isEmpty ? .secondary.opacity(0.5) : .blue)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(inputText.isEmpty)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+
+                // Close button
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 30, height: 44)
+                }
+                .buttonStyle(.plain)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .glassEffect(.regular)
+            .overlay(
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(isDragging ? Color.blue : Color.clear, lineWidth: isDragging ? 2 : 0)
+            )
+            .frame(maxWidth: 600)
+            .position(
+                x: (hasInitialPosition ? position.x : initialPosition.x) + dragOffset.width,
+                y: (hasInitialPosition ? position.y : initialPosition.y) + dragOffset.height
+            )
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        isDragging = true
+                        dragOffset = value.translation
+                    }
+                    .onEnded { value in
+                        isDragging = false
+                        let currentPos = hasInitialPosition ? position : initialPosition
+                        position = CGPoint(
+                            x: currentPos.x + value.translation.width,
+                            y: currentPos.y + value.translation.height
+                        )
+                        dragOffset = .zero
+                        hasInitialPosition = true
+                    }
+            )
+        }
+    }
+
+    private func sendMessage() {
+        guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let text = inputText
+        inputText = ""
+        chatViewModel.sendMessage(text)
+    }
+}
