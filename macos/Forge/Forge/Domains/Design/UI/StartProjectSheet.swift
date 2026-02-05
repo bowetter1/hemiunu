@@ -139,7 +139,7 @@ struct StartProjectSheet: View {
 
             // Init git
             Task {
-                _ = try? await appState.workspace.exec("git init", cwd: appState.workspace.projectPath(safeName))
+                _ = try? await appState.workspace.gitInit(project: safeName)
             }
         } catch {
             #if DEBUG

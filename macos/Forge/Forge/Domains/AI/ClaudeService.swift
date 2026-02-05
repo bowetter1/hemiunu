@@ -13,7 +13,12 @@ final class ClaudeService: AIService, @unchecked Sendable {
             return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: .claude)) }
         }
 
-        let body = buildRequestBody(messages: messages, systemPrompt: systemPrompt)
+        let body: Data
+        do {
+            body = try buildRequestBody(messages: messages, systemPrompt: systemPrompt)
+        } catch {
+            return AsyncThrowingStream { $0.finish(throwing: error) }
+        }
 
         let headers = [
             "x-api-key": apiKey,
@@ -41,7 +46,7 @@ final class ClaudeService: AIService, @unchecked Sendable {
         }
     }
 
-    private func buildRequestBody(messages: [AIMessage], systemPrompt: String) -> Data {
+    private func buildRequestBody(messages: [AIMessage], systemPrompt: String) throws -> Data {
         let apiMessages = messages.map { msg in
             ["role": msg.role, "content": msg.content]
         }
@@ -54,6 +59,6 @@ final class ClaudeService: AIService, @unchecked Sendable {
             "max_tokens": 8192,
         ]
 
-        return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
+        return try JSONSerialization.data(withJSONObject: payload)
     }
 }

@@ -37,9 +37,9 @@ class ChatViewModel {
 
         // Create assistant message placeholder
         let provider = appState.selectedProvider
-        var assistantMessage = ChatMessage(role: .assistant, content: "", aiProvider: provider)
+        let assistantMessage = ChatMessage(role: .assistant, content: "", aiProvider: provider)
         messages.append(assistantMessage)
-        let assistantIndex = messages.count - 1
+        let assistantId = assistantMessage.id
 
         // Build AI message history
         let aiMessages = messages.dropLast().map { msg in
@@ -59,14 +59,18 @@ class ChatViewModel {
 
                 for try await token in stream {
                     guard !Task.isCancelled else { break }
-                    messages[assistantIndex].content += token
+                    guard let index = messages.firstIndex(where: { $0.id == assistantId }) else { break }
+                    messages[index].content += token
                 }
 
                 // After streaming completes, handle any generated content
-                handleGeneratedContent(messages[assistantIndex].content)
+                if let index = messages.firstIndex(where: { $0.id == assistantId }) {
+                    handleGeneratedContent(messages[index].content)
+                }
             } catch {
-                if !Task.isCancelled {
-                    messages[assistantIndex].content += "\n\n[Error: \(error.localizedDescription)]"
+                if !Task.isCancelled,
+                   let index = messages.firstIndex(where: { $0.id == assistantId }) {
+                    messages[index].content += "\n\n[Error: \(error.localizedDescription)]"
                 }
             }
             isStreaming = false
@@ -100,20 +104,22 @@ class ChatViewModel {
 
     /// Extract HTML from the AI response and save it to the workspace
     private func handleGeneratedContent(_ content: String) {
-        // Extract HTML from markdown code blocks
-        guard let html = extractHTML(from: content) else { return }
+        let htmlFiles = extractAllHTML(from: content)
+        guard !htmlFiles.isEmpty else { return }
 
         // Determine project name
         guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
               let projectName = appState.localProjectName(from: projectId) else {
             // No project selected — create a new one
-            createProjectFromHTML(html)
+            createProjectFromHTML(htmlFiles)
             return
         }
 
         // Save to existing project
         do {
-            try appState.workspace.writeFile(project: projectName, path: "index.html", content: html)
+            for (filename, html) in htmlFiles {
+                try appState.workspace.writeFile(project: projectName, path: filename, content: html)
+            }
 
             // Git commit
             Task {
@@ -134,8 +140,8 @@ class ChatViewModel {
         }
     }
 
-    /// Create a new local project from generated HTML
-    private func createProjectFromHTML(_ html: String) {
+    /// Create a new local project from generated HTML files
+    private func createProjectFromHTML(_ htmlFiles: [(filename: String, html: String)]) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
             .replacingOccurrences(of: ":", with: "")
             .replacingOccurrences(of: " ", with: "")
@@ -143,11 +149,13 @@ class ChatViewModel {
 
         do {
             _ = try appState.workspace.createProject(name: projectName)
-            try appState.workspace.writeFile(project: projectName, path: "index.html", content: html)
+            for (filename, html) in htmlFiles {
+                try appState.workspace.writeFile(project: projectName, path: filename, content: html)
+            }
 
             // Init git
             Task {
-                _ = try? await appState.workspace.exec("git init", cwd: appState.workspace.projectPath(projectName))
+                _ = try? await appState.workspace.gitInit(project: projectName)
                 _ = try? await appState.workspace.gitCommit(project: projectName, message: "Initial generation")
             }
 
@@ -165,22 +173,97 @@ class ChatViewModel {
         }
     }
 
-    /// Extract HTML from markdown code blocks in AI response
-    private func extractHTML(from content: String) -> String? {
-        // Look for ```html ... ``` code blocks
-        let pattern = "```html\\s*\\n([\\s\\S]*?)\\n```"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
-              let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-              let range = Range(match.range(at: 1), in: content) else {
-            // Fallback: look for any ``` ... ``` block that starts with <!DOCTYPE or <html
-            let fallbackPattern = "```\\s*\\n(<!DOCTYPE[\\s\\S]*?)\\n```"
-            if let fallbackRegex = try? NSRegularExpression(pattern: fallbackPattern, options: [.caseInsensitive]),
-               let fallbackMatch = fallbackRegex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-               let fallbackRange = Range(fallbackMatch.range(at: 1), in: content) {
-                return String(content[fallbackRange])
-            }
-            return nil
+    // MARK: - HTML Extraction
+
+    /// Extract all HTML files from markdown code blocks in AI response.
+    /// Looks for filename hints like `<!-- filename.html -->` or ``` headers.
+    /// Returns an array of (filename, html) tuples.
+    private func extractAllHTML(from content: String) -> [(filename: String, html: String)] {
+        var results: [(filename: String, html: String)] = []
+
+        // Match ```html blocks, capturing optional filename from the line before
+        let blockPattern = "(?:(?://|<!--|#|/\\*)?\\s*([\\w./-]+\\.html)\\s*(?:-->|\\*/)?\\s*\\n)?```(?:html)?\\s*\\n([\\s\\S]*?)\\n```"
+        guard let regex = try? NSRegularExpression(pattern: blockPattern, options: []) else {
+            return extractSingleHTML(from: content)
         }
-        return String(content[range])
+
+        let nsContent = content as NSString
+        let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+
+        for match in matches {
+            let htmlRange = match.range(at: 2)
+            guard htmlRange.location != NSNotFound else { continue }
+            let html = nsContent.substring(with: htmlRange)
+
+            // Skip non-HTML code blocks
+            let trimmedHTML = html.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmedHTML.contains("<") && (trimmedHTML.contains("</") || trimmedHTML.lowercased().contains("<!doctype")) else {
+                continue
+            }
+
+            // Try to extract filename from capture group or from the HTML content
+            var filename: String?
+            let nameRange = match.range(at: 1)
+            if nameRange.location != NSNotFound {
+                filename = nsContent.substring(with: nameRange)
+            }
+
+            if filename == nil {
+                // Try to infer from a <!-- filename --> comment at the start of the HTML
+                let commentPattern = "^\\s*<!--\\s*([\\w./-]+\\.html)\\s*-->"
+                if let commentRegex = try? NSRegularExpression(pattern: commentPattern, options: []),
+                   let commentMatch = commentRegex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+                   let commentRange = Range(commentMatch.range(at: 1), in: html) {
+                    filename = String(html[commentRange])
+                }
+            }
+
+            results.append((filename: filename ?? "index.html", html: html))
+        }
+
+        // Deduplicate: if multiple blocks have the same name, number them
+        if results.isEmpty {
+            return extractSingleHTML(from: content)
+        }
+
+        // If only one result and it's unnamed, keep as index.html
+        if results.count == 1 {
+            return [(filename: results[0].filename, html: results[0].html)]
+        }
+
+        // Ensure unique filenames: if multiple blocks map to index.html, assign names
+        var seen: [String: Int] = [:]
+        var named: [(filename: String, html: String)] = []
+        for (index, item) in results.enumerated() {
+            var name = item.filename
+            if seen[name] != nil {
+                let base = name.replacingOccurrences(of: ".html", with: "")
+                name = "\(base)-\(index + 1).html"
+            }
+            seen[name] = index
+            named.append((filename: name, html: item.html))
+        }
+
+        return named
+    }
+
+    /// Fallback: extract a single HTML block (original behavior)
+    private func extractSingleHTML(from content: String) -> [(filename: String, html: String)] {
+        let pattern = "```html\\s*\\n([\\s\\S]*?)\\n```"
+        if let regex = try? NSRegularExpression(pattern: pattern, options: []),
+           let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+           let range = Range(match.range(at: 1), in: content) {
+            return [(filename: "index.html", html: String(content[range]))]
+        }
+
+        // Fallback: look for any ``` block that starts with <!DOCTYPE
+        let fallbackPattern = "```\\s*\\n(<!DOCTYPE[\\s\\S]*?)\\n```"
+        if let fallbackRegex = try? NSRegularExpression(pattern: fallbackPattern, options: [.caseInsensitive]),
+           let fallbackMatch = fallbackRegex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+           let fallbackRange = Range(fallbackMatch.range(at: 1), in: content) {
+            return [(filename: "index.html", html: String(content[fallbackRange]))]
+        }
+
+        return []
     }
 }

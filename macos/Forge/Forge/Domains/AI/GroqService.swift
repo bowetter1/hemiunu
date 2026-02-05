@@ -13,7 +13,12 @@ final class GroqService: AIService, @unchecked Sendable {
             return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: .groq)) }
         }
 
-        let body = buildRequestBody(messages: messages, systemPrompt: systemPrompt)
+        let body: Data
+        do {
+            body = try buildRequestBody(messages: messages, systemPrompt: systemPrompt)
+        } catch {
+            return AsyncThrowingStream { $0.finish(throwing: error) }
+        }
 
         let headers = [
             "Authorization": "Bearer \(apiKey)",
@@ -40,7 +45,7 @@ final class GroqService: AIService, @unchecked Sendable {
         }
     }
 
-    private func buildRequestBody(messages: [AIMessage], systemPrompt: String) -> Data {
+    private func buildRequestBody(messages: [AIMessage], systemPrompt: String) throws -> Data {
         var apiMessages: [[String: String]] = [
             ["role": "system", "content": systemPrompt]
         ]
@@ -56,6 +61,6 @@ final class GroqService: AIService, @unchecked Sendable {
             "max_tokens": 8192,
         ]
 
-        return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
+        return try JSONSerialization.data(withJSONObject: payload)
     }
 }

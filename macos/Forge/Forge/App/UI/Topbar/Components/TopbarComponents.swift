@@ -105,6 +105,3 @@ struct PulseModifier: ViewModifier {
             .onChange(of: active) { _, new in isPulsing = new }
     }
 }
-// MARK: - Legacy Support
-
-typealias ToolbarButton = IconButton

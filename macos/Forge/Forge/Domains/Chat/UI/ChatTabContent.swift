@@ -170,6 +170,7 @@ struct ChatTabContent: View {
 
 struct PulsingDots: View {
     @State private var active = 0
+    @State private var timer: Timer?
 
     var body: some View {
         HStack(spacing: 3) {
@@ -181,11 +182,15 @@ struct PulsingDots: View {
             }
         }
         .onAppear {
-            Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
+            timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
                 withAnimation(.easeInOut(duration: 0.3)) {
                     active = (active + 1) % 3
                 }
             }
+        }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
         }
     }
 }
