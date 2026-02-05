@@ -24,39 +24,28 @@ struct IconButton: View {
 
 struct ModeSelector: View {
     @Binding var selectedMode: AppMode
-    private let itemHeight: CGFloat = 28
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(AppMode.allCases, id: \.self) { mode in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        selectedMode = mode
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: icon(for: mode))
-                            .font(.system(size: 10, weight: .medium))
-                        Text(mode.rawValue)
+        GlassEffectContainer {
+            HStack(spacing: 4) {
+                ForEach(AppMode.allCases, id: \.self) { mode in
+                    Button {
+                        withAnimation(.bouncy) {
+                            selectedMode = mode
+                        }
+                    } label: {
+                        Label(mode.rawValue, systemImage: icon(for: mode))
                             .font(.system(size: 11, weight: selectedMode == mode ? .semibold : .regular))
                     }
-                    .foregroundColor(selectedMode == mode ? .white : .secondary)
-                    .padding(.horizontal, 12)
-                    .frame(height: itemHeight)
-                    .background(selectedMode == mode ? Color.blue : Color.clear)
-                    .cornerRadius(5)
+                    .buttonStyle(selectedMode == mode ? .glassProminent : .glass)
                 }
-                .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 3)
-        .background(Color.primary.opacity(0.05))
-        .cornerRadius(8)
     }
 
     private func icon(for mode: AppMode) -> String {
         switch mode {
-        case .design: return "paintbrush.fill"
+        case .design: return "paintbrush"
         case .code: return "chevron.left.forwardslash.chevron.right"
         }
     }
@@ -131,8 +120,7 @@ struct ActivityPill: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.primary.opacity(0.05))
-        .cornerRadius(10)
+        .glassEffect(.regular, in: .capsule)
         .animation(.easeInOut(duration: 0.2), value: boss.isProcessing)
         .animation(.easeInOut(duration: 0.2), value: boss.currentActivityLabel)
         .animation(.easeInOut(duration: 0.2), value: boss.aggregatedChecklist?.completedCount)
@@ -313,6 +301,3 @@ struct BossRow: View {
     }
 }
 
-// MARK: - Legacy Support
-
-typealias ToolbarButton = IconButton

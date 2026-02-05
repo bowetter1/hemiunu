@@ -1,140 +1,33 @@
 import SwiftUI
 import AppKit
 
-/// Main app router - handles navigation between modes
+/// Main app router - Liquid Glass layout with NavigationSplitView
 struct AppRouter: View {
     @StateObject private var appState = AppState.shared
     @StateObject private var designViewModel = DesignViewModel(appState: AppState.shared)
     @State private var showToolsPanel = true
+    @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
 
     /// Auth gate — show login when not connected
     private var showAuthGate: Bool {
         !appState.isConnected
     }
 
+    private var showPreviewControls: Bool {
+        appState.currentProject != nil && appState.currentMode == .design
+    }
+
+    private var boss: BossCoordinator {
+        appState.chatViewModel.boss
+    }
+
     var body: some View {
-        ZStack {
-            // Background
-            Color(nsColor: .windowBackgroundColor)
-                .ignoresSafeArea()
-
-            GridBackground()
-
+        Group {
             if showAuthGate {
                 LoginView(appState: appState)
             } else {
-                // Main layout - ignore safe area to flow into title bar
-                VStack(spacing: 0) {
-                    // Topbar spanning full width - flows into title bar area
-                    Topbar(
-                        showSidebar: $appState.showSidebar,
-                        selectedMode: $appState.currentMode,
-                        appearanceMode: $appState.appearanceMode,
-                        isConnected: appState.isConnected,
-                        errorMessage: appState.errorMessage,
-                        hasProject: appState.currentProject != nil,
-                        boss: appState.chatViewModel.boss,
-                        onNewProject: {
-                            appState.clearCurrentProject()
-                            appState.currentMode = .design
-                        },
-                        onLogout: {
-                            appState.logout()
-                            appState.clearCurrentProject()
-                        },
-                        showModeSelector: false,
-                        inlineTrafficLights: true,
-                        selectedDevice: $appState.selectedDevice,
-                        pageVersions: appState.pageVersions,
-                        currentVersion: appState.currentVersionNumber,
-                        onRestoreVersion: { version in
-                            if let project = appState.currentProject,
-                               let pageId = appState.selectedPageId {
-                                designViewModel.restoreVersion(project: project, pageId: pageId, version: version)
-                            }
-                        },
-                        onOpenInBrowser: {
-                            openPreviewInBrowser()
-                        }
-                    )
-                    .padding(.horizontal, 0)
-
-                    // Content row: left sidebar + main + right sidebar
-                    HStack(spacing: 0) {
-                        // Left sidebar
-                        if appState.showSidebar {
-                            SidebarContainer(
-                                appState: appState,
-                                currentMode: appState.currentMode,
-                                selectedProjectId: $appState.selectedProjectId,
-                                selectedPageId: $appState.selectedPageId,
-                                showResearchJSON: $appState.showResearchJSON,
-                                onNewProject: {
-                                    appState.clearCurrentProject()
-                                    appState.currentMode = .design
-                                },
-                                onClose: {
-                                    appState.showSidebar = false
-                                }
-                            )
-                            .padding(.leading, 16)
-                            .padding(.trailing, 8)
-                        }
-
-                        // Main content card
-                        modeContent
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                            )
-                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
-                            .padding(.leading, appState.showSidebar ? 0 : 16)
-                            .padding(.trailing, 8)
-
-                        // Right tools panel
-                        ToolsPanel(
-                            appState: appState,
-                            chatViewModel: appState.chatViewModel,
-                            selectedPageId: appState.selectedPageId,
-                            isExpanded: $showToolsPanel,
-                            onProjectCreated: { projectId in
-                                appState.selectedProjectId = projectId
-                                appState.currentMode = .design
-                            },
-                            onOpenFloatingChat: {
-                                appState.showFloatingChat = true
-                            }
-                        )
-                        .padding(.trailing, 16)
-                    }
-                    .padding(.bottom, 16)
-                }
-                .ignoresSafeArea(edges: .top)
-
-                // Centered Mode Selector overlay (centered on entire window)
-                VStack {
-                    ModeSelector(selectedMode: $appState.currentMode)
-                        .padding(.top, 8)
-                    Spacer()
-                }
-                .ignoresSafeArea(edges: .top)
-                .zIndex(20)
-
-                // Floating chat window
-                if appState.showFloatingChat {
-                    FloatingChatWindow(
-                        appState: appState,
-                        chatViewModel: appState.chatViewModel,
-                        onClose: {
-                            appState.showFloatingChat = false
-                        }
-                    )
-                    .zIndex(30)
-                }
+                mainContent
             }
-
         }
         .onAppear {
             Task {
@@ -155,6 +48,151 @@ struct AppRouter: View {
         }
     }
 
+    // MARK: - Main Content
+
+    private var mainContent: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            // Sidebar — automatic Liquid Glass treatment
+            SidebarContainer(
+                appState: appState,
+                currentMode: appState.currentMode,
+                selectedProjectId: $appState.selectedProjectId,
+                selectedPageId: $appState.selectedPageId,
+                showResearchJSON: $appState.showResearchJSON,
+                onNewProject: {
+                    appState.clearCurrentProject()
+                    appState.currentMode = .design
+                }
+            )
+        } detail: {
+            // Main content area
+            modeContent
+                .backgroundExtensionEffect()
+                .overlay(alignment: .bottom) {
+                    if appState.showFloatingChat {
+                        FloatingChatWindow(
+                            appState: appState,
+                            chatViewModel: appState.chatViewModel,
+                            onClose: {
+                                appState.showFloatingChat = false
+                            }
+                        )
+                        .padding(.bottom, 16)
+                    }
+                }
+        }
+        .inspector(isPresented: $showToolsPanel) {
+            ToolsPanel(
+                appState: appState,
+                chatViewModel: appState.chatViewModel,
+                selectedPageId: appState.selectedPageId,
+                onProjectCreated: { projectId in
+                    appState.selectedProjectId = projectId
+                    appState.currentMode = .design
+                },
+                onOpenFloatingChat: {
+                    appState.showFloatingChat = true
+                }
+            )
+            .inspectorColumnWidth(min: 280, ideal: 300, max: 340)
+        }
+        .toolbar {
+            toolbarContent
+        }
+    }
+
+    // MARK: - Toolbar (Liquid Glass)
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        // Center: Mode selector
+        ToolbarItem(placement: .principal) {
+            ModeSelector(selectedMode: $appState.currentMode)
+        }
+
+        // Preview controls (design mode with project)
+        ToolbarItemGroup(placement: .primaryAction) {
+            if showPreviewControls {
+                if !appState.pageVersions.isEmpty {
+                    VersionDots(
+                        versions: appState.pageVersions,
+                        currentVersion: appState.currentVersionNumber,
+                        onSelect: { version in
+                            if let project = appState.currentProject,
+                               let pageId = appState.selectedPageId {
+                                designViewModel.restoreVersion(project: project, pageId: pageId, version: version)
+                            }
+                        }
+                    )
+
+                    Text("v\(appState.currentVersionNumber)")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary.opacity(0.5))
+                }
+
+                devicePicker
+
+                Button {
+                    openPreviewInBrowser()
+                } label: {
+                    Image(systemName: "safari")
+                }
+                .help("Open in Browser")
+            }
+        }
+
+        // Activity + logs
+        ToolbarItemGroup(placement: .automatic) {
+            if boss.phase != .idle {
+                ActivityPill(boss: boss)
+            }
+
+            LogsButton(boss: boss, iconSize: 14)
+        }
+
+        // Account + appearance
+        ToolbarItemGroup(placement: .secondaryAction) {
+            if appState.isConnected {
+                Button {
+                    appState.logout()
+                    appState.clearCurrentProject()
+                } label: {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                }
+                .help("Log out")
+            }
+
+            Button {
+                cycleAppearance()
+            } label: {
+                Image(systemName: appearanceIcon)
+            }
+            .help(appState.appearanceMode.displayName)
+        }
+    }
+
+    // MARK: - Device Picker
+
+    private var devicePicker: some View {
+        GlassEffectContainer {
+            HStack(spacing: 2) {
+                deviceButton(.desktop, icon: "desktopcomputer")
+                deviceButton(.tablet, icon: "ipad")
+                deviceButton(.mobile, icon: "iphone")
+            }
+        }
+    }
+
+    private func deviceButton(_ device: PreviewDevice, icon: String) -> some View {
+        Button {
+            appState.selectedDevice = device
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+        }
+        .buttonStyle(appState.selectedDevice == device ? .glassProminent : .glass)
+    }
+
     // MARK: - Mode Content
 
     @ViewBuilder
@@ -164,7 +202,7 @@ struct AppRouter: View {
             DesignView(
                 appState: appState,
                 viewModel: designViewModel,
-                sidebarVisible: appState.showSidebar,
+                sidebarVisible: columnVisibility != .detailOnly,
                 toolsPanelVisible: showToolsPanel,
                 selectedPageId: appState.selectedPageId,
                 showResearchJSON: appState.showResearchJSON,
@@ -176,6 +214,26 @@ struct AppRouter: View {
             )
         case .code:
             CodeModeView(appState: appState, selectedPageId: $appState.selectedPageId)
+        }
+    }
+
+    // MARK: - Appearance
+
+    private var appearanceIcon: String {
+        switch appState.appearanceMode {
+        case .system: return "circle.lefthalf.filled"
+        case .light: return "sun.max"
+        case .dark: return "moon"
+        }
+    }
+
+    private func cycleAppearance() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            switch appState.appearanceMode {
+            case .system: appState.appearanceMode = .light
+            case .light: appState.appearanceMode = .dark
+            case .dark: appState.appearanceMode = .system
+            }
         }
     }
 
@@ -217,7 +275,6 @@ struct AppRouter: View {
             }
         }
     }
-
 }
 
 #Preview {

@@ -16,7 +16,7 @@ struct CommandBar: View {
 
             if !text.isEmpty {
                 Button(action: onSubmit) {
-                    Image(systemName: "arrow.up.circle.fill")
+                    Image(systemName: "arrow.up.circle")
                         .font(.title2)
                         .foregroundColor(.blue)
                 }
@@ -25,10 +25,7 @@ struct CommandBar: View {
         }
         .padding(.horizontal, 20)
         .frame(width: 500, height: 50)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-        .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
+        .glassEffect(.regular, in: .capsule)
     }
 }
 

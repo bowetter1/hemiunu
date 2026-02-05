@@ -51,7 +51,7 @@ struct FloatingChatWindow: View {
                             .scaleEffect(0.7)
                     } else {
                         Button(action: sendMessage) {
-                            Image(systemName: "arrow.up.circle.fill")
+                            Image(systemName: "arrow.up.circle")
                                 .font(.system(size: 22))
                                 .foregroundColor(inputText.isEmpty ? .secondary.opacity(0.5) : .orange)
                         }
@@ -71,13 +71,7 @@ struct FloatingChatWindow: View {
                 }
                 .buttonStyle(.plain)
             }
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 22))
-            .overlay(
-                RoundedRectangle(cornerRadius: 22)
-                    .stroke(isDragging ? Color.orange : Color.secondary.opacity(0.2), lineWidth: isDragging ? 2 : 1)
-            )
-            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22))
             .frame(maxWidth: 600)
             .position(
                 x: (hasInitialPosition ? position.x : initialPosition.x) + dragOffset.width,

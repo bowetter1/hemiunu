@@ -22,12 +22,10 @@ struct ApexApp: App {
         WindowGroup {
             AppRouter()
                 .preferredColorScheme(appState.appearanceMode.colorScheme)
-                .background(WindowAccessor())
                 .onAppear {
                     NotificationService.shared.requestPermission()
                 }
         }
-        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .appSettings) {
                 Picker("Appearance", selection: $appState.appearanceMode) {
@@ -100,29 +98,3 @@ enum BossPIDFile {
     }
 }
 
-// MARK: - Window Configuration
-
-/// Helper to configure NSWindow for full-size content with traffic lights
-struct WindowAccessor: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            if let window = view.window {
-                // Enable full-size content view
-                window.styleMask.insert(.fullSizeContentView)
-
-                // Make title bar transparent
-                window.titlebarAppearsTransparent = true
-                window.titleVisibility = .hidden
-
-                // Keep traffic lights visible
-                window.standardWindowButton(.closeButton)?.isHidden = false
-                window.standardWindowButton(.miniaturizeButton)?.isHidden = false
-                window.standardWindowButton(.zoomButton)?.isHidden = false
-            }
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-}
