@@ -172,7 +172,6 @@ extension LocalWorkspaceService {
 
         return files.compactMap { file in
             guard !file.isDirectory, file.path.hasSuffix(".html") else { return nil }
-            if !file.path.contains("/"), file.path != "index.html" { return nil }
             guard let html = try? String(contentsOf: base.appendingPathComponent(file.path), encoding: .utf8) else { return nil }
             return Page.local(
                 id: "local-page-\(project)/\(file.path)",

@@ -3,9 +3,10 @@ import Foundation
 extension LocalWorkspaceService {
     // MARK: - Shell Execution
 
-    /// Run a shell command and return result
-    func exec(
-        _ command: String,
+    /// Run a command with explicit arguments (safe from shell injection)
+    func run(
+        _ executable: String,
+        arguments: [String] = [],
         cwd: URL? = nil,
         timeout: TimeInterval = 120,
         env: [String: String]? = nil
@@ -15,8 +16,8 @@ extension LocalWorkspaceService {
                 let process = Process()
                 let pipe = Pipe()
 
-                process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-                process.arguments = ["-l", "-c", command]
+                process.executableURL = URL(fileURLWithPath: executable)
+                process.arguments = arguments
                 process.standardOutput = pipe
                 process.standardError = pipe
 
@@ -73,4 +74,25 @@ extension LocalWorkspaceService {
         lastOutput = result.output
         return result
     }
+
+    /// Convenience: find an executable in common paths
+    static func which(_ name: String) -> String {
+        let candidates = [
+            "/usr/bin/\(name)",
+            "/usr/local/bin/\(name)",
+            "/opt/homebrew/bin/\(name)",
+        ]
+        for path in candidates {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return "/usr/bin/env"
+    }
+
+    /// Path to git executable
+    static let gitPath: String = which("git")
+
+    /// Path to python3 executable
+    static let python3Path: String = which("python3")
 }

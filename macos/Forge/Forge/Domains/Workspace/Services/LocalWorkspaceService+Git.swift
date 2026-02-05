@@ -3,32 +3,55 @@ import Foundation
 extension LocalWorkspaceService {
     // MARK: - Git Operations
 
+    /// Initialize a git repository
+    func gitInit(project: String) async throws -> ShellResult {
+        try await run(
+            Self.gitPath,
+            arguments: ["init"],
+            cwd: projectPath(project)
+        )
+    }
+
     /// Clone a GitHub repo into ~/Forge/projects/<name>/
     func cloneRepo(url: String, name: String, branch: String = "main") async throws -> ShellResult {
         let dest = projectPath(name)
         if FileManager.default.fileExists(atPath: dest.path) {
             try FileManager.default.removeItem(at: dest)
         }
-        return try await exec("git clone --branch \(branch) --single-branch \(url) \(dest.path)")
+        return try await run(
+            Self.gitPath,
+            arguments: ["clone", "--branch", branch, "--single-branch", url, dest.path]
+        )
     }
 
     /// Git status for a project
     func gitStatus(project: String) async throws -> ShellResult {
-        try await exec("git status", cwd: projectPath(project))
+        try await run(
+            Self.gitPath,
+            arguments: ["status"],
+            cwd: projectPath(project)
+        )
     }
 
     /// Git commit all changes
     func gitCommit(project: String, message: String) async throws -> ShellResult {
         let dir = projectPath(project)
-        _ = try await exec("git add -A", cwd: dir)
-        let escaped = message.replacingOccurrences(of: "'", with: "'\\''")
-        return try await exec("git commit -m '\(escaped)' --allow-empty-message", cwd: dir)
+        _ = try await run(Self.gitPath, arguments: ["add", "-A"], cwd: dir)
+        return try await run(
+            Self.gitPath,
+            arguments: ["commit", "-m", message, "--allow-empty-message"],
+            cwd: dir
+        )
     }
 
     /// Git log — returns commits as PageVersion objects (oldest first, version 1-based)
     func gitVersions(project: String) async throws -> [PageVersion] {
         let dir = projectPath(project)
-        let result = try await exec("git log --format=%H||%s||%aI --reverse", cwd: dir)
+        let result = try await run(
+            Self.gitPath,
+            arguments: ["log", "--format=%H||%s||%aI", "--reverse"],
+            cwd: dir
+        )
         guard result.succeeded else { return [] }
 
         return result.output
@@ -50,6 +73,10 @@ extension LocalWorkspaceService {
     /// Restore workspace files to a specific git commit
     func gitRestore(project: String, commitHash: String) async throws {
         let dir = projectPath(project)
-        _ = try await exec("git checkout \(commitHash) -- .", cwd: dir)
+        _ = try await run(
+            Self.gitPath,
+            arguments: ["checkout", commitHash, "--", "."],
+            cwd: dir
+        )
     }
 }

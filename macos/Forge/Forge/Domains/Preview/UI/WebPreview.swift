@@ -95,7 +95,10 @@ struct HTMLWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
-        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        // Only allow file access when loading local project files (not inline HTML)
+        if localFileURL != nil {
+            config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        }
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         return webView
