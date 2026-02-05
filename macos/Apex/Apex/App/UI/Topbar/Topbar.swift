@@ -8,7 +8,7 @@ struct Topbar: View {
     let isConnected: Bool
     let errorMessage: String?
     let hasProject: Bool
-    let logs: [LogEntry]
+    let boss: BossCoordinator
     var onNewProject: (() -> Void)? = nil
     var onLogout: (() -> Void)? = nil
     var showModeSelector: Bool = true
@@ -81,13 +81,13 @@ struct Topbar: View {
             }
 
             // Activity indicator
-            if hasProject && !logs.isEmpty {
-                ActivityPill(logs: logs)
+            if boss.phase != .idle {
+                ActivityPill(boss: boss)
                     .frame(height: itemHeight)
             }
 
             // Logs button
-            LogsButton(logs: logs, iconSize: iconSize, hasProject: hasProject)
+            LogsButton(boss: boss, iconSize: iconSize)
 
             // Divider
             Capsule()

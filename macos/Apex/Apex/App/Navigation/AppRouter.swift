@@ -33,7 +33,7 @@ struct AppRouter: View {
                         isConnected: appState.isConnected,
                         errorMessage: appState.errorMessage,
                         hasProject: appState.currentProject != nil,
-                        logs: appState.projectLogs,
+                        boss: appState.chatViewModel.boss,
                         onNewProject: {
                             appState.clearCurrentProject()
                             appState.currentMode = .design

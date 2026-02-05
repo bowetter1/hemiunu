@@ -65,22 +65,19 @@ struct ModeSelector: View {
 // MARK: - Activity Pill
 
 struct ActivityPill: View {
-    let logs: [LogEntry]
+    let boss: BossCoordinator
 
     var body: some View {
         HStack(spacing: 6) {
-            // Pulsing dot
+            // Dot — pulses only while processing
             Circle()
                 .fill(phaseColor)
                 .frame(width: 6, height: 6)
-                .modifier(PulseModifier())
+                .modifier(PulseModifier(active: boss.isProcessing))
 
-            // Latest message
-            if let latest = logs.last {
-                Text(truncate(latest.message, to: 20))
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
+            Text(statusText)
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -89,40 +86,61 @@ struct ActivityPill: View {
     }
 
     private var phaseColor: Color {
-        guard let phase = logs.last?.phase else { return .secondary }
-        switch phase {
-        case "brief": return .blue
-        case "moodboard": return .purple
-        case "layouts": return .orange
-        case "editing": return .green
-        default: return .secondary
+        switch boss.phase {
+        case .idle: return .secondary
+        case .researching: return .blue
+        case .building: return boss.isProcessing ? .orange : .green
         }
     }
 
-    private func truncate(_ text: String, to length: Int) -> String {
-        text.count > length ? String(text.prefix(length - 1)) + "\u{2026}" : text
+    private var statusText: String {
+        switch boss.phase {
+        case .idle:
+            return "Idle"
+        case .researching:
+            return "Researching\u{2026}"
+        case .building:
+            if boss.isProcessing {
+                let active = boss.bosses.filter { $0.service.isProcessing }
+                if active.count == 1, let a = active.first {
+                    return "\(a.displayName) building\u{2026}"
+                }
+                return "Building (\(active.count))\u{2026}"
+            }
+            return "Done"
+        }
     }
 }
 
 struct PulseModifier: ViewModifier {
+    var active: Bool = true
     @State private var isPulsing = false
 
     func body(content: Content) -> some View {
         content
             .scaleEffect(isPulsing ? 1.4 : 1.0)
             .opacity(isPulsing ? 0.7 : 1.0)
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear { isPulsing = true }
+            .animation(
+                isPulsing
+                    ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
+                    : .default,
+                value: isPulsing
+            )
+            .onAppear { isPulsing = active }
+            .onChange(of: active) { _, new in isPulsing = new }
     }
 }
 
 // MARK: - Logs Button
 
 struct LogsButton: View {
-    let logs: [LogEntry]
+    let boss: BossCoordinator
     let iconSize: CGFloat
-    let hasProject: Bool
     @State private var isExpanded = false
+
+    private var agentCount: Int {
+        (boss.researchBoss != nil ? 1 : 0) + boss.bosses.count
+    }
 
     var body: some View {
         Button {
@@ -131,8 +149,8 @@ struct LogsButton: View {
             HStack(spacing: 3) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: iconSize, weight: .medium))
-                if hasProject && !logs.isEmpty {
-                    Text("\(logs.count)")
+                if boss.phase != .idle {
+                    Text("\(agentCount)")
                         .font(.system(size: 9, weight: .semibold))
                         .monospacedDigit()
                 }
@@ -144,7 +162,7 @@ struct LogsButton: View {
         }
         .buttonStyle(.plain)
         .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
-            LogsPopover(logs: logs)
+            LogsPopover(boss: boss)
         }
     }
 }
@@ -152,7 +170,7 @@ struct LogsButton: View {
 // MARK: - Logs Popover
 
 struct LogsPopover: View {
-    let logs: [LogEntry]
+    let boss: BossCoordinator
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -164,7 +182,7 @@ struct LogsPopover: View {
 
             Divider()
 
-            if logs.isEmpty {
+            if boss.phase == .idle {
                 Text("No activity yet")
                     .font(.system(size: 11))
                     .foregroundColor(Color(nsColor: .tertiaryLabelColor))
@@ -173,8 +191,11 @@ struct LogsPopover: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(logs) { log in
-                            LogRow(log: log)
+                        if let research = boss.researchBoss {
+                            BossRow(instance: research, label: "Research")
+                        }
+                        ForEach(boss.bosses) { instance in
+                            BossRow(instance: instance, label: instance.displayName)
                         }
                     }
                     .padding(8)
@@ -185,34 +206,32 @@ struct LogsPopover: View {
     }
 }
 
-struct LogRow: View {
-    let log: LogEntry
+struct BossRow: View {
+    let instance: BossInstance
+    let label: String
 
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(phaseColor)
+                .fill(instance.service.isProcessing ? .orange : .green)
                 .frame(width: 5, height: 5)
 
-            Text(log.message)
-                .font(.system(size: 10))
+            Image(systemName: instance.agent.icon)
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.primary)
-                .lineLimit(1)
 
             Spacer()
+
+            Text(instance.service.isProcessing ? "Running" : "Done")
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 4)
-    }
-
-    private var phaseColor: Color {
-        switch log.phase {
-        case "brief": return .blue
-        case "moodboard": return .purple
-        case "layouts": return .orange
-        case "editing": return .green
-        default: return .secondary
-        }
     }
 }
 
