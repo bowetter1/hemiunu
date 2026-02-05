@@ -191,15 +191,23 @@ Both `ClaudeService` and `GroqService` are `@unchecked Sendable`. They are state
 - **Unused code** — 6 dead types/aliases removed
 - **WebView sandboxing** — conditional file access
 
-### Remaining Actionable Items
+### Also Resolved (v2 → v2.1)
 
-1. **Fix scroll desync** in CodeEditorView (line numbers vs. code)
-2. **Fix ToolsPanel drag** — track start height, not accumulate translation
-3. **Fix pipe read ordering** in shell execution (read before wait)
-4. **Wire up** no-op buttons (CodeModeView refresh, tab close, collapsed tool buttons)
-5. **Consolidate** file icon/color mappings into one utility
-6. **Surface errors** to users in release builds (not just `#if DEBUG`)
+- **Scroll desync** — CodeEditorView now uses a single unified ScrollView for line numbers and code
+- **Drag gesture accumulation** — ToolsPanel tracks `dragStartHeight` on gesture start
+- **Pipe read ordering** — `readDataToEndOfFile()` now called before `waitUntilExit()`
+- **No-op buttons** — tab close, preview refresh, and collapsed tool buttons now functional
+- **Duplicate icon/color mappings** — consolidated into `FileTypeAppearance` shared utility
+- **Silent errors** — `#if DEBUG` print-only errors replaced with `appState.errorMessage`
+
+### Remaining (informational only)
+
+- 3a: Dual observation patterns (`@Observable` + `ObservableObject`)
+- 3b: AppState god object — consider splitting as app grows
+- 3d: `@unchecked Sendable` on AI services — acceptable (stateless)
+- 3e: BrowserChrome.swift empty — delete file from Xcode project
+- 3f: NotificationService `notify()` never called — use or remove permission request
 
 ### Verdict
 
-The codebase is in good shape as a foundation. All critical and high-severity issues from v1 have been resolved. The remaining findings are quality-of-life improvements — nothing blocks continued development. The architecture is clean, the domain boundaries are clear, and the code is consistently formatted and well-organized.
+All actionable items have been resolved. The codebase has zero critical, high, or medium-severity findings. What remains is purely informational — architectural notes for future scale. The app is ready for continued development on a solid, clean foundation.
