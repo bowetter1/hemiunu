@@ -5,9 +5,7 @@ import SwiftUI
 /// Right-side tools panel for actions, settings, and chat
 struct ToolsPanel: View {
     @ObservedObject var appState: AppState
-    @ObservedObject var webSocket: WebSocketManager
     var chatViewModel: ChatViewModel
-    private var client: APIClient { appState.client }
     let selectedPageId: String?  // Currently selected page (used as parent for generate site)
     @Binding var isExpanded: Bool
     let onProjectCreated: (String) -> Void
@@ -128,12 +126,7 @@ struct ToolsPanel: View {
                 // Chat section (takes remaining space)
                 ChatTabContent(
                     appState: appState,
-                    webSocket: webSocket,
-                    chatViewModel: chatViewModel,
-                    selectedPageId: selectedPageId,
-                    onProjectCreated: { projectId in
-                        onProjectCreated(projectId)
-                    }
+                    chatViewModel: chatViewModel
                 )
             }
         }

@@ -304,7 +304,7 @@ struct BuildSiteSheet: View {
         Include consistent navigation across all pages linking them together.\(anchorNote)
         """
 
-        chatViewModel.sendMessage(message, selectedPageId: nil, onProjectCreated: nil)
+        chatViewModel.sendMessage(message)
         isPresented = false
     }
 }

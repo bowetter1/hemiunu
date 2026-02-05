@@ -97,7 +97,6 @@ struct AppRouter: View {
                         // Right tools panel
                         ToolsPanel(
                             appState: appState,
-                            webSocket: appState.wsClient,
                             chatViewModel: appState.chatViewModel,
                             selectedPageId: appState.selectedPageId,
                             isExpanded: $showToolsPanel,
@@ -128,13 +127,7 @@ struct AppRouter: View {
                 if appState.showFloatingChat {
                     FloatingChatWindow(
                         appState: appState,
-                        webSocket: appState.wsClient,
                         chatViewModel: appState.chatViewModel,
-                        selectedPageId: appState.selectedPageId,
-                        onProjectCreated: { projectId in
-                            appState.selectedProjectId = projectId
-                            appState.currentMode = .design
-                        },
                         onClose: {
                             appState.showFloatingChat = false
                         }

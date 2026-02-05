@@ -4,12 +4,7 @@ import SwiftUI
 
 struct FloatingChatWindow: View {
     @ObservedObject var appState: AppState
-    @ObservedObject var webSocket: WebSocketManager
     var chatViewModel: ChatViewModel
-
-    private var client: APIClient { appState.client }
-    var selectedPageId: String?
-    var onProjectCreated: ((String) -> Void)?
     let onClose: () -> Void
 
     @State private var inputText = ""
@@ -112,6 +107,6 @@ struct FloatingChatWindow: View {
         guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         let text = inputText
         inputText = ""
-        chatViewModel.sendMessage(text, selectedPageId: selectedPageId, onProjectCreated: onProjectCreated)
+        chatViewModel.sendMessage(text)
     }
 }
