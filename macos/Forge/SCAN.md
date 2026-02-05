@@ -1,211 +1,174 @@
-# Forge App — Code Scan Report
+# Forge App — Code Scan Report (v2)
 
 **Date:** 2026-02-05
 **Scope:** All 57 Swift files in `macos/Forge/`
 **App:** Forge — AI-powered web design tool (macOS native, SwiftUI)
+**Previous scan:** v1 (same date) — identified 16 findings across security, bugs, architecture, and UI/UX
+
+---
+
+## Changes Since Last Scan
+
+The following issues from v1 have been **resolved**:
+
+| # | Finding | Status |
+|---|---------|--------|
+| 1a | Command injection in shell execution | **Fixed** — `exec()` replaced with `run()` using Process argument arrays |
+| 1b | WebView file access unconditional | **Fixed** — `allowFileAccessFromFileURLs` only when `localFileURL != nil` |
+| 2a | PulsingDots timer leak | **Fixed** — timer stored in `@State`, invalidated in `onDisappear` |
+| 2c | ChatViewModel message index safety | **Fixed** — uses `assistantId` (UUID) with `firstIndex(where:)` |
+| 2d | Silent JSON serialization failure | **Fixed** — `buildRequestBody` now `throws` in both ClaudeService and GroqService |
+| 2e | InfiniteGrid performance risk | **Fixed** — removed entirely |
+| 3d | Unused code (6 items) | **Fixed** — removed ToolCard, BrowserChrome (emptied), InfiniteGrid, ProjectFile (kept FileTreeNode), ToolbarButton alias |
+| 4b | Build Site only saves to index.html | **Fixed** — `extractAllHTML()` handles multiple files with filename detection |
+| 4a | loadPages excludes non-root HTML | **Fixed** — all `.html` files now loaded |
+| — | Glass-on-glass rendering (UI) | **Fixed** — removed nested `.glassEffect(.regular)`, use `glassFill` backgrounds |
+| — | WindowAccessor conflict with glass | **Fixed** — removed WindowAccessor, use `.windowStyle(.plain)` |
 
 ---
 
 ## Architecture Overview
 
-Forge is a well-structured macOS app using domain-driven design:
-
 ```
 Forge/
-├── App/          — Entry point, AppState (singleton), AppRouter, Topbar
+├── App/          — ForgeApp entry, AppState (singleton), AppRouter, Topbar
 ├── Domains/
-│   ├── AI/       — AIService protocol, Claude + Groq streaming, SSE parsing
-│   ├── Auth/     — Google OAuth → Firebase
-│   ├── Chat/     — ChatViewModel, message bubbles, floating chat
-│   ├── Design/   — DesignView, BriefBuilder, version management
-│   ├── Editor/   — CodeEditor, FileTree, CodeViewModel
-│   ├── Preview/  — WKWebView-based HTML preview
-│   ├── Projects/ — Project/Page domain models, formatters
-│   ├── Tools/    — Right panel (settings, new project, build site)
-│   └── Workspace/— Local file/git/shell operations, sidebar
+│   ├── AI/       — AIService protocol, Claude + Groq streaming, SSE parsing, Keychain
+│   ├── Auth/     — Google OAuth → Firebase via ASWebAuthenticationSession
+│   ├── Chat/     — ChatViewModel, message bubbles, floating chat, ChatTabContent
+│   ├── Design/   — DesignView, BriefBuilder, DesignViewModel, StartProjectSheet
+│   ├── Editor/   — CodeModeView, CodeEditorView, FileTreeView, CodeViewModel
+│   ├── Preview/  — WKWebView HTML preview, VersionDots
+│   ├── Projects/ — Project/Page domain models, formatters, filters
+│   ├── Tools/    — ToolsPanel, NewProject/BuildSite/Settings cards
+│   └── Workspace/— LocalWorkspaceService (files, git, shell, preview), sidebar views
 └── Shared/       — HTTPClient, Theme, CommandBar
 ```
 
-**Total lines:** ~3,600 across 57 files. Clean, focused codebase.
+**Total:** ~3,500 lines across 57 files. Clean, focused codebase.
 
 ---
 
-## Findings
+## Current Findings
 
 ### 1. SECURITY
 
-#### 1a. Command Injection in Shell Execution (HIGH)
+#### 1a. API Keys in Memory (LOW)
 
-`LocalWorkspaceService+Shell.swift:19` passes user-influenced strings directly to `/bin/zsh -l -c`:
+API keys are loaded from Keychain and held in plain strings during API calls (`ClaudeService.swift:12`, `GroqService.swift:12`). Standard practice — keys exist in process memory during streaming calls. No action needed.
 
-```swift
-process.arguments = ["-l", "-c", command]
-```
+#### 1b. `which()` Fallback to `/usr/bin/env` (LOW)
 
-Callers construct commands via string interpolation:
+`LocalWorkspaceService+Shell.swift:90` — if git/python3 isn't found in the three hardcoded paths, `which()` falls back to `/usr/bin/env`. When used with `run()`, this would attempt to execute `/usr/bin/env` with git arguments, which would silently fail or produce confusing errors rather than a clear "git not found" message.
 
-- `LocalWorkspaceService+Git.swift:12` — `cloneRepo` interpolates `url`, `name`, `branch`:
-  ```swift
-  "git clone --branch \(branch) --single-branch \(url) \(dest.path)"
-  ```
-- `LocalWorkspaceService+Git.swift:25` — `gitCommit` escapes single quotes but the escaping is insufficient for all injection vectors:
-  ```swift
-  let escaped = message.replacingOccurrences(of: "'", with: "'\\''")
-  "git commit -m '\(escaped)' --allow-empty-message"
-  ```
-- `LocalWorkspaceService+Git.swift:53` — `gitRestore` interpolates `commitHash`:
-  ```swift
-  "git checkout \(commitHash) -- ."
-  ```
+**Impact:** Low — git/python3 are virtually always at one of the three checked paths on macOS.
 
-If any of these values come from untrusted input (e.g., user-provided project names, AI-generated content), shell metacharacters could be injected.
+#### 1c. AI-Generated HTML Rendered Without Sandboxing (LOW)
 
-**Recommendation:** Use `Process` with explicit argument arrays instead of shell string interpolation, or rigorously validate/sanitize all interpolated values.
+`WebPreview.swift` renders AI-generated HTML in a WKWebView with `.nonPersistent()` data store. When rendering inline HTML (no `localFileURL`), file access is correctly disabled. However, there's no Content Security Policy or JavaScript restriction — AI-generated code could make network requests (fetch, XMLHttpRequest) or load external resources.
 
-#### 1b. WebView File Access (MEDIUM)
-
-`WebPreview.swift:98` enables file access from file URLs:
-
-```swift
-config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-```
-
-This allows JavaScript in loaded HTML files to read other local files. Since Forge renders AI-generated HTML, a malicious AI response could include JavaScript that reads local files.
-
-**Recommendation:** Consider sandboxing the WKWebView more tightly, or using `WKContentRuleList` to restrict file:// access patterns.
-
-#### 1c. API Keys in Memory (LOW)
-
-API keys are loaded from Keychain and held in plain strings during API calls (`ClaudeService.swift:12`, `GroqService.swift:12`). This is standard practice but worth noting — keys exist in process memory during the entire streaming call.
+**Impact:** Low — the AI generates code the user explicitly requested, and WebKit's process isolation provides baseline security.
 
 ---
 
 ### 2. BUGS & CORRECTNESS
 
-#### 2a. PulsingDots Timer Leak
+#### 2a. CodeEditorView Line Number / Editor Scroll Desync (MEDIUM)
 
-`ChatTabContent.swift:184` creates a `Timer.scheduledTimer` in `onAppear` but never invalidates it:
+`CodeEditorView.swift:82-104` — The line number gutter and the code editor are in separate `ScrollView` containers. They won't scroll in sync — the user can scroll the code while line numbers stay still, and vice versa.
 
-```swift
-.onAppear {
-    Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
-        withAnimation(.easeInOut(duration: 0.3)) {
-            active = (active + 1) % 3
-        }
-    }
-}
-```
+**Fix:** Unify into a single scroll container, or use `ScrollView` coordinate tracking to sync scroll positions.
 
-Every time the view appears, a new timer is created. If the view is removed and re-added, timers accumulate.
+#### 2b. `readDataToEndOfFile()` After `waitUntilExit()` Ordering (LOW)
 
-**Fix:** Store the timer reference and invalidate it in `onDisappear`, or use a SwiftUI `TimelineView` instead.
+`LocalWorkspaceService+Shell.swift:62-66` — The code calls `process.waitUntilExit()` before `pipe.fileHandleForReading.readDataToEndOfFile()`. For commands with large output, the pipe buffer can fill up, causing `waitUntilExit()` to block indefinitely (deadlock). The correct order is to read data first, then wait.
 
-#### 2b. Line Number / Editor Scroll Desync
+**Impact:** Low — most git/shell commands produce small output, but edge cases (large diffs, large `git log`) could hang.
 
-`CodeEditorView.swift:83-104` — The line number gutter and the code editor are in separate `ScrollView` containers. They won't scroll in sync — the user can scroll the code while line numbers stay still, and vice versa.
+#### 2c. CollapsedToolButton Does Nothing (LOW)
 
-**Fix:** Unify into a single scroll container, or use scroll position coordination.
+`ToolCard.swift:8` — `CollapsedToolButton`'s action is always `{}` (empty closure). When the tools panel is collapsed, the Build Site, Settings, and Chat buttons are decorative only — they don't expand the panel or trigger actions.
 
-#### 2c. ChatViewModel Message Index Safety
+**Impact:** Low — users can click the expand button at the top. But the buttons misleadingly look interactive.
 
-`ChatViewModel.swift:62` mutates `messages[assistantIndex]` during streaming, but `assistantIndex` is computed once at creation time. If messages are modified from another path (e.g., `resetForProject` called concurrently), the index could become stale or out of bounds.
+#### 2d. `DragGesture` Accumulates in ToolsPanel Divider (LOW)
 
-**Mitigation:** The `@MainActor` annotation helps, but a concurrent `resetForProject()` call (from `onChange` on project switch) during active streaming could still cause issues.
+`ToolsPanel.swift:83-89` — The drag gesture uses `value.translation.height` which is cumulative during a single drag. But `toolsHeight` is being set to `toolsHeight + translation`, meaning each `.onChanged` event adds the total translation so far (not the delta), causing the divider to jump unpredictably.
 
-#### 2d. Silent JSON Serialization Failure
+**Fix:** Track the starting height when drag begins and use `startHeight + translation.height`.
 
-Both `ClaudeService.swift:57` and `GroqService.swift:59`:
+#### 2e. Error Logging Only in DEBUG (INFO)
 
-```swift
-return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
-```
+Multiple files log errors only under `#if DEBUG`:
+- `ChatViewModel.swift:137-139` — failed HTML save
+- `ChatViewModel.swift:170-172` — failed project creation
+- `StartProjectSheet.swift:145-147` — failed project creation
 
-If serialization fails, an empty `Data()` is sent as the request body, which will produce a confusing API error rather than a clear failure.
-
-#### 2e. `InfiniteGrid` Performance
-
-`GridBackground.swift:9-18` — `InfiniteGrid` creates a 10,000×10,000 point canvas. Though it appears unused (only `GridBackground` is referenced), this would be very expensive if instantiated.
+In release builds, these errors are silently swallowed. Users get no feedback when saves fail.
 
 ---
 
 ### 3. ARCHITECTURE & CODE QUALITY
 
-#### 3a. Dual Observation Patterns
+#### 3a. Dual Observation Patterns (INFO)
 
-The codebase mixes `ObservableObject` / `@Published` / `@ObservedObject` (old pattern) with `@Observable` / `@MainActor` (new pattern):
+The codebase mixes two observation patterns:
+- **ObservableObject + @Published:** `AppState`, `CodeViewModel`, `DesignViewModel`
+- **@Observable (Swift Observation):** `ChatViewModel`, `LocalWorkspaceService`
 
-- `AppState` → `ObservableObject` + `@Published`
-- `ChatViewModel` → `@Observable` (Swift Observation)
-- `CodeViewModel` → `ObservableObject` + `@Published`
-- `DesignViewModel` → `ObservableObject` + `@Published`
-- `LocalWorkspaceService` → `@Observable`
+This works but creates inconsistency. `ChatViewModel` uses `@Observable` but is held as `var chatViewModel` in `AppState` (an `ObservableObject`). In most cases SwiftUI handles this correctly, but some edge cases may miss updates.
 
-This works but creates inconsistency. `ChatViewModel` uses `@Observable` but is consumed via `var chatViewModel` (not `@State` or `@Bindable`), which may cause update issues in some SwiftUI contexts.
+#### 3b. AppState God Object (INFO)
 
-#### 3b. AppState God Object
+`AppState` (~237 lines) holds nearly all app state: navigation, auth, projects, pages, files, AI provider, preview URLs, services, and view models. Manageable at current scale (~3,500 LOC) but will become a bottleneck as the app grows. Consider extracting domain-specific state objects (e.g., `PreviewState`, `ProjectState`).
 
-`AppState` (~237 lines) holds nearly all app state: navigation, auth, projects, pages, files, AI provider selection, preview URLs, services, and view models. This works at current scale but will become a bottleneck as the app grows.
+#### 3c. Duplicate Icon/Color Mappings (INFO)
 
-#### 3c. Duplicate Icon/Color Mappings
+File type → icon and file type → color mappings are duplicated across:
+- `ProjectFile.swift` (FileTreeNode.icon) — extension → SF Symbol
+- `CodeEditorView.swift` (iconForFile, colorForFile) — extension → SF Symbol + Color
+- `FileTreeView.swift` (iconColor) — extension → Color
+- `CodeFileRow.swift` (icon, iconColor) — extension → SF Symbol + Color
 
-File type → icon and file type → color mappings are duplicated in:
-- `ProjectFile.swift` (FileTreeNode.icon)
-- `CodeEditorView.swift` (iconForFile, colorForFile)
-- `FileTreeView.swift` (iconColor)
-- `CodeFileRow.swift` (icon, iconColor)
+These four locations define the same mappings with slight variations. One shared utility would reduce drift.
 
-These could be consolidated into one utility.
+#### 3d. `@unchecked Sendable` on AI Services (INFO)
 
-#### 3d. Unused Code
+Both `ClaudeService` and `GroqService` are `@unchecked Sendable`. They are stateless (only `let` properties), so they are genuinely Sendable. The `@unchecked` annotation suppresses compiler verification, which is acceptable here.
 
-- `ToolCard` view (`ToolCard.swift`) — defined but never used; replaced by inline card views
-- `CollapsedToolButton` — has empty `action: {}`, buttons do nothing when collapsed
-- `BrowserChrome` — defined but never used (WebPreview renders directly)
-- `InfiniteGrid` — defined but only `GridBackground` is used
-- `ProjectFile` struct — defined but never used (CodeViewModel uses `FileTreeNode` directly)
-- `ToolbarButton` typealias (`TopbarComponents.swift:110`) — legacy alias, should be removed
+#### 3e. BrowserChrome.swift is Empty (INFO)
 
-#### 3e. `@unchecked Sendable` Usage
+`BrowserChrome.swift` contains only a comment. It should either be deleted from the project or the file reference should be removed from the Xcode project to avoid confusion.
 
-Both `ClaudeService` and `GroqService` are marked `@unchecked Sendable`. They are stateless (no mutable properties), so they are actually safely Sendable, but the `@unchecked` suppresses compiler verification.
+#### 3f. NotificationService `notify()` Never Called (INFO)
+
+`NotificationService.swift` requests notification permissions on app launch, but `notify()` is never called anywhere in the codebase. Either use it (e.g., notify when generation completes while app is in background) or remove the permission request.
 
 ---
 
 ### 4. UI/UX
 
-#### 4a. `loadPages` Excludes Non-Root HTML
+#### 4a. FloatingChatWindow Uses `.glassEffect(.regular)` (LOW)
 
-`LocalWorkspaceService+Preview.swift:175`:
+`FloatingChatWindow.swift:82` applies `.glassEffect(.regular)` directly. This is correct for a floating overlay element (it's independent, not nested inside `GlassEffectContainer`), but it's the only component still using `.glassEffect()` directly, which may look inconsistent with the `glassFill` approach used elsewhere.
 
-```swift
-if !file.path.contains("/"), file.path != "index.html" { return nil }
-```
+#### 4b. CodeModeView Preview Refresh Button Does Nothing (LOW)
 
-This filters out any HTML file at the root level that isn't `index.html`. Files like `about.html`, `contact.html` at root level won't appear in pages. This seems intentional for the "Build Site" flow but may confuse users who manually add HTML files.
+`CodeModeView.swift:130-134` — The preview section's refresh button has `action: {}` (empty closure). It looks clickable but does nothing.
 
-#### 4b. Build Site Only Saves to `index.html`
+#### 4c. Close Button in CodeEditorView Tab Does Nothing (LOW)
 
-`ChatViewModel.swift:116`:
-
-```swift
-try appState.workspace.writeFile(project: projectName, path: "index.html", content: html)
-```
-
-When the AI generates multiple pages (as requested by "Build Site"), only the first HTML block is extracted and saved as `index.html`. The multi-page generation from `BuildSiteSheet` sends a prompt requesting multiple files, but the response handling only captures the first `\`\`\`html` block.
-
-#### 4c. No Error Display for Failed Saves
-
-`ChatViewModel.swift:131-134` — File write errors are only logged in DEBUG builds, not shown to the user. Same for project creation errors at line 162.
+`CodeEditorView.swift:42-48` — The tab close button ("xmark") has `action: {}`. It appears to be a close tab control but doesn't close the file.
 
 ---
 
 ### 5. DEPENDENCIES
 
-- **Firebase** (Auth, Core) — used for Google Sign-In
+- **Firebase** (Auth, Core) — Google Sign-In
 - **WebKit** — WKWebView for HTML preview
-- **Security** — Keychain access for API keys
-- **UserNotifications** — macOS notifications (permission requested but `notify()` never called)
-- **AuthenticationServices** — ASWebAuthenticationSession for OAuth
+- **Security** — Keychain for API keys
+- **UserNotifications** — Permission requested but `notify()` never called
+- **AuthenticationServices** — `ASWebAuthenticationSession` for OAuth
 
 ---
 
@@ -213,15 +176,30 @@ When the AI generates multiple pages (as requested by "Build Site"), only the fi
 
 | Category | Count | Severity |
 |----------|-------|----------|
-| Security | 3 | 1 High, 1 Medium, 1 Low |
-| Bugs | 5 | 2 Medium, 3 Low |
-| Architecture | 5 | All informational |
-| UI/UX | 3 | All informational |
+| Security | 3 | All Low |
+| Bugs | 5 | 1 Medium, 4 Low/Info |
+| Architecture | 6 | All informational |
+| UI/UX | 3 | All Low |
 
-The codebase is clean, well-organized, and follows good SwiftUI patterns. The main actionable items are:
+### Resolved Since v1
 
-1. **Fix command injection** in shell execution (use Process argument arrays)
-2. **Fix PulsingDots timer leak**
-3. **Fix multi-page save** — handle multiple HTML files from AI responses
-4. **Consolidate** file icon/color mappings
-5. **Remove** unused types (ToolCard, BrowserChrome, InfiniteGrid, ProjectFile, ToolbarButton alias)
+- **Command injection** — fully resolved with Process argument arrays
+- **Timer leak** — fixed with proper lifecycle management
+- **Silent JSON failures** — both services now throw
+- **Multi-page save** — new `extractAllHTML()` with filename detection
+- **Glass-on-glass UI** — clean single-level glass with `glassFill` backgrounds
+- **Unused code** — 6 dead types/aliases removed
+- **WebView sandboxing** — conditional file access
+
+### Remaining Actionable Items
+
+1. **Fix scroll desync** in CodeEditorView (line numbers vs. code)
+2. **Fix ToolsPanel drag** — track start height, not accumulate translation
+3. **Fix pipe read ordering** in shell execution (read before wait)
+4. **Wire up** no-op buttons (CodeModeView refresh, tab close, collapsed tool buttons)
+5. **Consolidate** file icon/color mappings into one utility
+6. **Surface errors** to users in release builds (not just `#if DEBUG`)
+
+### Verdict
+
+The codebase is in good shape as a foundation. All critical and high-severity issues from v1 have been resolved. The remaining findings are quality-of-life improvements — nothing blocks continued development. The architecture is clean, the domain boundaries are clear, and the code is consistently formatted and well-organized.
