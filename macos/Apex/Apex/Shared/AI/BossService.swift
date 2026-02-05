@@ -22,6 +22,17 @@ class BossService {
     /// Tracks whether we're inside a fenced code block (```...```) to filter from chat
     var insideCodeFence = false
 
+    // MARK: - Activity State
+
+    /// The raw name of the tool currently being executed (nil when agent is thinking)
+    var currentToolName: String?
+    /// Live checklist progress parsed from checklist.md
+    var checklistProgress: ChecklistProgress?
+    /// Stats from the most recent completed turn
+    var lastTurnStats: TurnStats?
+    /// Timer that polls checklist.md for progress updates
+    var checklistPollTimer: Timer?
+
     /// File handle for writing raw agent output to workspace log
     var logHandle: FileHandle?
 
@@ -73,6 +84,9 @@ class BossService {
 
             chatPollTimer?.invalidate()
             chatPollTimer = nil
+
+            checklistPollTimer?.invalidate()
+            checklistPollTimer = nil
 
             try? logHandle?.close()
             logHandle = nil

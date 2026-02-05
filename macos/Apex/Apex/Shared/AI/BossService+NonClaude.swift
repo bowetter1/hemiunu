@@ -19,10 +19,13 @@ extension BossService {
         let keys = Self.readAPIKeys()
 
         isProcessing = true
+        lastTurnStats = nil
+        currentToolName = nil
         defer {
             isProcessing = false
             runningProcess = nil
             stopChatFilePolling()
+            stopChecklistPolling()
             try? logHandle?.close()
             logHandle = nil
         }
@@ -38,6 +41,7 @@ extension BossService {
         // Start polling chat.jsonl BEFORE the process runs
         if let cwd = workingDirectory {
             startChatFilePolling(workspace: cwd, onLine: onLine)
+            startChecklistPolling(workspace: cwd)
         }
 
         // On first message, prepend instructions from workspace MD files
@@ -116,8 +120,10 @@ extension BossService {
 
         // Stop non-Claude per-process
         stopChatFilePolling()
+        stopChecklistPolling()
         runningProcess?.terminate()
         runningProcess = nil
+        currentToolName = nil
         isProcessing = false
     }
 
@@ -127,7 +133,11 @@ extension BossService {
         messageCount = 0
         sessionId = nil
         insideCodeFence = false
+        currentToolName = nil
+        checklistProgress = nil
+        lastTurnStats = nil
         stopChatFilePolling()
+        stopChecklistPolling()
         // Close and release log handle
         try? logHandle?.close()
         logHandle = nil

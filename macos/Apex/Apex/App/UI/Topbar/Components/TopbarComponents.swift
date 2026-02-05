@@ -68,21 +68,80 @@ struct ActivityPill: View {
     let boss: BossCoordinator
 
     var body: some View {
-        HStack(spacing: 6) {
-            // Dot — pulses only while processing
-            Circle()
-                .fill(phaseColor)
-                .frame(width: 6, height: 6)
-                .modifier(PulseModifier(active: boss.isProcessing))
+        HStack(spacing: 0) {
+            // Left section: phase dot + status text + tool activity
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(phaseColor)
+                    .frame(width: 6, height: 6)
+                    .modifier(PulseModifier(active: boss.isProcessing))
 
-            Text(statusText)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(statusText)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+
+                    // Tool activity subtitle (only while processing)
+                    if boss.isProcessing, let activity = boss.currentActivityLabel {
+                        Text(activity)
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                            .transition(.opacity)
+                    }
+                }
+            }
+
+            // Checklist progress (when available and processing)
+            if let checklist = boss.aggregatedChecklist, checklist.totalCount > 0 {
+                pillDivider
+
+                HStack(spacing: 4) {
+                    ChecklistRing(fraction: checklist.fraction)
+                        .frame(width: 12, height: 12)
+
+                    Text("BUILD \(checklist.label)")
+                        .font(.system(size: 9, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+                .transition(.opacity)
+            }
+
+            // Stats badge (after turn completes, not while processing)
+            if !boss.isProcessing, let stats = boss.lastStats {
+                pillDivider
+
+                HStack(spacing: 4) {
+                    Text(stats.formattedDuration)
+                        .font(.system(size: 9, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+
+                    Text("\u{2014}")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+
+                    Text(stats.formattedCost)
+                        .font(.system(size: 9, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+                .transition(.opacity)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color.primary.opacity(0.05))
         .cornerRadius(10)
+        .animation(.easeInOut(duration: 0.2), value: boss.isProcessing)
+        .animation(.easeInOut(duration: 0.2), value: boss.currentActivityLabel)
+        .animation(.easeInOut(duration: 0.2), value: boss.aggregatedChecklist?.completedCount)
+    }
+
+    private var pillDivider: some View {
+        Divider()
+            .frame(height: 14)
+            .padding(.horizontal, 6)
     }
 
     private var phaseColor: Color {
@@ -108,6 +167,25 @@ struct ActivityPill: View {
                 return "Building (\(active.count))\u{2026}"
             }
             return "Done"
+        }
+    }
+}
+
+// MARK: - Checklist Progress Ring
+
+struct ChecklistRing: View {
+    let fraction: Double
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.1), lineWidth: 2)
+
+            Circle()
+                .trim(from: 0, to: fraction)
+                .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut(duration: 0.3), value: fraction)
         }
     }
 }

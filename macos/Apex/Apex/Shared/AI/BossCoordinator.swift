@@ -88,4 +88,43 @@ class BossCoordinator {
         researchBoss != nil || bosses.count > 1
     }
 
+    // MARK: - Activity
+
+    /// Friendly name of the tool currently being used by the selected boss
+    var currentActivityLabel: String? {
+        guard let toolName = selectedBoss?.service.currentToolName else { return nil }
+        return ToolNameMapper.friendlyName(for: toolName)
+    }
+
+    /// Aggregated checklist progress across all builders, or single boss progress
+    var aggregatedChecklist: ChecklistProgress? {
+        if bosses.count <= 1 {
+            return selectedBoss?.service.checklistProgress
+        }
+        // Multi-boss: sum all builder checklists
+        var totalCompleted = 0
+        var totalSteps = 0
+        var currentStep: String?
+        for boss in bosses {
+            if let cp = boss.service.checklistProgress {
+                totalCompleted += cp.completedCount
+                totalSteps += cp.totalCount
+                if currentStep == nil, let step = cp.currentStep {
+                    currentStep = step
+                }
+            }
+        }
+        guard totalSteps > 0 else { return nil }
+        return ChecklistProgress(
+            currentStep: currentStep,
+            completedCount: totalCompleted,
+            totalCount: totalSteps
+        )
+    }
+
+    /// Stats from the most recent completed turn of the selected boss
+    var lastStats: TurnStats? {
+        selectedBoss?.service.lastTurnStats
+    }
+
 }
