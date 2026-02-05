@@ -142,9 +142,7 @@ struct StartProjectSheet: View {
                 _ = try? await appState.workspace.gitInit(project: safeName)
             }
         } catch {
-            #if DEBUG
-            print("[StartProject] Error: \(error)")
-            #endif
+            appState.errorMessage = "Failed to create project: \(error.localizedDescription)"
         }
 
         let projectId = "local:\(safeName)"

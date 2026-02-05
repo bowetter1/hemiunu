@@ -7,6 +7,7 @@ struct CodeEditorView: View {
     let language: String
     let isLoading: Bool
     let onSave: () -> Void
+    var onClose: (() -> Void)? = nil
 
     @State private var lineCount = 1
     @FocusState private var isFocused: Bool
@@ -39,7 +40,7 @@ struct CodeEditorView: View {
                     .foregroundColor(.primary)
 
                 // Close button
-                Button(action: {}) {
+                Button(action: { onClose?() }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -81,42 +82,37 @@ struct CodeEditorView: View {
 
     private var editorArea: some View {
         GeometryReader { geometry in
-            HStack(alignment: .top, spacing: 0) {
-                // Line numbers
-                lineNumbers
+            ScrollView([.horizontal, .vertical]) {
+                HStack(alignment: .top, spacing: 0) {
+                    // Line numbers
+                    VStack(alignment: .trailing, spacing: 0) {
+                        ForEach(1...max(lineCount, 1), id: \.self) { line in
+                            Text("\(line)")
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(.secondary.opacity(0.5))
+                                .frame(height: 18)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
                     .frame(width: 50)
+                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
 
-                // Divider
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.2))
-                    .frame(width: 1)
+                    // Divider
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(width: 1)
 
-                // Code content
-                ScrollView([.horizontal, .vertical]) {
+                    // Code content
                     TextEditor(text: $content)
                         .font(.system(size: 13, design: .monospaced))
                         .scrollContentBackground(.hidden)
+                        .scrollDisabled(true)
                         .focused($isFocused)
-                        .frame(minWidth: geometry.size.width - 51, minHeight: geometry.size.height)
+                        .frame(minWidth: geometry.size.width - 51, minHeight: max(CGFloat(lineCount) * 18 + 16, geometry.size.height))
                 }
             }
         }
-    }
-
-    private var lineNumbers: some View {
-        ScrollView {
-            VStack(alignment: .trailing, spacing: 0) {
-                ForEach(1...max(lineCount, 1), id: \.self) { line in
-                    Text("\(line)")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.secondary.opacity(0.5))
-                        .frame(height: 18)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-        }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
         .onChange(of: content) { _, newValue in
             lineCount = newValue.components(separatedBy: "\n").count
         }
@@ -140,31 +136,10 @@ struct CodeEditorView: View {
     }
 
     private var iconForFile: String {
-        let ext = (fileName as NSString).pathExtension.lowercased()
-        switch ext {
-        case "py": return "text.badge.star"
-        case "js", "jsx": return "j.square"
-        case "ts", "tsx": return "t.square"
-        case "html": return "chevron.left.forwardslash.chevron.right"
-        case "css", "scss": return "paintbrush"
-        case "json": return "curlybraces"
-        case "md": return "doc.text"
-        case "swift": return "swift"
-        default: return "doc"
-        }
+        FileTypeAppearance.icon(forPath: fileName)
     }
 
     private var colorForFile: Color {
-        let ext = (fileName as NSString).pathExtension.lowercased()
-        switch ext {
-        case "py": return .yellow
-        case "js", "jsx": return .yellow
-        case "ts", "tsx": return .blue
-        case "html": return .orange
-        case "css", "scss": return .purple
-        case "json": return .green
-        case "swift": return .orange
-        default: return .secondary
-        }
+        FileTypeAppearance.color(forPath: fileName)
     }
 }

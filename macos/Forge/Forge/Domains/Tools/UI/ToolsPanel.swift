@@ -12,6 +12,7 @@ struct ToolsPanel: View {
     var onOpenFloatingChat: (() -> Void)? = nil
 
     @State private var toolsHeight: CGFloat = 400
+    @State private var dragStartHeight: CGFloat = 400
     @State private var isDraggingDivider = false
 
     private let panelWidth: CGFloat = 300
@@ -80,8 +81,11 @@ struct ToolsPanel: View {
                     .gesture(
                         DragGesture()
                             .onChanged { value in
-                                isDraggingDivider = true
-                                let newHeight = toolsHeight + value.translation.height
+                                if !isDraggingDivider {
+                                    isDraggingDivider = true
+                                    dragStartHeight = toolsHeight
+                                }
+                                let newHeight = dragStartHeight + value.translation.height
                                 toolsHeight = min(max(newHeight, minToolsHeight), maxToolsHeight)
                             }
                             .onEnded { _ in
@@ -155,18 +159,24 @@ struct ToolsPanel: View {
                 .buttonStyle(.plain)
 
                 // Build site button
-                CollapsedToolButton(icon: "rectangle.stack", color: .purple)
+                CollapsedToolButton(icon: "rectangle.stack", color: .purple) {
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true }
+                }
 
                 Divider()
                     .frame(width: 20)
 
-                CollapsedToolButton(icon: "gearshape", color: .gray)
+                CollapsedToolButton(icon: "gearshape", color: .gray) {
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true }
+                }
 
                 Divider()
                     .frame(width: 20)
 
                 // Chat button
-                CollapsedToolButton(icon: "bubble.left.and.bubble.right", color: .blue)
+                CollapsedToolButton(icon: "bubble.left.and.bubble.right", color: .blue) {
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true }
+                }
             }
 
             Spacer()

@@ -5,6 +5,7 @@ struct CodeModeView: View {
     @ObservedObject var appState: AppState
     @Binding var selectedPageId: String?
     @StateObject private var viewModel: CodeViewModel
+    @State private var previewRefreshToken = UUID()
 
     private let fileTreeWidth: CGFloat = 240
 
@@ -91,7 +92,11 @@ struct CodeModeView: View {
                     fileName: (path as NSString).lastPathComponent,
                     language: detectLanguage(path),
                     isLoading: viewModel.isLoadingContent,
-                    onSave: viewModel.saveCurrentFile
+                    onSave: viewModel.saveCurrentFile,
+                    onClose: {
+                        viewModel.selectedFilePath = nil
+                        viewModel.currentFileContent = ""
+                    }
                 )
             } else {
                 emptyEditorState
@@ -127,7 +132,12 @@ struct CodeModeView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.secondary)
                 Spacer()
-                Button(action: {}) {
+                Button(action: {
+                    if let path = viewModel.selectedFilePath {
+                        viewModel.loadFileContent(path)
+                        previewRefreshToken = UUID()
+                    }
+                }) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)

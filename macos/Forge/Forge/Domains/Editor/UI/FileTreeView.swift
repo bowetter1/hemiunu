@@ -138,18 +138,7 @@ struct FileTreeRow: View {
         if node.isDirectory {
             return .blue
         }
-        let ext = (node.path as NSString).pathExtension.lowercased()
-        switch ext {
-        case "py": return .yellow
-        case "js", "jsx": return .yellow
-        case "ts", "tsx": return .blue
-        case "html": return .orange
-        case "css", "scss": return .purple
-        case "json": return .green
-        case "md": return .gray
-        case "swift": return .orange
-        default: return .secondary
-        }
+        return FileTypeAppearance.color(forPath: node.path)
     }
 
     private var backgroundColor: Color {

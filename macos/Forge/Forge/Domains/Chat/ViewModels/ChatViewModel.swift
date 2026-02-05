@@ -134,9 +134,7 @@ class ChatViewModel {
             appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
             appState.refreshPreview()
         } catch {
-            #if DEBUG
-            print("[Chat] Failed to save HTML: \(error)")
-            #endif
+            appState.errorMessage = "Failed to save HTML: \(error.localizedDescription)"
         }
     }
 
@@ -167,9 +165,7 @@ class ChatViewModel {
             appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
             appState.refreshLocalProjects()
         } catch {
-            #if DEBUG
-            print("[Chat] Failed to create project: \(error)")
-            #endif
+            appState.errorMessage = "Failed to create project: \(error.localizedDescription)"
         }
     }
 

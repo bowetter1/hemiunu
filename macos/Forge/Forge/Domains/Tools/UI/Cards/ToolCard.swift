@@ -3,9 +3,10 @@ import SwiftUI
 struct CollapsedToolButton: View {
     let icon: String
     let color: Color
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        Button(action: {}) {
+        Button(action: { action?() }) {
             Image(systemName: icon)
                 .font(.system(size: 14))
                 .foregroundColor(color)

@@ -45,27 +45,11 @@ struct CodeFileRow: View {
 
     private var icon: String {
         if entry.isDirectory { return "folder.fill" }
-        switch entry.fileExtension {
-        case "html": return "doc.text.fill"
-        case "css": return "paintbrush.fill"
-        case "js", "ts": return "curlybraces"
-        case "json": return "doc.badge.gearshape"
-        case "jpg", "jpeg", "png", "gif", "svg", "webp": return "photo"
-        case "py": return "chevron.left.forwardslash.chevron.right"
-        default: return "doc.fill"
-        }
+        return FileTypeAppearance.icon(for: entry.fileExtension)
     }
 
     private var iconColor: Color {
         if entry.isDirectory { return .blue.opacity(0.7) }
-        switch entry.fileExtension {
-        case "html": return .orange
-        case "css": return .blue
-        case "js", "ts": return .yellow
-        case "json": return .purple
-        case "jpg", "jpeg", "png", "gif", "svg", "webp": return .green
-        case "py": return .cyan
-        default: return .secondary
-        }
+        return FileTypeAppearance.color(for: entry.fileExtension)
     }
 }

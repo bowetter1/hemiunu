@@ -59,10 +59,11 @@ extension LocalWorkspaceService {
                     execute: timeoutWorkItem
                 )
 
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+
                 process.waitUntilExit()
                 timeoutWorkItem.cancel()
 
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 let output = String(data: data, encoding: .utf8) ?? ""
 
                 continuation.resume(returning: ShellResult(
