@@ -6,8 +6,6 @@ struct CodeModeView: View {
     @Binding var selectedPageId: String?
     @StateObject private var viewModel: CodeViewModel
 
-    @State private var showGenerateSheet = false
-
     private let fileTreeWidth: CGFloat = 240
 
     init(appState: AppState, selectedPageId: Binding<String?>) {
@@ -36,14 +34,6 @@ struct CodeModeView: View {
         .onChange(of: appState.currentProject?.id) { _, _ in
             viewModel.loadFiles()
         }
-        .sheet(isPresented: $showGenerateSheet) {
-            GenerateProjectSheet(
-                isPresented: $showGenerateSheet,
-                isGenerating: $viewModel.isGenerating,
-                progress: $viewModel.generationProgress,
-                onGenerate: viewModel.generateProject
-            )
-        }
     }
 
     // MARK: - File Tree Section
@@ -66,14 +56,6 @@ struct CodeModeView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.isLoadingFiles)
-
-                // Generate button
-                Button(action: { showGenerateSheet = true }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -128,22 +110,6 @@ struct CodeModeView: View {
             Text("Select a file to edit")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
-
-            if viewModel.files.isEmpty && appState.currentProject != nil {
-                Button(action: { showGenerateSheet = true }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "wand.and.stars")
-                        Text("Generate Project")
-                    }
-                    .font(.system(size: 13))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.accentColor)
-                    .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
-            }
 
             Spacer()
         }
@@ -217,181 +183,6 @@ struct CodeModeView: View {
         case "md": return "markdown"
         case "swift": return "swift"
         default: return "text"
-        }
-    }
-}
-
-// MARK: - Generate Project Sheet
-
-struct GenerateProjectSheet: View {
-    @Binding var isPresented: Bool
-    @Binding var isGenerating: Bool
-    @Binding var progress: String
-
-    let onGenerate: (String) -> Void
-
-    @State private var selectedType = "python"
-
-    let projectTypes = [
-        ("python", "Python", "Basic Python project"),
-        ("flask", "Flask", "Flask web application"),
-        ("fastapi", "FastAPI", "FastAPI REST API"),
-        ("node", "Node.js", "Node.js project"),
-        ("react", "React", "React frontend app"),
-        ("nextjs", "Next.js", "Next.js fullstack app"),
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Generate Project")
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-                Button(action: { isPresented = false }) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-                .disabled(isGenerating)
-            }
-            .padding()
-
-            Divider()
-
-            if isGenerating {
-                generatingView
-            } else {
-                projectTypeSelector
-            }
-        }
-        .frame(width: 400, height: 350)
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private var projectTypeSelector: some View {
-        VStack(spacing: 16) {
-            Text("Choose a project type:")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .padding(.top, 8)
-
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(projectTypes, id: \.0) { type, name, description in
-                        ProjectTypeRow(
-                            type: type,
-                            name: name,
-                            description: description,
-                            isSelected: selectedType == type
-                        ) {
-                            selectedType = type
-                        }
-                    }
-                }
-                .padding(.horizontal)
-            }
-
-            Spacer()
-
-            // Generate button
-            Button(action: { onGenerate(selectedType) }) {
-                HStack {
-                    Image(systemName: "wand.and.stars")
-                    Text("Generate \(projectTypes.first { $0.0 == selectedType }?.1 ?? "") Project")
-                }
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Color.accentColor)
-                .cornerRadius(8)
-            }
-            .buttonStyle(.plain)
-            .padding()
-        }
-    }
-
-    private var generatingView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-
-            ProgressView()
-                .scaleEffect(1.2)
-
-            Text("Generating project...")
-                .font(.system(size: 14, weight: .medium))
-
-            Text(progress)
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-struct ProjectTypeRow: View {
-    let type: String
-    let name: String
-    let description: String
-    let isSelected: Bool
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 12) {
-                Image(systemName: iconFor(type))
-                    .font(.system(size: 20))
-                    .foregroundColor(colorFor(type))
-                    .frame(width: 32)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.primary)
-                    Text(description)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.accentColor)
-                }
-            }
-            .padding(12)
-            .background(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func iconFor(_ type: String) -> String {
-        switch type {
-        case "python", "flask", "fastapi": return "text.badge.star"
-        case "node": return "server.rack"
-        case "react", "nextjs": return "atom"
-        default: return "doc"
-        }
-    }
-
-    private func colorFor(_ type: String) -> Color {
-        switch type {
-        case "python", "flask", "fastapi": return .yellow
-        case "node": return .green
-        case "react", "nextjs": return .cyan
-        default: return .secondary
         }
     }
 }

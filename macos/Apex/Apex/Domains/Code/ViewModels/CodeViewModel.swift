@@ -10,8 +10,6 @@ class CodeViewModel: ObservableObject {
     @Published var isLoadingFiles = false
     @Published var isLoadingContent = false
     @Published var isSaving = false
-    @Published var isGenerating = false
-    @Published var generationProgress: String = ""
     @Published var errorMessage: String?
 
     private let appState: AppState
@@ -139,26 +137,6 @@ class CodeViewModel: ObservableObject {
                 isSaving = false
             } catch {
                 isSaving = false
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    func generateProject(type: String) {
-        guard let projectId = currentProjectId else { return }
-        isGenerating = true
-        generationProgress = "Starting generation..."
-
-        Task {
-            do {
-                _ = try await client.codeGen.generate(
-                    projectId: projectId,
-                    projectType: type
-                )
-                isGenerating = false
-                loadFiles()
-            } catch {
-                isGenerating = false
                 errorMessage = error.localizedDescription
             }
         }
