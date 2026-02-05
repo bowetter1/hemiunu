@@ -25,7 +25,7 @@ class APIClient {
     lazy var auth = AuthService(client: self)
     lazy var projectService = ProjectService(client: self)
     lazy var pageService = PageService(client: self)
-    lazy var variantService = VariantService(client: self)
+
     lazy var fileService = FileService(client: self)
     lazy var codeGen = CodeGenService(client: self)
 

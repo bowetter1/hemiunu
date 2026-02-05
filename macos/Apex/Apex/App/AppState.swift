@@ -189,26 +189,14 @@ class AppState: ObservableObject {
             let project = try await client.projectService.get(id: id)
             currentProject = project
 
-            // Load variants
-            let loadedVariants = try await client.variantService.getAll(projectId: id)
-            variants = loadedVariants
-
             // Load pages
             let loadedPages = try await client.pageService.getAll(projectId: id)
             pages = loadedPages
+            variants = []
 
-            // Auto-select first variant and its first page
-            if let firstVariant = loadedVariants.first {
-                selectedVariantId = firstVariant.id
-                if let firstPage = loadedPages.first(where: { $0.variantId == firstVariant.id }) {
-                    selectedPageId = firstPage.id
-                }
-            } else if !loadedPages.isEmpty {
-                if let firstLayout = loadedPages.first(where: { $0.layoutVariant != nil }) {
-                    selectedPageId = firstLayout.id
-                } else if let firstPage = loadedPages.first {
-                    selectedPageId = firstPage.id
-                }
+            // Auto-select first page
+            if let firstPage = loadedPages.first {
+                selectedPageId = firstPage.id
             }
 
             // Load logs
