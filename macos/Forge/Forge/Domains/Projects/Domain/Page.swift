@@ -1,0 +1,55 @@
+import Foundation
+
+/// A page in a project
+struct Page: Identifiable, Codable, Equatable {
+    let id: String
+    let name: String
+    let html: String
+    let parentPageId: String?
+    let layoutVariant: Int?
+    let currentVersion: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, html
+        case parentPageId = "parent_page_id"
+        case layoutVariant = "layout_variant"
+        case currentVersion = "current_version"
+    }
+
+    init(id: String, name: String, html: String, parentPageId: String? = nil, layoutVariant: Int? = nil, currentVersion: Int = 1) {
+        self.id = id
+        self.name = name
+        self.html = html
+        self.parentPageId = parentPageId
+        self.layoutVariant = layoutVariant
+        self.currentVersion = currentVersion
+    }
+
+    /// Create a synthetic Page for local filesystem projects
+    static func local(id: String, name: String, html: String) -> Page {
+        Page(id: id, name: name, html: html)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        html = try container.decode(String.self, forKey: .html)
+        parentPageId = try container.decodeIfPresent(String.self, forKey: .parentPageId)
+        layoutVariant = try container.decodeIfPresent(Int.self, forKey: .layoutVariant)
+        currentVersion = try container.decodeIfPresent(Int.self, forKey: .currentVersion) ?? 1
+    }
+}
+
+/// A version of a page
+struct PageVersion: Identifiable, Codable {
+    let id: String
+    let version: Int
+    let instruction: String?
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, version, instruction
+        case createdAt = "created_at"
+    }
+}
