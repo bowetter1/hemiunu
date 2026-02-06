@@ -34,8 +34,13 @@ class ChatViewModel {
         }
 
         let service = appState.activeAIService
+        let promptText = text
 
         streamTask = Task {
+            let startTime = CFAbsoluteTimeGetCurrent()
+            var firstTokenTime: CFAbsoluteTime?
+            var tokenCount = 0
+
             do {
                 let stream = service.generate(
                     messages: Array(aiMessages),
@@ -44,9 +49,16 @@ class ChatViewModel {
                 isLoading = false
                 for try await token in stream {
                     guard !Task.isCancelled else { break }
+                    if firstTokenTime == nil { firstTokenTime = CFAbsoluteTimeGetCurrent() }
+                    tokenCount += 1
                     messages[assistantIndex].content += token
                 }
+                let totalTime = CFAbsoluteTimeGetCurrent() - startTime
+                let ttft = firstTokenTime.map { $0 - startTime } ?? totalTime
+                let contentLength = messages[assistantIndex].content.count
+
                 handleGeneratedContent(messages[assistantIndex].content)
+                logRequest(provider: provider, prompt: promptText, totalTime: totalTime, ttft: ttft, chunks: tokenCount, chars: contentLength)
                 saveChatHistory()
             } catch {
                 if !Task.isCancelled {
@@ -167,6 +179,40 @@ class ChatViewModel {
         decoder.dateDecodingStrategy = .iso8601
         if let loaded = try? decoder.decode([ChatMessage].self, from: data) {
             messages = loaded
+        }
+    }
+
+    // MARK: - Request Logging
+
+    private func logRequest(provider: AIProvider, prompt: String, totalTime: Double, ttft: Double, chunks: Int, chars: Int) {
+        let logURL = appState.workspace.rootDirectory.appendingPathComponent("ai-log.md")
+        let dateStr = ISO8601DateFormatter().string(from: Date())
+        let projectName = (appState.selectedProjectId ?? "none").replacingOccurrences(of: "local:", with: "")
+        let promptPreview = String(prompt.prefix(80)).replacingOccurrences(of: "\n", with: " ")
+
+        let entry = """
+        | \(dateStr) | \(provider.shortLabel) | \(provider.modelName) | \(projectName) | \(promptPreview) | \(String(format: "%.1f", ttft))s | \(String(format: "%.1f", totalTime))s | \(chunks) | \(chars) |
+
+        """
+
+        // Create file with header if it doesn't exist
+        if !FileManager.default.fileExists(atPath: logURL.path) {
+            let header = """
+            # Forge AI Log
+
+            | Timestamp | Provider | Model | Project | Prompt | TTFT | Total | Chunks | Chars |
+            |-----------|----------|-------|---------|--------|------|-------|--------|-------|
+
+            """
+            try? header.write(to: logURL, atomically: true, encoding: .utf8)
+        }
+
+        if let handle = try? FileHandle(forWritingTo: logURL) {
+            handle.seekToEndOfFile()
+            if let data = entry.data(using: .utf8) {
+                handle.write(data)
+            }
+            handle.closeFile()
         }
     }
 
