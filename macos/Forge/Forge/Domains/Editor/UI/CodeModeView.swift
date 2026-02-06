@@ -16,15 +16,12 @@ struct CodeModeView: View {
 
     var body: some View {
         HSplitView {
-            // Left: File tree
             fileTreeSection
                 .frame(minWidth: 200, idealWidth: fileTreeWidth, maxWidth: 300)
 
-            // Center: Code editor
             editorSection
                 .frame(minWidth: 300)
 
-            // Right: Preview
             previewSection
                 .frame(minWidth: 300)
         }
@@ -40,15 +37,11 @@ struct CodeModeView: View {
 
     private var fileTreeSection: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Text("Files")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.secondary)
-
                 Spacer()
-
-                // Refresh button
                 Button(action: viewModel.loadFiles) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11))
@@ -62,12 +55,10 @@ struct CodeModeView: View {
 
             Divider()
 
-            // File tree
             if viewModel.isLoadingFiles {
                 VStack {
                     Spacer()
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    ProgressView().scaleEffect(0.8)
                     Spacer()
                 }
             } else {
@@ -102,15 +93,12 @@ struct CodeModeView: View {
     private var emptyEditorState: some View {
         VStack(spacing: 16) {
             Spacer()
-
             Image(systemName: "doc.text")
                 .font(.system(size: 48))
                 .foregroundColor(.secondary.opacity(0.4))
-
             Text("Select a file to edit")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
-
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -121,7 +109,6 @@ struct CodeModeView: View {
 
     private var previewSection: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Text("Preview")
                     .font(.system(size: 11, weight: .semibold))
@@ -140,14 +127,8 @@ struct CodeModeView: View {
 
             Divider()
 
-            // Preview content
             if isHtmlFile {
-                WebPreview(
-                    html: viewModel.currentFileContent,
-                    sidebarVisible: false,
-                    toolsPanelVisible: false,
-                    selectedDevice: .desktop
-                )
+                HTMLWebView(html: viewModel.currentFileContent, projectId: appState.currentProject?.id)
             } else {
                 VStack {
                     Spacer()

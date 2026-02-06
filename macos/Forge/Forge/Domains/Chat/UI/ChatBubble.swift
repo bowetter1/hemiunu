@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Full-width chat bubble (used in ChatPanel — right panel)
+/// Full-width chat bubble (used in ChatPanel)
 struct ChatBubble: View {
     let message: ChatMessage
 
@@ -21,7 +21,7 @@ struct ChatBubble: View {
     }
 
     private var backgroundColor: Color {
-        message.role == .user ? .blue : Theme.Colors.glassFill
+        message.role == .user ? .blue : Color(nsColor: .windowBackgroundColor)
     }
 }
 
@@ -37,7 +37,7 @@ struct SidebarChatBubble: View {
                 .font(.system(size: 12))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(message.role == .user ? Color.blue : Theme.Colors.glassFill)
+                .background(message.role == .user ? Color.blue : Color(nsColor: .windowBackgroundColor))
                 .foregroundColor(message.role == .user ? .white : .primary)
                 .cornerRadius(12)
 

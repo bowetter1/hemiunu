@@ -7,7 +7,7 @@ enum PreviewDevice: String, CaseIterable {
     case mobile
 }
 
-/// Live preview of HTML content
+/// Live preview of HTML content — expands when sidebar hidden
 struct WebPreview: View {
     let html: String
     var projectId: String? = nil
@@ -42,13 +42,13 @@ struct WebPreview: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+            .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
             .animation(.easeInOut(duration: 0.2), value: previewWidth)
             .padding(20)
     }
 }
 
-/// Version history dots
+/// Version history dots — clickable to navigate between versions
 struct VersionDots: View {
     let versions: [PageVersion]
     let currentVersion: Int
@@ -70,7 +70,7 @@ struct VersionDots: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Theme.Colors.glassFill)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.8))
         .cornerRadius(10)
     }
 }
@@ -102,7 +102,7 @@ struct HTMLWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        // Local file URL
+        // Local file URL: load directly
         if let localURL = localFileURL {
             let urlString = localURL.absoluteString
             if context.coordinator.lastLocalUrl != urlString || context.coordinator.lastRefreshToken != refreshToken {

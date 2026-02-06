@@ -13,7 +13,7 @@ struct LoginView: View {
             Text("Forge")
                 .font(.system(size: 40, weight: .bold))
 
-            Text("AI Website Builder")
+            Text("AI Design Studio")
                 .font(.title3)
                 .foregroundStyle(.secondary)
 
@@ -52,9 +52,21 @@ struct LoginView: View {
         errorMessage = nil
         Task {
             do {
-                _ = try await appState.authService.signInWithGoogle()
+                #if DEBUG
+                print("[Auth] Starting Google Sign-In...")
+                #endif
+                let token = try await appState.authService.signInWithGoogle()
+                #if DEBUG
+                print("[Auth] Got Firebase token: \(token.prefix(20))...")
+                #endif
                 await appState.didSignIn()
+                #if DEBUG
+                print("[Auth] didSignIn() completed")
+                #endif
             } catch {
+                #if DEBUG
+                print("[Auth] Sign-in error: \(error)")
+                #endif
                 errorMessage = error.localizedDescription
             }
             isLoading = false

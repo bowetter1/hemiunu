@@ -7,7 +7,6 @@ struct SidebarSessionRow: View {
     let selectedProjectId: String?
     let onSelect: (String) -> Void
     var onDelete: (() -> Void)? = nil
-    /// Pages for the currently selected project (shown as children under the active layout)
     var pages: [Page] = []
     var selectedPageId: String? = nil
     var onSelectPage: ((String) -> Void)? = nil
@@ -27,7 +26,6 @@ struct SidebarSessionRow: View {
 
     private var multiProjectGroup: some View {
         VStack(spacing: 0) {
-            // Session header — expand/collapse only
             Button(action: { withAnimation { isExpanded.toggle() } }) {
                 HStack(spacing: 8) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
@@ -71,7 +69,6 @@ struct SidebarSessionRow: View {
             }
             .buttonStyle(.plain)
 
-            // Layout rows
             if isExpanded {
                 VStack(spacing: 1) {
                     ForEach(Array(group.projects.enumerated()), id: \.element.id) { index, project in
@@ -97,7 +94,6 @@ struct SidebarSessionRow: View {
                             }
                             .buttonStyle(.plain)
 
-                            // Pages under selected layout
                             if isSelected(project), !pages.isEmpty {
                                 pageRows
                             }
@@ -141,7 +137,6 @@ struct SidebarSessionRow: View {
         .padding(.top, 2)
     }
 
-    /// Strip .html and capitalize for display
     private func pageDisplayName(_ name: String) -> String {
         let base = name.replacingOccurrences(of: ".html", with: "")
         return base.replacingOccurrences(of: "-", with: " ").capitalized
@@ -151,11 +146,5 @@ struct SidebarSessionRow: View {
 
     private func isSelected(_ project: LocalProject) -> Bool {
         selectedProjectId == "local:\(project.name)"
-    }
-
-    private func relativeDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct NewProjectCard: View {
     @ObservedObject var appState: AppState
+    var chatViewModel: ChatViewModel
     let onProjectCreated: (String) -> Void
 
     @State private var showStartSheet = false
@@ -34,14 +35,14 @@ struct NewProjectCard: View {
             }
             .buttonStyle(.plain)
         }
-        .background(Theme.Colors.glassFill)
+        .background(Color.secondary.opacity(0.05))
         .cornerRadius(8)
         .sheet(isPresented: $showStartSheet) {
             StartProjectSheet(
                 isPresented: $showStartSheet,
+                chatViewModel: chatViewModel,
                 onProjectCreated: onProjectCreated
             )
-            .environmentObject(appState)
         }
     }
 }

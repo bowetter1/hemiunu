@@ -8,7 +8,6 @@ struct DesignView: View {
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedPageId: String?
-    var showResearchJSON: Bool = false
     var onProjectCreated: ((String) -> Void)? = nil
 
     var selectedPage: Page? {
@@ -17,47 +16,79 @@ struct DesignView: View {
     }
 
     var body: some View {
-        if appState.currentProject != nil {
-            projectContent
+        if let project = appState.currentProject {
+            projectContent(project)
                 .onChange(of: selectedPageId) { _, newPageId in
-                    if let project = appState.currentProject {
-                        viewModel.handlePageChange(projectId: project.id, pageId: newPageId)
-                    }
+                    viewModel.handlePageChange(projectId: project.id, pageId: newPageId)
                 }
                 .onChange(of: appState.pages) { _, newPages in
-                    if let project = appState.currentProject {
-                        viewModel.handlePagesUpdate(projectId: project.id, selectedPageId: selectedPageId, newPages: newPages)
-                    }
+                    viewModel.handlePagesUpdate(projectId: project.id, selectedPageId: selectedPageId, newPages: newPages)
                 }
                 .onAppear {
-                    if let project = appState.currentProject, let pageId = selectedPageId {
+                    if let pageId = selectedPageId {
                         viewModel.handlePageChange(projectId: project.id, pageId: pageId)
                     }
                 }
         } else {
-            BriefBuilderView(appState: appState) { projectId in
-                onProjectCreated?(projectId)
-            }
+            welcomeView
         }
     }
 
+    // MARK: - Welcome View (no project)
+
+    private var welcomeView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "sparkles")
+                .font(.system(size: 56))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .blue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            VStack(spacing: 8) {
+                Text("Welcome to Forge")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.primary)
+
+                Text("Build anything. Just describe it.")
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    // MARK: - Project Content
+
     @ViewBuilder
-    private var projectContent: some View {
-        if let project = appState.currentProject {
-            if appState.isLocalProject, let localURL = appState.localPreviewURL {
-                localPreviewContent(project: project, baseURL: localURL)
-            } else if let page = selectedPage {
+    private func projectContent(_ project: Project) -> some View {
+        if appState.isLocalProject, let localURL = appState.localPreviewURL {
+            localPreviewContent(project: project, baseURL: localURL)
+        } else if let page = selectedPage {
+            WebPreview(
+                html: page.html,
+                projectId: project.id,
+                sidebarVisible: sidebarVisible,
+                toolsPanelVisible: toolsPanelVisible,
+                selectedDevice: appState.selectedDevice
+            )
+        } else {
+            if let firstPage = appState.pages.first {
                 WebPreview(
-                    html: page.html,
+                    html: firstPage.html,
                     projectId: project.id,
                     sidebarVisible: sidebarVisible,
                     toolsPanelVisible: toolsPanelVisible,
                     selectedDevice: appState.selectedDevice
                 )
-            } else if let mainPage = appState.pages.first(where: { $0.layoutVariant == nil }) {
-                WebPreview(html: mainPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
-            } else if let firstPage = appState.pages.first {
-                WebPreview(html: firstPage.html, projectId: project.id, sidebarVisible: sidebarVisible, toolsPanelVisible: toolsPanelVisible, selectedDevice: appState.selectedDevice)
             } else {
                 GeneratingView(message: "Loading...")
             }
@@ -94,6 +125,9 @@ struct DesignView: View {
                 Text("No HTML file found")
                     .font(.title3)
                     .foregroundColor(.secondary)
+                Text("The local project at \(baseURL.path) has no index.html")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 Button("Open in Finder") {
                     NSWorkspace.shared.open(baseURL)
                 }
@@ -117,26 +151,6 @@ struct GeneratingView: View {
             Text(message)
                 .font(.body)
                 .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct ErrorView: View {
-    let message: String
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
-                .foregroundColor(.red)
-            Text("Error")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text(message)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

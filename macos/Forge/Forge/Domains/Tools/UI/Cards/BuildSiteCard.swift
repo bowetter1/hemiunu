@@ -31,7 +31,7 @@ struct BuildSiteCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(Theme.Colors.glassFill)
+        .background(Color.secondary.opacity(0.05))
         .cornerRadius(8)
         .disabled(appState.currentProject == nil)
         .opacity(appState.currentProject == nil ? 0.4 : 1)

@@ -3,17 +3,24 @@ import UniformTypeIdentifiers
 
 struct StartProjectSheet: View {
     @Binding var isPresented: Bool
+    let chatViewModel: ChatViewModel
+    var initialBrief: String = ""
     let onProjectCreated: (String) -> Void
 
+    // Form state
     @State private var projectName = ""
     @State private var briefText: String
     @State private var websiteURL = ""
+    @State private var selectedImage: NSImage?
+    @State private var isDraggingOver = false
     @State private var isCreating = false
 
-    @EnvironmentObject private var appState: AppState
+    // AI provider
+    @State private var selectedProvider: AIProvider = .groq
 
-    init(isPresented: Binding<Bool>, initialBrief: String = "", onProjectCreated: @escaping (String) -> Void) {
+    init(isPresented: Binding<Bool>, chatViewModel: ChatViewModel, initialBrief: String = "", onProjectCreated: @escaping (String) -> Void) {
         self._isPresented = isPresented
+        self.chatViewModel = chatViewModel
         self._briefText = State(initialValue: initialBrief)
         self.onProjectCreated = onProjectCreated
     }
@@ -37,12 +44,12 @@ struct StartProjectSheet: View {
 
             Divider()
 
-            // Content
+            // Scrollable content
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     // Project name
                     sectionLabel("Project Name", icon: "tag")
-                    TextField("e.g. My Café", text: $projectName)
+                    TextField("e.g. Fjallraven", text: $projectName)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .padding(10)
@@ -60,13 +67,28 @@ struct StartProjectSheet: View {
                         .cornerRadius(8)
 
                     // URL
-                    sectionLabel("Reference URL (optional)", icon: "link")
+                    sectionLabel("Reference URL", icon: "link")
                     TextField("https://example.com", text: $websiteURL)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .padding(10)
                         .background(Color(nsColor: .textBackgroundColor))
                         .cornerRadius(8)
+
+                    Divider()
+
+                    // AI Provider
+                    sectionLabel("AI Provider", icon: "brain")
+                    Picker("Provider", selection: $selectedProvider) {
+                        ForEach(AIProvider.allCases, id: \.self) { provider in
+                            Text(provider.displayName).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    // Image upload
+                    sectionLabel("Inspiration", icon: "photo")
+                    imageDropZone
                 }
                 .padding(20)
             }
@@ -76,6 +98,7 @@ struct StartProjectSheet: View {
             // Footer
             HStack {
                 Spacer()
+
                 Button(action: createProject) {
                     HStack(spacing: 6) {
                         if isCreating {
@@ -100,7 +123,7 @@ struct StartProjectSheet: View {
             }
             .padding()
         }
-        .frame(width: 420, height: 400)
+        .frame(width: 480, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -116,7 +139,80 @@ struct StartProjectSheet: View {
             .foregroundColor(.secondary)
     }
 
+    @ViewBuilder
+    private var imageDropZone: some View {
+        ZStack {
+            if let image = selectedImage {
+                ZStack(alignment: .topTrailing) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Button(action: { selectedImage = nil }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white)
+                            .shadow(radius: 2)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(4)
+                }
+            } else {
+                VStack(spacing: 6) {
+                    Image(systemName: isDraggingOver ? "arrow.down.circle.fill" : "photo.badge.plus")
+                        .font(.system(size: 20))
+                        .foregroundColor(isDraggingOver ? .blue : .secondary.opacity(0.5))
+                    Text("Drop image or click")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 80)
+                .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(
+                            isDraggingOver ? Color.blue : Color.secondary.opacity(0.2),
+                            style: StrokeStyle(lineWidth: 1, dash: [4])
+                        )
+                )
+                .cornerRadius(8)
+                .onTapGesture { openImagePicker() }
+            }
+        }
+        .onDrop(of: [.image, .fileURL], isTargeted: $isDraggingOver) { providers in
+            handleImageDrop(providers)
+        }
+    }
+
     // MARK: - Actions
+
+    private func openImagePicker() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.image, .png, .jpeg]
+
+        if panel.runModal() == .OK, let url = panel.url {
+            selectedImage = NSImage(contentsOf: url)
+        }
+    }
+
+    private func handleImageDrop(_ providers: [NSItemProvider]) -> Bool {
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadObject(ofClass: NSImage.self) { image, _ in
+                    DispatchQueue.main.async {
+                        selectedImage = image as? NSImage
+                    }
+                }
+                return true
+            }
+        }
+        return false
+    }
 
     private func createProject() {
         guard canCreate else { return }
@@ -127,34 +223,13 @@ struct StartProjectSheet: View {
             prompt += "\n\nReference website: \(websiteURL)"
         }
 
-        let trimmedName = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let safeName = trimmedName.isEmpty
-            ? "project-\(DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short).replacingOccurrences(of: ":", with: "").replacingOccurrences(of: " ", with: ""))"
-            : trimmedName.lowercased().replacingOccurrences(of: " ", with: "-")
+        // Set provider before sending
+        chatViewModel.appState.selectedProvider = selectedProvider
 
-        // Create project directory and brief
-        do {
-            _ = try appState.workspace.createProject(name: safeName)
-            try appState.workspace.writeFile(project: safeName, path: "brief.md", content: "## Project\n\n\(prompt)")
-
-            // Init git
-            Task {
-                _ = try? await appState.workspace.exec("git init", cwd: appState.workspace.projectPath(safeName))
-            }
-        } catch {
-            #if DEBUG
-            print("[StartProject] Error: \(error)")
-            #endif
-        }
-
-        let projectId = "local:\(safeName)"
         isPresented = false
-
-        // Send the brief to the chat
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 200_000_000)
-            appState.setSelectedProjectId(projectId)
-            appState.chatViewModel.sendMessage(prompt)
+            chatViewModel.sendMessage(prompt)
         }
     }
 }

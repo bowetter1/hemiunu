@@ -60,15 +60,12 @@ struct FileTreeRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Row content
             HStack(spacing: 4) {
-                // Indent
                 if depth > 0 {
                     Color.clear
                         .frame(width: CGFloat(depth) * indentWidth)
                 }
 
-                // Expand/collapse for directories
                 if node.isDirectory {
                     Button(action: { withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() } }) {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
@@ -81,13 +78,11 @@ struct FileTreeRow: View {
                     Color.clear.frame(width: 12)
                 }
 
-                // Icon
                 Image(systemName: node.isDirectory ? (isExpanded ? "folder.fill" : "folder") : node.icon)
                     .font(.system(size: 12))
                     .foregroundColor(iconColor)
                     .frame(width: 16)
 
-                // Name
                 Text(node.name)
                     .font(.system(size: 12))
                     .foregroundColor(.primary)
@@ -95,7 +90,6 @@ struct FileTreeRow: View {
 
                 Spacer()
 
-                // File size for files
                 if !node.isDirectory && node.size > 0 {
                     Text(formatSize(node.size))
                         .font(.system(size: 10))
@@ -120,7 +114,6 @@ struct FileTreeRow: View {
                 isHovering = hovering
             }
 
-            // Children
             if node.isDirectory && isExpanded {
                 ForEach(node.children) { child in
                     FileTreeRow(
@@ -135,9 +128,7 @@ struct FileTreeRow: View {
     }
 
     private var iconColor: Color {
-        if node.isDirectory {
-            return .blue
-        }
+        if node.isDirectory { return .blue }
         let ext = (node.path as NSString).pathExtension.lowercased()
         switch ext {
         case "py": return .yellow
@@ -153,22 +144,14 @@ struct FileTreeRow: View {
     }
 
     private var backgroundColor: Color {
-        if selectedPath == node.path {
-            return Color.accentColor.opacity(0.2)
-        }
-        if isHovering {
-            return Color.primary.opacity(0.05)
-        }
+        if selectedPath == node.path { return Color.accentColor.opacity(0.2) }
+        if isHovering { return Color.primary.opacity(0.05) }
         return Color.clear
     }
 
     private func formatSize(_ bytes: Int) -> String {
-        if bytes < 1024 {
-            return "\(bytes) B"
-        } else if bytes < 1024 * 1024 {
-            return String(format: "%.1f KB", Double(bytes) / 1024)
-        } else {
-            return String(format: "%.1f MB", Double(bytes) / (1024 * 1024))
-        }
+        if bytes < 1024 { return "\(bytes) B" }
+        else if bytes < 1024 * 1024 { return String(format: "%.1f KB", Double(bytes) / 1024) }
+        else { return String(format: "%.1f MB", Double(bytes) / (1024 * 1024)) }
     }
 }

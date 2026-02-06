@@ -20,21 +20,17 @@ class DesignViewModel: ObservableObject {
         self.appState = appState
     }
 
-    // MARK: - Version Management
-
     func loadVersions(projectId: String, pageId: String) {
         if projectId.hasPrefix("local:") {
             loadLocalVersions(projectId: projectId)
             return
         }
-        // No server version loading in Forge
         pageVersions = []
     }
 
     func restoreVersion(project: Project, pageId: String, version: Int) {
         if project.id.hasPrefix("local:") {
             restoreLocalVersion(projectId: project.id, version: version)
-            return
         }
     }
 
@@ -52,11 +48,8 @@ class DesignViewModel: ObservableObject {
     func handlePagesUpdate(projectId: String, selectedPageId: String?, newPages: [Page]) {
         if projectId.hasPrefix("local:") {
             loadLocalVersions(projectId: projectId)
-            return
         }
     }
-
-    // MARK: - Local Versioning (Git)
 
     private func loadLocalVersions(projectId: String) {
         guard !isLoadingVersions else { return }

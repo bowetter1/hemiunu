@@ -9,9 +9,7 @@ struct BuildSiteSheet: View {
 
     /// Nav links parsed from the current index.html
     @State private var navLinks: [NavLink] = []
-    /// Which nav links are selected for building
     @State private var selectedLinks: Set<String> = []
-    /// Custom pages added by user
     @State private var customPages: [String] = []
     @State private var customPageName = ""
 
@@ -38,7 +36,6 @@ struct BuildSiteSheet: View {
             // Page list
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    // Nav links from index.html
                     ForEach(navLinks, id: \.name) { link in
                         navLinkRow(link)
                     }
@@ -56,11 +53,8 @@ struct BuildSiteSheet: View {
                         .padding(.horizontal, 4)
                     }
 
-                    // Custom pages
                     if !customPages.isEmpty {
-                        Divider()
-                            .padding(.vertical, 6)
-
+                        Divider().padding(.vertical, 6)
                         ForEach(customPages, id: \.self) { name in
                             customPageRow(name)
                         }
@@ -197,14 +191,12 @@ struct BuildSiteSheet: View {
         customPageName = ""
     }
 
-    /// Read index.html from the local workspace and extract <nav> links
     private func parseNavLinks() {
         guard let html = readCurrentHTML() else { return }
 
         var links: [NavLink] = []
         var seen = Set<String>()
 
-        // Extract links from <nav>...</nav> block first, fall back to <header>
         let navHTML: String
         if let navRegex = try? NSRegularExpression(pattern: "<nav[^>]*>.*?</nav>", options: [.caseInsensitive, .dotMatchesLineSeparators]),
            let navMatch = navRegex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)) {
@@ -216,18 +208,14 @@ struct BuildSiteSheet: View {
             return
         }
 
-        // Match <a href="...">text</a>
         let pattern = #"<a\s[^>]*href\s*=\s*"([^"]*)"[^>]*>(.*?)</a>"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) else { return }
         let nsString = navHTML as NSString
         let matches = regex.matches(in: navHTML, range: NSRange(location: 0, length: nsString.length))
 
         for match in matches {
-            let href = nsString.substring(with: match.range(at: 1))
-                .trimmingCharacters(in: .whitespaces)
+            let href = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespaces)
             let rawText = nsString.substring(with: match.range(at: 2))
-
-            // Strip HTML tags from link text
             let name = rawText.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -258,12 +246,7 @@ struct BuildSiteSheet: View {
         }
 
         if let previewURL = appState.localPreviewURL {
-            let candidates = [
-                "index.html",
-                "proposal/index.html",
-                "dist/index.html",
-                "public/index.html",
-            ]
+            let candidates = ["index.html", "proposal/index.html", "dist/index.html", "public/index.html"]
             for candidate in candidates {
                 let url = previewURL.appendingPathComponent(candidate)
                 if let html = try? String(contentsOf: url, encoding: .utf8) {
@@ -271,14 +254,12 @@ struct BuildSiteSheet: View {
                 }
             }
         }
-
         return nil
     }
 
     private func buildSite() {
         var allPages = Array(selectedLinks).sorted()
         allPages.append(contentsOf: customPages)
-
         guard !allPages.isEmpty else { return }
 
         let pageList = allPages.joined(separator: ", ")

@@ -9,7 +9,6 @@ struct SidebarFileRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 6) {
-                // Tree connector for child pages
                 if !isRoot {
                     HStack(spacing: 0) {
                         Rectangle()
@@ -96,10 +95,8 @@ struct SidebarLayoutPageRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Layout/Hero page row
             Button(action: { onSelectPage(page.id) }) {
                 HStack(spacing: 8) {
-                    // Expand/collapse button (only if has children)
                     if !childPages.isEmpty {
                         Button(action: { isExpanded.toggle() }) {
                             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
@@ -141,18 +138,15 @@ struct SidebarLayoutPageRow: View {
             }
             .buttonStyle(.plain)
 
-            // Child pages (indented)
             if isExpanded && !childPages.isEmpty {
                 VStack(spacing: 1) {
-                    ForEach(Array(childPages.enumerated()), id: \.element.id) { index, child in
+                    ForEach(Array(childPages.enumerated()), id: \.element.id) { _, child in
                         Button(action: { onSelectPage(child.id) }) {
                             HStack(spacing: 6) {
-                                // Tree connector line
                                 HStack(spacing: 0) {
                                     Rectangle()
                                         .fill(Color.secondary.opacity(0.3))
                                         .frame(width: 1)
-
                                     Rectangle()
                                         .fill(Color.secondary.opacity(0.3))
                                         .frame(width: 8, height: 1)
@@ -189,71 +183,5 @@ struct SidebarLayoutPageRow: View {
             return "Layout \(variant)"
         }
         return page.name
-    }
-}
-
-struct SidebarProjectRow: View {
-    let project: Project
-    let isSelected: Bool
-    let onSelect: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Button(action: onSelect) {
-                HStack(alignment: .top, spacing: 8) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                        .padding(.top, 4)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(projectTitle)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-
-                        Text(formattedDate)
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    }
-
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            // Always visible 3-dot menu
-            Menu {
-                Button(role: .destructive, action: onDelete) {
-                    Label("Delete", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
-        .cornerRadius(6)
-    }
-
-    var projectTitle: String {
-        ProjectFormatters.projectTitle(project)
-    }
-
-    var formattedDate: String {
-        ProjectFormatters.formattedDate(project.createdAt)
-    }
-
-    var statusColor: Color {
-        ProjectFormatters.statusColor(for: project)
     }
 }
