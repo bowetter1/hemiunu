@@ -24,9 +24,9 @@ enum SystemPrompts {
     - Make targeted changes based on the user's request
 
     FORMAT:
-    - Wrap your HTML code in ```html code blocks
-    - You may add a brief explanation before or after the code
-    - If the user's request is unclear, ask a clarifying question instead
+    - Always start with a brief 1-2 sentence description of what you built or changed
+    - Then wrap your HTML code in ```html code blocks
+    - If the user's request is unclear, ask a clarifying question instead of generating code
     """
 
     /// Code editing prompt — used in code mode

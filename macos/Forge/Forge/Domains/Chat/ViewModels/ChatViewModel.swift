@@ -47,10 +47,12 @@ class ChatViewModel {
                     messages[assistantIndex].content += token
                 }
                 handleGeneratedContent(messages[assistantIndex].content)
+                saveChatHistory()
             } catch {
                 if !Task.isCancelled {
                     messages[assistantIndex].content += "\n\n[Error: \(error.localizedDescription)]"
                 }
+                saveChatHistory()
             }
             isStreaming = false
             isLoading = false
@@ -67,6 +69,7 @@ class ChatViewModel {
     func resetForProject() {
         stopStreaming()
         messages = []
+        loadChatHistory()
     }
 
     func selectedPage(for pageId: String?) -> Page? {
@@ -80,6 +83,14 @@ class ChatViewModel {
 
     private func handleGeneratedContent(_ content: String) {
         guard let html = extractHTML(from: content) else { return }
+
+        // Strip code blocks from chat display — keep only conversational text
+        if let lastAssistantIndex = messages.lastIndex(where: { $0.role == .assistant }) {
+            let chatText = stripCodeBlocks(from: content).trimmingCharacters(in: .whitespacesAndNewlines)
+            messages[lastAssistantIndex].content = chatText.isEmpty
+                ? "Site updated."
+                : chatText + "\n\n\u{2705} Site updated."
+        }
 
         guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
               let projectName = appState.localProjectName(from: projectId) else {
@@ -129,6 +140,42 @@ class ChatViewModel {
             print("[Chat] Failed to create project: \(error)")
             #endif
         }
+    }
+
+    // MARK: - Chat History Persistence
+
+    private var chatHistoryURL: URL? {
+        guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
+              let projectName = appState.localProjectName(from: projectId) else { return nil }
+        return appState.workspace.projectPath(projectName).appendingPathComponent("chat-history.json")
+    }
+
+    private func saveChatHistory() {
+        guard let url = chatHistoryURL else { return }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+        guard let data = try? encoder.encode(messages) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    private func loadChatHistory() {
+        guard let url = chatHistoryURL,
+              FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url) else { return }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let loaded = try? decoder.decode([ChatMessage].self, from: data) {
+            messages = loaded
+        }
+    }
+
+    /// Remove all ``` code blocks from a string, keeping surrounding text
+    private func stripCodeBlocks(from content: String) -> String {
+        let pattern = "```[\\w]*\\s*\\n[\\s\\S]*?\\n```"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return content }
+        let range = NSRange(content.startIndex..., in: content)
+        return regex.stringByReplacingMatches(in: content, range: range, withTemplate: "")
     }
 
     private func extractHTML(from content: String) -> String? {
