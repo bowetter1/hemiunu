@@ -83,13 +83,15 @@ class AppState: ObservableObject {
 
     // MARK: - AI
 
-    @Published var selectedProvider: AIProvider = .groq
+    @Published var selectedProvider: AIProvider = .cerebras
+    let cerebrasService = CerebrasService()
     let groqService = GroqService()
     let claudeService = ClaudeService()
 
     /// Returns the active AI service based on the selected provider
     var activeAIService: any AIService {
         switch selectedProvider {
+        case .cerebras: return cerebrasService
         case .groq: return groqService
         case .claude: return claudeService
         }
