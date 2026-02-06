@@ -28,8 +28,8 @@ enum AIProvider: String, CaseIterable, Codable {
 
     var modelName: String {
         switch self {
-        case .groq: return "llama-3.3-70b-versatile"
-        case .claude: return "claude-sonnet-4-5-20250929"
+        case .groq: return "qwen/qwen3-32b"
+        case .claude: return "claude-opus-4-6"
         }
     }
 
