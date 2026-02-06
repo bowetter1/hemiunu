@@ -13,9 +13,6 @@ enum Theme {
         static let background = Color(nsColor: .windowBackgroundColor)
         static let secondaryBackground = Color(nsColor: .controlBackgroundColor)
         static let tertiaryBackground = Color(nsColor: .textBackgroundColor)
-
-        static let glassFill = Color.primary.opacity(0.06)
-        static let glassFillHover = Color.primary.opacity(0.12)
     }
 
     // MARK: - Spacing
@@ -31,16 +28,16 @@ enum Theme {
     // MARK: - Corner Radius
 
     enum Radius {
-        static let sm: CGFloat = 6
-        static let md: CGFloat = 10
-        static let lg: CGFloat = 14
-        static let xl: CGFloat = 20
+        static let sm: CGFloat = 4
+        static let md: CGFloat = 8
+        static let lg: CGFloat = 12
+        static let xl: CGFloat = 16
     }
 
     // MARK: - Layout
 
     enum Layout {
-        static let sidebarWidth: CGFloat = 240
-        static let topbarHeight: CGFloat = 44
+        static let sidebarWidth: CGFloat = 220
+        static let topbarHeight: CGFloat = 36
     }
 }

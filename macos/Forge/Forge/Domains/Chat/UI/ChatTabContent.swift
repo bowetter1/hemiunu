@@ -62,7 +62,7 @@ struct ChatTabContent: View {
             Text("Forge")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
-            Text("Describe what you want to build.\nAI generates your site locally.")
+            Text("AI builds your site locally.\nDescribe what you want to build.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary.opacity(0.7))
                 .multilineTextAlignment(.center)
@@ -81,14 +81,14 @@ struct ChatTabContent: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Theme.Colors.glassFill)
+        .background(Color(nsColor: .windowBackgroundColor))
         .cornerRadius(10)
     }
 
     private var streamingIndicator: some View {
         HStack(spacing: 6) {
             PulsingDots()
-            Text("Generating...")
+            Text("Streaming...")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
             Spacer()

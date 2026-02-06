@@ -27,8 +27,12 @@ struct ToolsPanel: View {
             }
         }
         .frame(width: isExpanded ? panelWidth : 44)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
-        .glassEffect(.regular)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+        )
     }
 
     private var expandedPanel: some View {
@@ -60,7 +64,7 @@ struct ToolsPanel: View {
                 ScrollView {
                     VStack(spacing: 8) {
                         // New Project - always at top
-                        NewProjectCard(appState: appState, onProjectCreated: onProjectCreated)
+                        NewProjectCard(appState: appState, chatViewModel: chatViewModel, onProjectCreated: onProjectCreated)
 
                         // Build full site from existing page
                         BuildSiteCard(appState: appState, chatViewModel: chatViewModel)
@@ -182,7 +186,7 @@ struct ToolsPanelDivider: View {
 
     var body: some View {
         Rectangle()
-            .fill(isDragging ? Color.blue : Color.secondary.opacity(0.3))
+            .fill(isDragging ? Color.orange : Color.secondary.opacity(0.3))
             .frame(height: isDragging ? 3 : 1)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle().inset(by: -4))

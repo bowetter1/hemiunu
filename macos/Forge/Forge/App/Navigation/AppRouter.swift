@@ -18,12 +18,9 @@ struct AppRouter: View {
             Color(nsColor: .windowBackgroundColor)
                 .ignoresSafeArea()
 
-            GridBackground()
-
             if showAuthGate {
                 LoginView(appState: appState)
             } else {
-                GlassEffectContainer {
                 // Main layout - ignore safe area to flow into title bar
                 VStack(spacing: 0) {
                     // Topbar spanning full width - flows into title bar area
@@ -32,13 +29,8 @@ struct AppRouter: View {
                         selectedMode: $appState.currentMode,
                         appearanceMode: $appState.appearanceMode,
                         isConnected: appState.isConnected,
-                        errorMessage: appState.errorMessage,
                         hasProject: appState.currentProject != nil,
-                        isStreaming: appState.chatViewModel.isStreaming,
-                        onNewProject: {
-                            appState.clearCurrentProject()
-                            appState.currentMode = .design
-                        },
+                        chatViewModel: appState.chatViewModel,
                         onLogout: {
                             appState.logout()
                             appState.clearCurrentProject()
@@ -58,7 +50,6 @@ struct AppRouter: View {
                             openPreviewInBrowser()
                         }
                     )
-                    .padding(.horizontal, 0)
 
                     // Content row: left sidebar + main + right sidebar
                     HStack(spacing: 0) {
@@ -85,7 +76,12 @@ struct AppRouter: View {
                         // Main content card
                         modeContent
                             .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xl))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
                             .padding(.leading, appState.showSidebar ? 0 : 16)
                             .padding(.trailing, 8)
 
@@ -129,9 +125,7 @@ struct AppRouter: View {
                     )
                     .zIndex(30)
                 }
-                } // GlassEffectContainer
             }
-
         }
         .onAppear {
             Task {
@@ -164,7 +158,6 @@ struct AppRouter: View {
                 sidebarVisible: appState.showSidebar,
                 toolsPanelVisible: showToolsPanel,
                 selectedPageId: appState.selectedPageId,
-                showResearchJSON: appState.showResearchJSON,
                 onProjectCreated: { projectId in
                     Task {
                         await appState.loadProject(id: projectId)
@@ -206,7 +199,6 @@ struct AppRouter: View {
             }
         }
     }
-
 }
 
 #Preview {

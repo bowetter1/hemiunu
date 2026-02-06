@@ -6,10 +6,8 @@ struct Topbar: View {
     @Binding var selectedMode: AppMode
     @Binding var appearanceMode: AppearanceMode
     let isConnected: Bool
-    let errorMessage: String?
     let hasProject: Bool
-    let isStreaming: Bool
-    var onNewProject: (() -> Void)? = nil
+    let chatViewModel: ChatViewModel
     var onLogout: (() -> Void)? = nil
     var showModeSelector: Bool = true
     var inlineTrafficLights: Bool = false
@@ -58,7 +56,7 @@ struct Topbar: View {
         .frame(height: height, alignment: .top)
         .padding(.top, topInset)
         .padding(.horizontal, 12)
-        .glassEffect(.regular)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var leftGroup: some View {
@@ -80,11 +78,14 @@ struct Topbar: View {
                 previewControls
             }
 
-            // Streaming indicator
-            if isStreaming {
-                StreamingIndicator()
+            // Activity indicator
+            if chatViewModel.isStreaming {
+                ActivityPill(chatViewModel: chatViewModel)
                     .frame(height: itemHeight)
             }
+
+            // Logs button
+            TopbarLogsButton(chatViewModel: chatViewModel, iconSize: iconSize)
 
             // Divider
             Capsule()
@@ -134,7 +135,7 @@ struct Topbar: View {
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(Theme.Colors.glassFill)
+            .background(Color.primary.opacity(0.05))
             .cornerRadius(6)
 
             // Open in browser

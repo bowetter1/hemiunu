@@ -10,8 +10,9 @@
 		A10001000000000000000001 /* ForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000001 /* ForgeApp.swift */; };
 		A10001000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000002 /* AppState.swift */; };
 		A10001000000000000000003 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000003 /* AppRouter.swift */; };
-		A10001000000000000000004 /* Topbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000004 /* Topbar.swift */; };
 		A10001000000000000000005 /* TopbarComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000005 /* TopbarComponents.swift */; };
+		A10001000000000000000042 /* Topbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000042 /* Topbar.swift */; };
+		A10001000000000000000043 /* ToolCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000043 /* ToolCard.swift */; };
 		A10001000000000000000006 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000006 /* NotificationService.swift */; };
 		A10001000000000000000007 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000007 /* AuthService.swift */; };
 		A10001000000000000000008 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000008 /* LoginView.swift */; };
@@ -33,7 +34,6 @@
 		A10001000000000000000018 /* ChatBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000018 /* ChatBubble.swift */; };
 		A10001000000000000000019 /* FloatingChatWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000019 /* FloatingChatWindow.swift */; };
 		A1000100000000000000001A /* WebPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001A /* WebPreview.swift */; };
-		A1000100000000000000001B /* BrowserChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001B /* BrowserChrome.swift */; };
 		A1000100000000000000001C /* ProjectFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001C /* ProjectFile.swift */; };
 		A1000100000000000000001D /* CodeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001D /* CodeViewModel.swift */; };
 		A1000100000000000000001E /* CodeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001E /* CodeEditorView.swift */; };
@@ -53,22 +53,19 @@
 		A1000100000000000000002C /* CodeFileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000002C /* CodeFileRow.swift */; };
 		A1000100000000000000002D /* ToolsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000002D /* ToolsPanel.swift */; };
 		A1000100000000000000002E /* NewProjectCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000002E /* NewProjectCard.swift */; };
-		A1000100000000000000002F /* ToolCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000002F /* ToolCard.swift */; };
 		A10001000000000000000030 /* BuildSiteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000030 /* BuildSiteCard.swift */; };
 		A10001000000000000000031 /* BuildSiteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000031 /* BuildSiteSheet.swift */; };
 		A10001000000000000000032 /* SettingsToolCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000032 /* SettingsToolCard.swift */; };
 		A10001000000000000000033 /* DesignView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000033 /* DesignView.swift */; };
-		A10001000000000000000034 /* BriefBuilderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000034 /* BriefBuilderView.swift */; };
 		A10001000000000000000035 /* StartProjectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000035 /* StartProjectSheet.swift */; };
-		A10001000000000000000036 /* GridBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000036 /* GridBackground.swift */; };
 		A10001000000000000000037 /* DesignViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000037 /* DesignViewModel.swift */; };
 		A10001000000000000000038 /* HTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000038 /* HTTPClient.swift */; };
 		A10001000000000000000039 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000039 /* Theme.swift */; };
-		A1000100000000000000003A /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000003A /* CommandBar.swift */; };
 		A1000100000000000000003B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000003B /* Assets.xcassets */; };
-		A1000100000000000000003F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 04EA1AE02F35036A000A2556 /* GoogleService-Info.plist */; };
 		A1000100000000000000003C /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E10001000000000000000001 /* FirebaseAuth */; };
 		A1000100000000000000003D /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = E10001000000000000000002 /* GoogleSignIn */; };
+		A1000100000000000000003F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 04EA1AE02F35036A000A2556 /* GoogleService-Info.plist */; };
+		A10001000000000000000041 /* default-preview.html in Resources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000041 /* default-preview.html */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -76,8 +73,9 @@
 		B10001000000000000000001 /* ForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgeApp.swift; sourceTree = "<group>"; };
 		B10001000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		B10001000000000000000003 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
-		B10001000000000000000004 /* Topbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Topbar.swift; sourceTree = "<group>"; };
 		B10001000000000000000005 /* TopbarComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopbarComponents.swift; sourceTree = "<group>"; };
+		B10001000000000000000042 /* Topbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Topbar.swift; sourceTree = "<group>"; };
+		B10001000000000000000043 /* ToolCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCard.swift; sourceTree = "<group>"; };
 		B10001000000000000000006 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		B10001000000000000000007 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		B10001000000000000000008 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -99,7 +97,6 @@
 		B10001000000000000000018 /* ChatBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubble.swift; sourceTree = "<group>"; };
 		B10001000000000000000019 /* FloatingChatWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingChatWindow.swift; sourceTree = "<group>"; };
 		B1000100000000000000001A /* WebPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebPreview.swift; sourceTree = "<group>"; };
-		B1000100000000000000001B /* BrowserChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserChrome.swift; sourceTree = "<group>"; };
 		B1000100000000000000001C /* ProjectFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectFile.swift; sourceTree = "<group>"; };
 		B1000100000000000000001D /* CodeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeViewModel.swift; sourceTree = "<group>"; };
 		B1000100000000000000001E /* CodeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorView.swift; sourceTree = "<group>"; };
@@ -119,22 +116,19 @@
 		B1000100000000000000002C /* CodeFileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeFileRow.swift; sourceTree = "<group>"; };
 		B1000100000000000000002D /* ToolsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolsPanel.swift; sourceTree = "<group>"; };
 		B1000100000000000000002E /* NewProjectCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProjectCard.swift; sourceTree = "<group>"; };
-		B1000100000000000000002F /* ToolCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCard.swift; sourceTree = "<group>"; };
 		B10001000000000000000030 /* BuildSiteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildSiteCard.swift; sourceTree = "<group>"; };
 		B10001000000000000000031 /* BuildSiteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildSiteSheet.swift; sourceTree = "<group>"; };
 		B10001000000000000000032 /* SettingsToolCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsToolCard.swift; sourceTree = "<group>"; };
 		B10001000000000000000033 /* DesignView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignView.swift; sourceTree = "<group>"; };
-		B10001000000000000000034 /* BriefBuilderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriefBuilderView.swift; sourceTree = "<group>"; };
 		B10001000000000000000035 /* StartProjectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartProjectSheet.swift; sourceTree = "<group>"; };
-		B10001000000000000000036 /* GridBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridBackground.swift; sourceTree = "<group>"; };
 		B10001000000000000000037 /* DesignViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignViewModel.swift; sourceTree = "<group>"; };
 		B10001000000000000000038 /* HTTPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPClient.swift; sourceTree = "<group>"; };
 		B10001000000000000000039 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		B1000100000000000000003A /* CommandBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBar.swift; sourceTree = "<group>"; };
 		B1000100000000000000003B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B1000100000000000000003C /* Forge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Forge.entitlements; sourceTree = "<group>"; };
 		B1000100000000000000003D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B1000100000000000000003E /* Forge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Forge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10001000000000000000041 /* default-preview.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "default-preview.html"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -165,6 +159,7 @@
 				D10001000000000000000004 /* App */,
 				D10001000000000000000050 /* Domains */,
 				D10001000000000000000080 /* Shared */,
+				D10001000000000000000090 /* Resources */,
 				B1000100000000000000003B /* Assets.xcassets */,
 				B1000100000000000000003C /* Forge.entitlements */,
 				B1000100000000000000003D /* Info.plist */,
@@ -211,7 +206,7 @@
 		D10001000000000000000007 /* Topbar */ = {
 			isa = PBXGroup;
 			children = (
-				B10001000000000000000004 /* Topbar.swift */,
+				B10001000000000000000042 /* Topbar.swift */,
 				D10001000000000000000008 /* Components */,
 			);
 			path = Topbar;
@@ -364,7 +359,6 @@
 			isa = PBXGroup;
 			children = (
 				B1000100000000000000001A /* WebPreview.swift */,
-				B1000100000000000000001B /* BrowserChrome.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -476,8 +470,8 @@
 		D1000100000000000000006B /* Cards */ = {
 			isa = PBXGroup;
 			children = (
+				B10001000000000000000043 /* ToolCard.swift */,
 				B1000100000000000000002E /* NewProjectCard.swift */,
-				B1000100000000000000002F /* ToolCard.swift */,
 				B10001000000000000000030 /* BuildSiteCard.swift */,
 				B10001000000000000000031 /* BuildSiteSheet.swift */,
 				B10001000000000000000032 /* SettingsToolCard.swift */,
@@ -498,9 +492,7 @@
 			isa = PBXGroup;
 			children = (
 				B10001000000000000000033 /* DesignView.swift */,
-				B10001000000000000000034 /* BriefBuilderView.swift */,
 				B10001000000000000000035 /* StartProjectSheet.swift */,
-				B10001000000000000000036 /* GridBackground.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -542,9 +534,16 @@
 		D10001000000000000000083 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				B1000100000000000000003A /* CommandBar.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		D10001000000000000000090 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B10001000000000000000041 /* default-preview.html */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -614,6 +613,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000100000000000000003B /* Assets.xcassets in Resources */,
+				A10001000000000000000041 /* default-preview.html in Resources */,
 				A1000100000000000000003F /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -629,10 +629,10 @@
 				A10001000000000000000001 /* ForgeApp.swift in Sources */,
 				A10001000000000000000006 /* NotificationService.swift in Sources */,
 				A10001000000000000000003 /* AppRouter.swift in Sources */,
-				A10001000000000000000004 /* Topbar.swift in Sources */,
 				A10001000000000000000005 /* TopbarComponents.swift in Sources */,
+				A10001000000000000000042 /* Topbar.swift in Sources */,
+				A10001000000000000000043 /* ToolCard.swift in Sources */,
 				A10001000000000000000039 /* Theme.swift in Sources */,
-				A1000100000000000000003A /* CommandBar.swift in Sources */,
 				A10001000000000000000038 /* HTTPClient.swift in Sources */,
 				A1000100000000000000000D /* AIProvider.swift in Sources */,
 				A1000100000000000000000F /* AIError.swift in Sources */,
@@ -671,15 +671,11 @@
 				A10001000000000000000007 /* AuthService.swift in Sources */,
 				A10001000000000000000008 /* LoginView.swift in Sources */,
 				A1000100000000000000001A /* WebPreview.swift in Sources */,
-				A1000100000000000000001B /* BrowserChrome.swift in Sources */,
 				A10001000000000000000037 /* DesignViewModel.swift in Sources */,
 				A10001000000000000000033 /* DesignView.swift in Sources */,
-				A10001000000000000000034 /* BriefBuilderView.swift in Sources */,
 				A10001000000000000000035 /* StartProjectSheet.swift in Sources */,
-				A10001000000000000000036 /* GridBackground.swift in Sources */,
 				A1000100000000000000002D /* ToolsPanel.swift in Sources */,
 				A1000100000000000000002E /* NewProjectCard.swift in Sources */,
-				A1000100000000000000002F /* ToolCard.swift in Sources */,
 				A10001000000000000000030 /* BuildSiteCard.swift in Sources */,
 				A10001000000000000000031 /* BuildSiteSheet.swift in Sources */,
 				A10001000000000000000032 /* SettingsToolCard.swift in Sources */,
@@ -741,7 +737,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -797,7 +793,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -826,6 +822,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.forge.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -855,6 +852,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.forge.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";

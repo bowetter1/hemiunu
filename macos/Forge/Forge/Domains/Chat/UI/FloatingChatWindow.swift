@@ -24,7 +24,7 @@ struct FloatingChatWindow: View {
                 // Drag handle
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 12))
-                    .foregroundColor(isDragging ? .blue : .secondary.opacity(0.5))
+                    .foregroundColor(isDragging ? .orange : .secondary.opacity(0.5))
                     .frame(width: 30, height: 44)
                     .contentShape(Rectangle())
                     .onHover { hovering in
@@ -39,28 +39,21 @@ struct FloatingChatWindow: View {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14))
-                        .foregroundColor(.blue)
+                        .foregroundColor(.orange)
 
                     TextField("Ask anything...", text: $inputText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 14))
                         .onSubmit { sendMessage() }
 
-                    if chatViewModel.isStreaming {
-                        Button(action: { chatViewModel.stopStreaming() }) {
-                            Image(systemName: "stop.circle.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(.red)
-                        }
-                        .buttonStyle(.plain)
-                    } else if chatViewModel.isLoading {
+                    if chatViewModel.isLoading {
                         ProgressView()
                             .scaleEffect(0.7)
                     } else {
                         Button(action: sendMessage) {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 22))
-                                .foregroundColor(inputText.isEmpty ? .secondary.opacity(0.5) : .blue)
+                                .foregroundColor(inputText.isEmpty ? .secondary.opacity(0.5) : .orange)
                         }
                         .buttonStyle(.plain)
                         .disabled(inputText.isEmpty)
@@ -78,12 +71,13 @@ struct FloatingChatWindow: View {
                 }
                 .buttonStyle(.plain)
             }
+            .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 22))
-            .glassEffect(.regular)
             .overlay(
                 RoundedRectangle(cornerRadius: 22)
-                    .stroke(isDragging ? Color.blue : Color.clear, lineWidth: isDragging ? 2 : 0)
+                    .stroke(isDragging ? Color.orange : Color.secondary.opacity(0.2), lineWidth: isDragging ? 2 : 1)
             )
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
             .frame(maxWidth: 600)
             .position(
                 x: (hasInitialPosition ? position.x : initialPosition.x) + dragOffset.width,

@@ -53,8 +53,9 @@ class AppState: ObservableObject {
     // MARK: - Navigation
 
     @Published var currentMode: AppMode = .design
-    @Published var showSidebar: Bool = true
     @Published var showFloatingChat: Bool = false
+    @Published var showSidebar: Bool = true
+    @Published var showResearchJSON: Bool = false
 
     // MARK: - Preview
 
@@ -71,7 +72,6 @@ class AppState: ObservableObject {
 
     @Published var selectedProjectId: String?
     @Published var selectedPageId: String?
-    @Published var showResearchJSON: Bool = false
 
     // MARK: - Domain Data
 

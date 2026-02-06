@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseCore
+import AppKit
 
 @main
 struct ForgeApp: App {
@@ -19,6 +20,7 @@ struct ForgeApp: App {
                     NotificationService.shared.requestPermission()
                 }
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .appSettings) {
                 Picker("Appearance", selection: $appState.appearanceMode) {
@@ -36,19 +38,29 @@ struct ForgeApp: App {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
-        // Clean shutdown — no boss processes to kill
+        // Clean shutdown
     }
 }
 
 // MARK: - Window Configuration
 
+/// Helper to configure NSWindow for full-size content with traffic lights
 struct WindowAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {
+                // Enable full-size content view
+                window.styleMask.insert(.fullSizeContentView)
+
+                // Make title bar transparent
                 window.titlebarAppearsTransparent = true
                 window.titleVisibility = .hidden
+
+                // Keep traffic lights visible
+                window.standardWindowButton(.closeButton)?.isHidden = false
+                window.standardWindowButton(.miniaturizeButton)?.isHidden = false
+                window.standardWindowButton(.zoomButton)?.isHidden = false
             }
         }
         return view

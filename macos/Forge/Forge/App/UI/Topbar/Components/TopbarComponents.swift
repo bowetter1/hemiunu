@@ -50,7 +50,7 @@ struct ModeSelector: View {
             }
         }
         .padding(.horizontal, 3)
-        .background(Theme.Colors.glassFill)
+        .background(Color.primary.opacity(0.05))
         .cornerRadius(8)
     }
 
@@ -62,26 +62,124 @@ struct ModeSelector: View {
     }
 }
 
-// MARK: - Streaming Indicator
+// MARK: - Activity Pill
 
-struct StreamingIndicator: View {
-    @State private var isPulsing = false
+struct ActivityPill: View {
+    let chatViewModel: ChatViewModel
 
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(Color.blue)
+                .fill(phaseColor)
                 .frame(width: 6, height: 6)
-                .modifier(PulseModifier(active: true))
+                .modifier(PulseModifier(active: chatViewModel.isStreaming))
 
-            Text("Generating\u{2026}")
+            Text(statusText)
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Theme.Colors.glassFill)
+        .background(Color.primary.opacity(0.05))
         .cornerRadius(10)
+        .animation(.easeInOut(duration: 0.2), value: chatViewModel.isStreaming)
+    }
+
+    private var phaseColor: Color {
+        if chatViewModel.isStreaming {
+            return chatViewModel.isLoading ? .blue : .orange
+        }
+        return .secondary
+    }
+
+    private var statusText: String {
+        if chatViewModel.isStreaming {
+            return chatViewModel.isLoading ? "Thinking\u{2026}" : "Streaming\u{2026}"
+        }
+        return "Idle"
+    }
+}
+
+// MARK: - Topbar Logs Button
+
+struct TopbarLogsButton: View {
+    let chatViewModel: ChatViewModel
+    let iconSize: CGFloat
+    @State private var isExpanded = false
+
+    var body: some View {
+        Button {
+            isExpanded.toggle()
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: iconSize, weight: .medium))
+                if !chatViewModel.messages.isEmpty {
+                    Text("\(chatViewModel.messages.count)")
+                        .font(.system(size: 9, weight: .semibold))
+                        .monospacedDigit()
+                }
+            }
+            .foregroundColor(.secondary)
+            .frame(height: 28)
+            .padding(.horizontal, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
+            LogsPopover(messages: chatViewModel.messages)
+        }
+    }
+}
+
+// MARK: - Logs Popover
+
+struct LogsPopover: View {
+    let messages: [ChatMessage]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Activity")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+
+            Divider()
+
+            if messages.isEmpty {
+                Text("No activity yet")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                    .frame(maxWidth: .infinity)
+                    .padding(16)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(messages.suffix(20)) { message in
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(message.role == .user ? .blue : .green)
+                                    .frame(width: 5, height: 5)
+
+                                Image(systemName: message.role == .user ? "person" : "sparkles")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+
+                                Text(message.content.prefix(60) + (message.content.count > 60 ? "\u{2026}" : ""))
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+                            }
+                            .padding(.vertical, 3)
+                            .padding(.horizontal, 4)
+                        }
+                    }
+                    .padding(8)
+                }
+            }
+        }
+        .frame(width: 260, height: 200)
     }
 }
 
@@ -105,6 +203,7 @@ struct PulseModifier: ViewModifier {
             .onChange(of: active) { _, new in isPulsing = new }
     }
 }
+
 // MARK: - Legacy Support
 
 typealias ToolbarButton = IconButton
