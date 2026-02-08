@@ -1,35 +1,50 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct StartProjectSheet: View {
+struct OpusDesignSheet: View {
     @Binding var isPresented: Bool
-    let chatViewModel: ChatViewModel
-    var initialBrief: String = ""
+    let boss: BossCoordinator?
     let onProjectCreated: (String) -> Void
 
     // Form state
     @State private var projectName = ""
-    @State private var briefText: String
+    @State private var briefText = ""
     @State private var websiteURL = ""
     @State private var selectedImage: NSImage?
     @State private var isDraggingOver = false
     @State private var isCreating = false
 
-    // AI provider
-    @State private var selectedProvider: AIProvider = .groq
+    // Generation config
+    @State private var config = GenerationConfig()
+    @State private var selectedImageSource: ImageSource = .auto
 
-    init(isPresented: Binding<Bool>, chatViewModel: ChatViewModel, initialBrief: String = "", onProjectCreated: @escaping (String) -> Void) {
-        self._isPresented = isPresented
-        self.chatViewModel = chatViewModel
-        self._briefText = State(initialValue: initialBrief)
-        self.onProjectCreated = onProjectCreated
+    private enum ImageSource: String, CaseIterable, Identifiable {
+        case auto = "auto"
+        case none = "none"
+        case existingImages = "existing_images"
+        case img2img = "img2img"
+        case ai = "ai"
+        case stock = "stock"
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .auto: return "AI chooses"
+            case .none: return "No images"
+            case .existingImages: return "Existing (from site)"
+            case .img2img: return "Img2img (restyle)"
+            case .ai: return "AI generated"
+            case .stock: return "Stock photos"
+            }
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Start Project")
+                Text("Opus Design")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Button(action: { isPresented = false }) {
@@ -49,7 +64,7 @@ struct StartProjectSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     // Project name
                     sectionLabel("Project Name", icon: "tag")
-                    TextField("e.g. Fjallraven", text: $projectName)
+                    TextField("e.g. Fjällräven", text: $projectName)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .padding(10)
@@ -58,10 +73,11 @@ struct StartProjectSheet: View {
 
                     // Brief
                     sectionLabel("Description", icon: "text.alignleft")
-                    TextEditor(text: $briefText)
+                    TextField("What do you want to build?", text: $briefText, axis: .vertical)
+                        .textFieldStyle(.plain)
                         .font(.system(size: 12))
-                        .frame(minHeight: 200, maxHeight: 400)
-                        .padding(6)
+                        .lineLimit(3...5)
+                        .padding(10)
                         .background(Color(nsColor: .textBackgroundColor))
                         .cornerRadius(8)
 
@@ -76,14 +92,52 @@ struct StartProjectSheet: View {
 
                     Divider()
 
-                    // AI Provider
-                    sectionLabel("AI Provider", icon: "brain")
-                    Picker("Provider", selection: $selectedProvider) {
-                        ForEach(AIProvider.allCases, id: \.self) { provider in
-                            Text(provider.displayName).tag(provider)
+                    // Image source
+                    sectionLabel("Image Source", icon: "photo.on.rectangle")
+                    Picker("", selection: $selectedImageSource) {
+                        ForEach(ImageSource.allCases) { source in
+                            Text(source.title).tag(source)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.radioGroup)
+                    .font(.system(size: 11))
+                    .padding(6)
+                    .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+                    .cornerRadius(8)
+
+                    Divider()
+
+                    // Research toggles
+                    sectionLabel("Research", icon: "magnifyingglass")
+
+                    toggleRow(
+                        title: "Web search for company",
+                        description: "Searches the web to find the company website",
+                        isOn: $config.webSearchCompany
+                    )
+                    toggleRow(
+                        title: "Scrape company site",
+                        description: "Extracts brand colors and images from their site",
+                        isOn: $config.scrapeCompanySite
+                    )
+                    toggleRow(
+                        title: "Find inspiration sites",
+                        description: "Finds \(config.inspirationSiteCount) inspiration sites + competitors",
+                        isOn: $config.findInspirationSites
+                    )
+
+                    Divider()
+
+                    // Info text
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 10))
+                            .foregroundColor(.orange)
+                        Text("Claude Opus researches + designs 3 alternatives, then 3 Kimi build them in parallel")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.leading, 4)
 
                     // Image upload
                     sectionLabel("Inspiration", icon: "photo")
@@ -122,7 +176,7 @@ struct StartProjectSheet: View {
             }
             .padding()
         }
-        .frame(width: 520, height: 760)
+        .frame(width: 480, height: 560)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -136,6 +190,23 @@ struct StartProjectSheet: View {
         Label(title, systemImage: icon)
             .font(.system(size: 10, weight: .medium))
             .foregroundColor(.secondary)
+    }
+
+    private func toggleRow(title: String, description: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                Text(description)
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            Toggle("", isOn: isOn)
+                .toggleStyle(.switch)
+                .labelsHidden()
+        }
+        .padding(.leading, 4)
     }
 
     @ViewBuilder
@@ -214,56 +285,48 @@ struct StartProjectSheet: View {
     }
 
     private func createProject() {
-        guard canCreate else { return }
+        guard canCreate, let boss else { return }
         isCreating = true
 
-        var prompt = briefText
+        var enhancedBrief = briefText
         if !websiteURL.isEmpty {
-            prompt += "\n\nReference website: \(websiteURL)"
+            enhancedBrief += "\n\nReference website: \(websiteURL)"
         }
 
-        // Set provider before sending
-        chatViewModel.appState.selectedProvider = selectedProvider
+        // Image source instruction
+        let imgInstruction = imageSourceInstruction
 
-        // Generate project name from user input or timestamp
-        let name = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let safeName: String
-        if name.isEmpty {
-            let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
-                .replacingOccurrences(of: ":", with: "")
-                .replacingOccurrences(of: " ", with: "")
-            safeName = "project-\(timestamp)"
-        } else {
-            safeName = name.lowercased()
-                .replacingOccurrences(of: " ", with: "-")
-                .filter { $0.isLetter || $0.isNumber || $0 == "-" }
-        }
+        // Set flow type
+        config.flowType = .opusDesign
 
-        // Create project folder + set ID BEFORE sending message so tools are available
-        let appState = chatViewModel.appState
-        do {
-            _ = try appState.workspace.createProject(name: safeName)
-            let projectId = "local:\(safeName)"
-            appState.setSelectedProjectId(projectId)
-            appState.setLocalPreviewURL(appState.workspace.projectPath(safeName))
-            appState.setLocalFiles(appState.workspace.listFiles(project: safeName))
-            appState.refreshLocalProjects()
+        // Activate Opus Design mode (1 Claude + 3 Kimi)
+        boss.activateOpusDesign()
 
-            // Ensure git is initialized so versioning works from first generation
-            Task {
-                _ = try? await appState.workspace.ensureGitRepository(project: safeName)
-            }
-        } catch {
-            #if DEBUG
-            print("[StartProject] Failed to create project folder: \(error)")
-            #endif
-        }
+        // Store build-phase config
+        let trimmedName = projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        boss.configureBuild(
+            config: config,
+            imageInstruction: imgInstruction,
+            inspirationImage: selectedImage,
+            projectName: trimmedName.isEmpty ? nil : trimmedName
+        )
 
         isPresented = false
-        onProjectCreated("local:\(safeName)")
+        // Small delay to let the sheet dismiss, then start the flow
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 200_000_000)
-            chatViewModel.sendMessage(prompt)
+            boss.startOpusDesignFlow(enhancedBrief, setLoading: { _ in })
+        }
+    }
+
+    private var imageSourceInstruction: String? {
+        switch selectedImageSource {
+        case .auto: return nil
+        case .none: return "Do not use any images in the design"
+        case .existingImages: return "Download and use images from the existing site"
+        case .img2img: return "Use img2img (apex_img2img) to restyle reference images from the site"
+        case .ai: return "Generate all images with AI (apex_generate_image)"
+        case .stock: return "Use stock photos only (apex_search_photos from Pexels)"
         }
     }
 }

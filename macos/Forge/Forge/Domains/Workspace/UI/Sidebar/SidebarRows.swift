@@ -49,13 +49,13 @@ struct SidebarPageRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 Image(systemName: "doc.text")
-                    .font(.system(size: 10))
+                    .font(.system(size: 9))
                     .foregroundColor(.secondary)
 
                 Text(pageName)
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundColor(.primary)
                     .lineLimit(1)
 
@@ -68,8 +68,8 @@ struct SidebarPageRow: View {
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+            .padding(.vertical, 3)
+            .background(isSelected ? Color.blue.opacity(0.08) : Color.clear)
             .cornerRadius(4)
         }
         .buttonStyle(.plain)
@@ -132,9 +132,9 @@ struct SidebarLayoutPageRow: View {
                     }
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.vertical, 5)
                 .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
-                .cornerRadius(6)
+                .cornerRadius(5)
             }
             .buttonStyle(.plain)
 
@@ -153,12 +153,12 @@ struct SidebarLayoutPageRow: View {
                                 }
                                 .frame(width: 16, height: 20)
 
-                                Image(systemName: "doc.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.blue.opacity(0.7))
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
 
                                 Text(child.name)
-                                    .font(.system(size: 11))
+                                    .font(.system(size: 10))
                                     .foregroundColor(.primary)
                                     .lineLimit(1)
 
@@ -166,8 +166,8 @@ struct SidebarLayoutPageRow: View {
                             }
                             .padding(.leading, 24)
                             .padding(.trailing, 10)
-                            .padding(.vertical, 4)
-                            .background(selectedPageId == child.id ? Color.blue.opacity(0.15) : Color.clear)
+                            .padding(.vertical, 3)
+                            .background(selectedPageId == child.id ? Color.blue.opacity(0.08) : Color.clear)
                             .cornerRadius(4)
                         }
                         .buttonStyle(.plain)

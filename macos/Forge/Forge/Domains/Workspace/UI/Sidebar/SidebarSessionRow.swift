@@ -26,69 +26,52 @@ struct SidebarSessionRow: View {
 
     private var multiProjectGroup: some View {
         VStack(spacing: 0) {
-            Button(action: { withAnimation { isExpanded.toggle() } }) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+            }) {
                 HStack(spacing: 8) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .frame(width: 10)
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(group.displayName)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-
-                        if group.hasBriefTitle {
-                            Text(group.dateLabel)
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary)
-                        }
-                    }
+                    Text(group.displayName)
+                        .font(.system(size: 12, weight: isSelected(group) ? .medium : .regular))
+                        .foregroundStyle(isSelected(group) ? .primary : .secondary)
+                        .lineLimit(1)
 
                     Spacer()
-
-                    Menu {
-                        Button(role: .destructive, action: { onDelete?() }) {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .frame(width: 20, height: 20)
-                            .contentShape(Rectangle())
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .cornerRadius(6)
+                .padding(.vertical, 5)
+                .background(isSelected(group) ? Color.blue.opacity(0.15) : Color.clear)
+                .cornerRadius(5)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                Button(role: .destructive, action: { onDelete?() }) {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
 
             if isExpanded {
                 VStack(spacing: 1) {
                     ForEach(Array(group.projects.enumerated()), id: \.element.id) { index, project in
                         VStack(spacing: 0) {
                             Button(action: { onSelect(project.name) }) {
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(isSelected(project) ? Color.blue : Color.secondary.opacity(0.3))
-                                        .frame(width: 6, height: 6)
+                                HStack(spacing: 6) {
+                                    Image(systemName: isSelected(project) ? "chevron.down" : "chevron.right")
+                                        .font(.system(size: 7, weight: .semibold))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 8)
 
                                     Text(project.agentName ?? "Layout \(index + 1)")
                                         .font(.system(size: 11, weight: isSelected(project) ? .medium : .regular))
-                                        .foregroundColor(.primary)
+                                        .foregroundStyle(isSelected(project) ? .primary : .tertiary)
                                         .lineLimit(1)
 
                                     Spacer()
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(isSelected(project) ? Color.blue.opacity(0.15) : Color.clear)
+                                .padding(.leading, 26)
+                                .padding(.trailing, 10)
+                                .padding(.vertical, 4)
+                                .background(isSelected(project) ? Color.blue.opacity(0.1) : Color.clear)
                                 .cornerRadius(4)
                                 .contentShape(Rectangle())
                             }
@@ -100,7 +83,6 @@ struct SidebarSessionRow: View {
                         }
                     }
                 }
-                .padding(.leading, 20)
             }
         }
     }
@@ -111,29 +93,28 @@ struct SidebarSessionRow: View {
         VStack(spacing: 1) {
             ForEach(pages) { page in
                 Button(action: { onSelectPage?(page.id) }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.fill")
+                    HStack(spacing: 5) {
+                        Image(systemName: "doc.text")
                             .font(.system(size: 9))
-                            .foregroundColor(selectedPageId == page.id ? .blue : .secondary.opacity(0.6))
-                            .frame(width: 12)
+                            .foregroundStyle(.secondary)
 
                         Text(pageDisplayName(page.name))
-                            .font(.system(size: 11))
-                            .foregroundColor(.primary)
+                            .font(.system(size: 10))
+                            .foregroundStyle(selectedPageId == page.id ? .primary : .tertiary)
                             .lineLimit(1)
 
                         Spacer()
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(selectedPageId == page.id ? Color.blue.opacity(0.15) : Color.clear)
+                    .padding(.vertical, 3)
+                    .background(selectedPageId == page.id ? Color.blue.opacity(0.08) : Color.clear)
                     .cornerRadius(4)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.leading, 16)
+        .padding(.leading, 44)
         .padding(.top, 2)
     }
 
@@ -143,6 +124,10 @@ struct SidebarSessionRow: View {
     }
 
     // MARK: - Helpers
+
+    private func isSelected(_ group: LocalProjectGroup) -> Bool {
+        group.projects.contains { isSelected($0) }
+    }
 
     private func isSelected(_ project: LocalProject) -> Bool {
         selectedProjectId == "local:\(project.name)"

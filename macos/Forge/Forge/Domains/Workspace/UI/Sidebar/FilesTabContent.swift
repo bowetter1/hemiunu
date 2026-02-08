@@ -200,13 +200,14 @@ struct FilesTabContent: View {
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
                 .textCase(.uppercase)
+                .tracking(1)
             Spacer()
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
     }
 }

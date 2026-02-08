@@ -3,11 +3,12 @@ import WebKit
 
 enum PreviewDevice: String, CaseIterable {
     case desktop
+    case laptop
     case tablet
     case mobile
 }
 
-/// Live preview of HTML content — expands when sidebar hidden
+/// Live preview of HTML content — fixed device viewport centered behind side panels
 struct WebPreview: View {
     let html: String
     var projectId: String? = nil
@@ -16,35 +17,45 @@ struct WebPreview: View {
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedDevice: PreviewDevice = .desktop
+    private let cornerRadius: CGFloat = 16
+    private let sidebarTotalWidth: CGFloat = 212
+    private let toolsPanelTotalWidth: CGFloat = 312
 
-    private let baseWidth: CGFloat = 800
-    private let sidebarWidth: CGFloat = 220
-    private let toolsPanelWidth: CGFloat = 220
-
-    private var previewWidth: CGFloat {
+    private var viewportWidth: CGFloat {
         switch selectedDevice {
-        case .desktop:
-            var width = baseWidth
-            if !sidebarVisible { width += sidebarWidth }
-            if !toolsPanelVisible { width += toolsPanelWidth }
-            return width
-        case .tablet:
-            return 768
-        case .mobile:
-            return 375
+        case .desktop: return 1280
+        case .laptop: return 1024
+        case .tablet: return 768
+        case .mobile: return 375
         }
     }
 
+    private var horizontalOffset: CGFloat {
+        let sidebarSpace: CGFloat = sidebarVisible ? sidebarTotalWidth : 0
+        let toolsSpace: CGFloat = toolsPanelVisible ? toolsPanelTotalWidth : 0
+        return (sidebarSpace - toolsSpace) / 2
+    }
+
     var body: some View {
-        HTMLWebView(html: html, projectId: projectId, localFileURL: localFileURL, refreshToken: refreshToken)
-            .frame(width: previewWidth)
-            .frame(maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
-            .animation(.easeInOut(duration: 0.2), value: previewWidth)
-            .padding(20)
+        GeometryReader { geo in
+            HTMLWebView(
+                html: html,
+                projectId: projectId,
+                localFileURL: localFileURL,
+                refreshToken: refreshToken,
+                cornerRadius: cornerRadius
+            )
+                .frame(width: viewportWidth, height: geo.size.height)
+                .clipShape(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+                    style: FillStyle(antialiased: false)
+                )
+                .position(x: geo.size.width / 2 + horizontalOffset, y: geo.size.height / 2)
+                .animation(.easeInOut(duration: 0.25), value: selectedDevice)
+                .animation(.easeInOut(duration: 0.2), value: sidebarVisible)
+                .animation(.easeInOut(duration: 0.2), value: toolsPanelVisible)
+        }
+        .clipped()
     }
 }
 
@@ -70,7 +81,7 @@ struct VersionDots: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.8))
+        .glassEffect(.regular, in: .rect(cornerRadius: 10, style: .continuous))
         .cornerRadius(10)
     }
 }
@@ -81,6 +92,7 @@ struct HTMLWebView: NSViewRepresentable {
     var projectId: String? = nil
     var localFileURL: URL? = nil
     var refreshToken: UUID = UUID()
+    var cornerRadius: CGFloat = 16
 
     final class Coordinator {
         var lastHTML: String?
@@ -98,10 +110,16 @@ struct HTMLWebView: NSViewRepresentable {
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
+        webView.wantsLayer = true
+        webView.layer?.cornerRadius = cornerRadius
+        webView.layer?.masksToBounds = true
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        webView.layer?.cornerRadius = cornerRadius
+        webView.layer?.masksToBounds = true
+
         // Local file URL: load directly
         if let localURL = localFileURL {
             let urlString = localURL.absoluteString

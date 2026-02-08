@@ -88,9 +88,10 @@ extension BossCoordinator {
         // Copy role-specific skill file — critical for agent behavior
         let skillFileName: String
         switch role {
-        case .solo:     skillFileName = "solo.md"
-        case .research: skillFileName = "research-only.md"
-        case .builder:  skillFileName = "builder-only.md"
+        case .solo:           skillFileName = "solo.md"
+        case .research:       skillFileName = "research-only.md"
+        case .researchDesign: skillFileName = "research-design.md"
+        case .builder:        skillFileName = "builder-only.md"
         }
 
         let skillSrc = templateDir.appendingPathComponent("skills/\(skillFileName)")
@@ -107,7 +108,7 @@ extension BossCoordinator {
             // No persistent memory — copy template as starting point (non-critical)
             let memoryFileName: String
             switch role {
-            case .research: memoryFileName = "memory-research.md"
+            case .research, .researchDesign: memoryFileName = "memory-research.md"
             case .builder, .solo: memoryFileName = "memory-build.md"
             }
             let memorySrc = templateDir.appendingPathComponent("skills/\(memoryFileName)")

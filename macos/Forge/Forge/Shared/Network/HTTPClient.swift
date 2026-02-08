@@ -10,12 +10,16 @@ enum HTTPClient {
         body: Data
     ) -> AsyncThrowingStream<Data, Error> {
         AsyncThrowingStream { continuation in
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 300
+            config.timeoutIntervalForResource = 600
             let delegate = StreamDelegate(continuation: continuation)
-            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
 
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.httpBody = body
+            request.timeoutInterval = 300
             for (key, value) in headers {
                 request.setValue(value, forHTTPHeaderField: key)
             }
@@ -38,11 +42,16 @@ enum HTTPClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = body
+        request.timeoutInterval = 300
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 600
+        let session = URLSession(configuration: config)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }

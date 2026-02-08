@@ -66,6 +66,9 @@ struct ToolsPanel: View {
                         // New Project - always at top
                         NewProjectCard(appState: appState, chatViewModel: chatViewModel, onProjectCreated: onProjectCreated)
 
+                        // Opus Design — research + 3 parallel builds
+                        OpusDesignCard(appState: appState, chatViewModel: chatViewModel, onProjectCreated: onProjectCreated)
+
                         // Build full site from existing page
                         BuildSiteCard(appState: appState, chatViewModel: chatViewModel)
 

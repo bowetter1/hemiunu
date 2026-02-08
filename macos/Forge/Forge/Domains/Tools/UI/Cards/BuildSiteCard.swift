@@ -9,30 +9,26 @@ struct BuildSiteCard: View {
 
     var body: some View {
         Button { showSheet = true } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "rectangle.stack")
-                    .font(.system(size: 14))
-                    .foregroundColor(.purple)
-                    .frame(width: 28, height: 28)
-                    .background(Color.purple.opacity(0.15))
-                    .cornerRadius(6)
+            HStack(spacing: 10) {
+                Image(systemName: "rectangle.stack.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.purple)
+                    .frame(width: 32)
 
                 Text("Build Site")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary)
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.tertiary)
             }
             .padding(10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(Color.secondary.opacity(0.05))
-        .cornerRadius(8)
         .disabled(appState.currentProject == nil)
         .opacity(appState.currentProject == nil ? 0.4 : 1)
         .sheet(isPresented: $showSheet) {

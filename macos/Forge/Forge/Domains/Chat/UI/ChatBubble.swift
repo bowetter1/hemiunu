@@ -12,7 +12,7 @@ struct ChatBubble: View {
                 .font(.system(size: 13))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(backgroundColor)
+                .background(bubbleBackground)
                 .foregroundColor(message.role == .user ? .white : .primary)
                 .cornerRadius(16)
 
@@ -20,8 +20,13 @@ struct ChatBubble: View {
         }
     }
 
-    private var backgroundColor: Color {
-        message.role == .user ? .blue : Color(nsColor: .windowBackgroundColor)
+    @ViewBuilder
+    private var bubbleBackground: some View {
+        if message.role == .user {
+            LinearGradient(colors: [.blue, .blue.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        } else {
+            Color(nsColor: .windowBackgroundColor).opacity(0.6)
+        }
     }
 }
 
@@ -37,11 +42,20 @@ struct SidebarChatBubble: View {
                 .font(.system(size: 12))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(message.role == .user ? Color.blue : Color(nsColor: .windowBackgroundColor))
+                .background(sidebarBubbleBackground)
                 .foregroundColor(message.role == .user ? .white : .primary)
                 .cornerRadius(12)
 
             if message.role == .assistant { Spacer(minLength: 20) }
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarBubbleBackground: some View {
+        if message.role == .user {
+            LinearGradient(colors: [.blue, .blue.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        } else {
+            Color(nsColor: .windowBackgroundColor).opacity(0.6)
         }
     }
 }

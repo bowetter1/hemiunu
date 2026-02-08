@@ -51,6 +51,16 @@ extension BossCoordinator {
         phase = .idle
     }
 
+    /// Activate Opus Design flow: 1 Claude research boss + 3 Kimi builders
+    func activateOpusDesign() {
+        if isActive { resetSession() }
+        isActive = true
+        researchBoss = BossInstance(id: "research", agent: .claude)
+        bosses = (0..<3).map { BossInstance(id: "boss-\($0)", agent: .kimi) }
+        phase = .idle
+        selectedBossId = researchBoss?.id
+    }
+
     /// Store build-phase config before sending the first message
     func configureBuild(config: GenerationConfig, imageInstruction: String?, inspirationImage: NSImage?, projectName: String? = nil) {
         self.buildConfig = config

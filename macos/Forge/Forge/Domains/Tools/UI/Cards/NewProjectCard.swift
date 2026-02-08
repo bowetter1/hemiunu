@@ -10,33 +10,27 @@ struct NewProjectCard: View {
     @State private var showStartSheet = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            Button(action: { showStartSheet = true }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14))
-                        .foregroundColor(.blue)
-                        .frame(width: 28, height: 28)
-                        .background(Color.blue.opacity(0.15))
-                        .cornerRadius(6)
+        Button(action: { showStartSheet = true }) {
+            HStack(spacing: 10) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.blue)
+                    .frame(width: 32)
 
-                    Text("New Project")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
+                Text("New Project")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary)
 
-                    Spacer()
+                Spacer()
 
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-                .padding(10)
-                .contentShape(Rectangle())
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
             }
-            .buttonStyle(.plain)
+            .padding(10)
+            .contentShape(Rectangle())
         }
-        .background(Color.secondary.opacity(0.05))
-        .cornerRadius(8)
+        .buttonStyle(.plain)
         .sheet(isPresented: $showStartSheet) {
             StartProjectSheet(
                 isPresented: $showStartSheet,

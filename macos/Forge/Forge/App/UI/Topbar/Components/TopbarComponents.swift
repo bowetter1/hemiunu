@@ -11,7 +11,7 @@ struct IconButton: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: size, weight: .medium))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
@@ -24,7 +24,7 @@ struct IconButton: View {
 
 struct ModeSelector: View {
     @Binding var selectedMode: AppMode
-    private let itemHeight: CGFloat = 28
+    private let itemHeight: CGFloat = 26
 
     var body: some View {
         HStack(spacing: 2) {
@@ -34,24 +34,18 @@ struct ModeSelector: View {
                         selectedMode = mode
                     }
                 } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: icon(for: mode))
-                            .font(.system(size: 10, weight: .medium))
-                        Text(mode.rawValue)
-                            .font(.system(size: 11, weight: selectedMode == mode ? .semibold : .regular))
-                    }
-                    .foregroundColor(selectedMode == mode ? .white : .secondary)
-                    .padding(.horizontal, 12)
-                    .frame(height: itemHeight)
-                    .background(selectedMode == mode ? Color.blue : Color.clear)
-                    .cornerRadius(5)
+                    Image(systemName: icon(for: mode))
+                        .font(.system(size: 12))
+                        .foregroundStyle(selectedMode == mode ? .blue : .secondary)
+                        .frame(width: 28, height: 22)
+                        .background(selectedMode == mode ? Color.blue.opacity(0.12) : Color.clear)
+                        .cornerRadius(5)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 3)
-        .background(Color.primary.opacity(0.05))
-        .cornerRadius(8)
+        .background(Color.secondary.opacity(0.08))
+        .cornerRadius(6)
     }
 
     private func icon(for mode: AppMode) -> String {
@@ -59,6 +53,39 @@ struct ModeSelector: View {
         case .design: return "paintbrush.fill"
         case .code: return "chevron.left.forwardslash.chevron.right"
         }
+    }
+}
+
+// MARK: - Topbar Version Picker
+
+struct TopbarVersionPicker: View {
+    let versions: [PageVersion]
+    let currentVersion: Int
+    var onSelect: ((Int) -> Void)? = nil
+
+    private var sortedVersions: [PageVersion] {
+        versions.sorted { $0.version < $1.version }
+    }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(sortedVersions) { item in
+                let isSelected = item.version == currentVersion
+                Button {
+                    onSelect?(item.version)
+                } label: {
+                    Text("v\(item.version)")
+                        .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? .blue : .secondary)
+                        .frame(width: 28, height: 22)
+                        .background(isSelected ? Color.blue.opacity(0.12) : Color.clear)
+                        .cornerRadius(5)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(Color.secondary.opacity(0.08))
+        .cornerRadius(6)
     }
 }
 
@@ -76,12 +103,12 @@ struct ActivityPill: View {
 
             Text(statusText)
                 .font(.system(size: 10))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.primary.opacity(0.05))
-        .cornerRadius(10)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(Capsule())
         .animation(.easeInOut(duration: 0.2), value: chatViewModel.isStreaming)
     }
 
@@ -120,7 +147,7 @@ struct TopbarLogsButton: View {
                         .monospacedDigit()
                 }
             }
-            .foregroundColor(.secondary)
+            .foregroundStyle(.secondary)
             .frame(height: 28)
             .padding(.horizontal, 4)
             .contentShape(Rectangle())

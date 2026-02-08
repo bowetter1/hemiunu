@@ -71,12 +71,7 @@ struct FloatingChatWindow: View {
                 }
                 .buttonStyle(.plain)
             }
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 22))
-            .overlay(
-                RoundedRectangle(cornerRadius: 22)
-                    .stroke(isDragging ? Color.orange : Color.secondary.opacity(0.2), lineWidth: isDragging ? 2 : 1)
-            )
+            .glassEffect(.regular, in: .rect(cornerRadius: 22, style: .continuous))
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
             .frame(maxWidth: 600)
             .position(

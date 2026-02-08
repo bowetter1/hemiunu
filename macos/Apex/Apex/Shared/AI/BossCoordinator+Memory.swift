@@ -11,7 +11,7 @@ extension BossCoordinator {
     /// Persistent memory filename for a given role
     private func memoryPersistName(for role: WorkspaceRole) -> String {
         switch role {
-        case .research: return "memory-research.md"
+        case .research, .researchDesign: return "memory-research.md"
         case .builder, .solo: return "memory-build.md"
         }
     }

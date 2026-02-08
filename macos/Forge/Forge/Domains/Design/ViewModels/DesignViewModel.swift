@@ -22,15 +22,27 @@ class DesignViewModel: ObservableObject {
 
     func loadVersions(projectId: String, pageId: String) {
         if projectId.hasPrefix("local:") {
+#if DEBUG
+            print("[Versions][DesignVM] loadVersions local projectId=\(projectId) pageId=\(pageId)")
+#endif
             loadLocalVersions(projectId: projectId)
             return
         }
-        pageVersions = []
+#if DEBUG
+        print("[Versions][DesignVM] loadVersions ignored non-local projectId=\(projectId)")
+#endif
     }
 
     func restoreVersion(project: Project, pageId: String, version: Int) {
         if project.id.hasPrefix("local:") {
+#if DEBUG
+            print("[Versions][DesignVM] restoreVersion local projectId=\(project.id) pageId=\(pageId) target=v\(version)")
+#endif
             restoreLocalVersion(projectId: project.id, version: version)
+        } else {
+#if DEBUG
+            print("[Versions][DesignVM] restoreVersion ignored non-local projectId=\(project.id)")
+#endif
         }
     }
 
@@ -39,21 +51,37 @@ class DesignViewModel: ObservableObject {
             if let page = appState.pages.first(where: { $0.id == pageId }) {
                 lastKnownVersion = page.currentVersion
             }
+#if DEBUG
+            print("[Versions][DesignVM] handlePageChange projectId=\(projectId) pageId=\(pageId) lastKnown=\(lastKnownVersion)")
+#endif
             loadVersions(projectId: projectId, pageId: pageId)
         } else {
+#if DEBUG
+            print("[Versions][DesignVM] handlePageChange cleared (nil pageId)")
+#endif
             pageVersions = []
         }
     }
 
     func handlePagesUpdate(projectId: String, selectedPageId: String?, newPages: [Page]) {
         if projectId.hasPrefix("local:") {
+#if DEBUG
+            print("[Versions][DesignVM] handlePagesUpdate local projectId=\(projectId) pages=\(newPages.count)")
+#endif
             loadLocalVersions(projectId: projectId)
+        } else {
+#if DEBUG
+            print("[Versions][DesignVM] handlePagesUpdate ignored non-local projectId=\(projectId)")
+#endif
         }
     }
 
     private func loadLocalVersions(projectId: String) {
         guard !isLoadingVersions else { return }
         guard let projectName = appState.localProjectName(from: projectId) else {
+#if DEBUG
+            print("[Versions][DesignVM] loadLocalVersions invalid projectId=\(projectId)")
+#endif
             pageVersions = []
             return
         }
@@ -70,7 +98,13 @@ class DesignViewModel: ObservableObject {
                 } else if let latest = versions.last {
                     lastKnownVersion = latest.version
                 }
+#if DEBUG
+                print("[Versions][DesignVM] loadLocalVersions project=\(projectName) count=\(versions.count) current=\(lastKnownVersion)")
+#endif
             } catch {
+#if DEBUG
+                print("[Versions][DesignVM] loadLocalVersions FAILED project=\(projectName) error=\(error.localizedDescription)")
+#endif
                 pageVersions = []
             }
         }
@@ -87,7 +121,13 @@ class DesignViewModel: ObservableObject {
                 restoredVersion = version
                 appState.pages = newPages
                 appState.previewRefreshToken = UUID()
+#if DEBUG
+                print("[Versions][DesignVM] restoreLocalVersion DONE project=\(projectName) target=v\(version)")
+#endif
             } catch {
+#if DEBUG
+                print("[Versions][DesignVM] restoreLocalVersion FAILED project=\(projectName) target=v\(version) error=\(error.localizedDescription)")
+#endif
                 // Restore failed
             }
         }

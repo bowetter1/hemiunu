@@ -10,6 +10,7 @@ class ChatViewModel {
 
     let appState: AppState
     private var streamTask: Task<Void, Never>?
+    private let agentLoop = AgentLoop()
 
     init(appState: AppState) {
         self.appState = appState
@@ -36,6 +37,110 @@ class ChatViewModel {
         let service = appState.activeAIService
         let promptText = text
 
+        // Use agent loop with tools when a project is selected
+        if let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
+           let projectName = appState.localProjectName(from: projectId) {
+            sendWithTools(
+                text: text,
+                aiMessages: Array(aiMessages),
+                assistantIndex: assistantIndex,
+                service: service,
+                provider: provider,
+                projectName: projectName,
+                promptText: promptText
+            )
+        } else {
+            sendWithStreaming(
+                aiMessages: Array(aiMessages),
+                assistantIndex: assistantIndex,
+                service: service,
+                provider: provider,
+                promptText: promptText
+            )
+        }
+    }
+
+    // MARK: - Agent Loop (with tools)
+
+    private func sendWithTools(
+        text: String,
+        aiMessages: [AIMessage],
+        assistantIndex: Int,
+        service: any AIService,
+        provider: AIProvider,
+        projectName: String,
+        promptText: String
+    ) {
+        let executor = ToolExecutor(
+            workspace: appState.workspace,
+            projectName: projectName
+        )
+
+        streamTask = Task {
+            let startTime = CFAbsoluteTimeGetCurrent()
+
+            do {
+                isLoading = false
+                messages[assistantIndex].content = "Thinking..."
+
+                let result = try await agentLoop.run(
+                    userMessage: text,
+                    history: Array(aiMessages.dropLast()), // exclude the current user message
+                    systemPrompt: SystemPrompts.websiteBuilderWithTools,
+                    service: service,
+                    executor: executor
+                ) { [weak self] event in
+                    guard let self else { return }
+                    switch event {
+                    case .thinking:
+                        break
+                    case .toolStart(let name, _):
+                        let icon = self.toolIcon(name)
+                        messages[assistantIndex].content = "\(icon) \(self.toolLabel(name))..."
+                    case .toolDone(let name, let summary):
+                        let icon = self.toolIcon(name)
+                        messages[assistantIndex].content = "\(icon) \(self.toolLabel(name)) — done\n\(summary)"
+                    case .text:
+                        break // final text handled below
+                    case .error(let msg):
+                        messages[assistantIndex].content = "Error: \(msg)"
+                    }
+                }
+
+                // Set final response
+                messages[assistantIndex].content = result.text.isEmpty ? "Done." : result.text
+
+                let totalTime = CFAbsoluteTimeGetCurrent() - startTime
+                logRequest(provider: provider, prompt: promptText, totalTime: totalTime, ttft: 0, chunks: 0, chars: result.text.count, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens)
+
+                await commitWorkspaceVersion(projectName: projectName, message: text)
+
+                // Refresh project state
+                appState.setPages(appState.workspace.loadPages(project: projectName))
+                appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
+                appState.refreshPreview()
+
+                saveChatHistory()
+            } catch {
+                if !Task.isCancelled {
+                    messages[assistantIndex].content = "Error: \(error.localizedDescription)"
+                }
+                saveChatHistory()
+            }
+            isStreaming = false
+            isLoading = false
+        }
+    }
+
+    // MARK: - Streaming (no tools)
+
+    private func sendWithStreaming(
+        aiMessages: [AIMessage],
+        assistantIndex: Int,
+        service: any AIService,
+        provider: AIProvider,
+        promptText: String
+    ) {
         streamTask = Task {
             let startTime = CFAbsoluteTimeGetCurrent()
             var firstTokenTime: CFAbsoluteTime?
@@ -43,7 +148,7 @@ class ChatViewModel {
 
             do {
                 let stream = service.generate(
-                    messages: Array(aiMessages),
+                    messages: aiMessages,
                     systemPrompt: SystemPrompts.websiteBuilder
                 )
                 isLoading = false
@@ -57,8 +162,8 @@ class ChatViewModel {
                 let ttft = firstTokenTime.map { $0 - startTime } ?? totalTime
                 let contentLength = messages[assistantIndex].content.count
 
-                handleGeneratedContent(messages[assistantIndex].content)
-                logRequest(provider: provider, prompt: promptText, totalTime: totalTime, ttft: ttft, chunks: tokenCount, chars: contentLength)
+                await handleGeneratedContent(messages[assistantIndex].content)
+                logRequest(provider: provider, prompt: promptText, totalTime: totalTime, ttft: ttft, chunks: tokenCount, chars: contentLength, inputTokens: 0, outputTokens: 0)
                 saveChatHistory()
             } catch {
                 if !Task.isCancelled {
@@ -68,6 +173,32 @@ class ChatViewModel {
             }
             isStreaming = false
             isLoading = false
+        }
+    }
+
+    // MARK: - Tool Display Helpers
+
+    private func toolIcon(_ name: String) -> String {
+        switch name {
+        case "list_files": return "📁"
+        case "read_file": return "📄"
+        case "create_file": return "📝"
+        case "edit_file": return "✏️"
+        case "delete_file": return "🗑️"
+        case "web_search": return "🔍"
+        default: return "🔧"
+        }
+    }
+
+    private func toolLabel(_ name: String) -> String {
+        switch name {
+        case "list_files": return "Listing files"
+        case "read_file": return "Reading file"
+        case "create_file": return "Creating file"
+        case "edit_file": return "Editing file"
+        case "delete_file": return "Deleting file"
+        case "web_search": return "Searching the web"
+        default: return name
         }
     }
 
@@ -93,7 +224,7 @@ class ChatViewModel {
 
     // MARK: - Content Extraction
 
-    private func handleGeneratedContent(_ content: String) {
+    private func handleGeneratedContent(_ content: String) async {
         guard let html = extractHTML(from: content) else { return }
 
         // Strip code blocks from chat display — keep only conversational text
@@ -106,18 +237,15 @@ class ChatViewModel {
 
         guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
               let projectName = appState.localProjectName(from: projectId) else {
-            createProjectFromHTML(html)
-            return
+            return // No project — streaming without project, HTML stays in chat only
         }
 
         do {
             try appState.workspace.writeFile(project: projectName, path: "index.html", content: html)
-            Task {
-                _ = try? await appState.workspace.gitCommit(
-                    project: projectName,
-                    message: messages.last(where: { $0.role == .user })?.content ?? "Update"
-                )
-            }
+            await commitWorkspaceVersion(
+                projectName: projectName,
+                message: messages.last(where: { $0.role == .user })?.content ?? "Update"
+            )
             appState.setPages(appState.workspace.loadPages(project: projectName))
             appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
             appState.refreshPreview()
@@ -128,30 +256,15 @@ class ChatViewModel {
         }
     }
 
-    private func createProjectFromHTML(_ html: String) {
-        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
-            .replacingOccurrences(of: ":", with: "")
-            .replacingOccurrences(of: " ", with: "")
-        let projectName = "project-\(timestamp)"
+    private func commitWorkspaceVersion(projectName: String, message: String) async {
+        _ = try? await appState.workspace.gitCommit(project: projectName, message: message)
+        await refreshLocalVersionState(projectName: projectName)
+    }
 
-        do {
-            _ = try appState.workspace.createProject(name: projectName)
-            try appState.workspace.writeFile(project: projectName, path: "index.html", content: html)
-            Task {
-                _ = try? await appState.workspace.exec("git init", cwd: appState.workspace.projectPath(projectName))
-                _ = try? await appState.workspace.gitCommit(project: projectName, message: "Initial generation")
-            }
-            let projectId = "local:\(projectName)"
-            appState.setSelectedProjectId(projectId)
-            appState.setLocalPreviewURL(appState.workspace.projectPath(projectName))
-            appState.setPages(appState.workspace.loadPages(project: projectName))
-            appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
-            appState.refreshLocalProjects()
-        } catch {
-            #if DEBUG
-            print("[Chat] Failed to create project: \(error)")
-            #endif
-        }
+    private func refreshLocalVersionState(projectName: String) async {
+        guard let versions = try? await appState.workspace.gitVersions(project: projectName) else { return }
+        appState.pageVersions = versions
+        appState.currentVersionNumber = versions.last?.version ?? 1
     }
 
     // MARK: - Chat History Persistence
@@ -184,14 +297,24 @@ class ChatViewModel {
 
     // MARK: - Request Logging
 
-    private func logRequest(provider: AIProvider, prompt: String, totalTime: Double, ttft: Double, chunks: Int, chars: Int) {
+    private func logRequest(provider: AIProvider, prompt: String, totalTime: Double, ttft: Double, chunks: Int, chars: Int, inputTokens: Int = 0, outputTokens: Int = 0) {
         let logURL = appState.workspace.rootDirectory.appendingPathComponent("ai-log.md")
         let dateStr = ISO8601DateFormatter().string(from: Date())
         let projectName = (appState.selectedProjectId ?? "none").replacingOccurrences(of: "local:", with: "")
         let promptPreview = String(prompt.prefix(80)).replacingOccurrences(of: "\n", with: " ")
+        let tokensStr = inputTokens + outputTokens > 0
+            ? "\(inputTokens)→\(outputTokens)"
+            : "-"
+        let costStr: String
+        if inputTokens + outputTokens > 0 {
+            let cost = (Double(inputTokens) * provider.inputCostPerMillion + Double(outputTokens) * provider.outputCostPerMillion) / 1_000_000
+            costStr = String(format: "$%.2f", cost)
+        } else {
+            costStr = "-"
+        }
 
         let entry = """
-        | \(dateStr) | \(provider.shortLabel) | \(provider.modelName) | \(projectName) | \(promptPreview) | \(String(format: "%.1f", ttft))s | \(String(format: "%.1f", totalTime))s | \(chunks) | \(chars) |
+        | \(dateStr) | \(provider.shortLabel) | \(provider.modelName) | \(projectName) | \(promptPreview) | \(String(format: "%.1f", ttft))s | \(String(format: "%.1f", totalTime))s | \(chunks) | \(chars) | \(tokensStr) | \(costStr) |
 
         """
 
@@ -200,8 +323,8 @@ class ChatViewModel {
             let header = """
             # Forge AI Log
 
-            | Timestamp | Provider | Model | Project | Prompt | TTFT | Total | Chunks | Chars |
-            |-----------|----------|-------|---------|--------|------|-------|--------|-------|
+            | Timestamp | Provider | Model | Project | Prompt | TTFT | Total | Chunks | Chars | Tokens | Cost |
+            |-----------|----------|-------|---------|--------|------|-------|--------|-------|--------|------|
 
             """
             try? header.write(to: logURL, atomically: true, encoding: .utf8)

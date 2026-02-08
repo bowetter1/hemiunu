@@ -3,6 +3,7 @@ import SwiftUI
 /// Unified topbar with consistent alignment
 struct Topbar: View {
     @Binding var showSidebar: Bool
+    @Binding var showToolsPanel: Bool
     @Binding var selectedMode: AppMode
     @Binding var appearanceMode: AppearanceMode
     let isConnected: Bool
@@ -19,10 +20,10 @@ struct Topbar: View {
     var onRestoreVersion: ((Int) -> Void)? = nil
     var onOpenInBrowser: (() -> Void)? = nil
 
-    private let height: CGFloat = 44
-    private let itemHeight: CGFloat = 28
-    private let topInset: CGFloat = 4
-    private let iconSize: CGFloat = 14
+    private let height: CGFloat = 38
+    private let itemHeight: CGFloat = 26
+    private let topInset: CGFloat = 2
+    private let iconSize: CGFloat = 12
     private let trafficLightsWidth: CGFloat = 78
 
     private var showPreviewControls: Bool {
@@ -76,12 +77,18 @@ struct Topbar: View {
             // Preview controls — version, devices, safari — grouped together
             if showPreviewControls {
                 previewControls
+                    .layoutPriority(2)
             }
 
             // Activity indicator
-            if chatViewModel.isStreaming {
-                ActivityPill(chatViewModel: chatViewModel)
-                    .frame(height: itemHeight)
+            ActivityPill(chatViewModel: chatViewModel)
+                .frame(height: itemHeight)
+
+            // Show tools button when panel is hidden
+            if !showToolsPanel {
+                IconButton(icon: "sidebar.right", size: iconSize) {
+                    withAnimation(.easeInOut(duration: 0.2)) { showToolsPanel = true }
+                }
             }
 
             // Logs button
@@ -92,18 +99,18 @@ struct Topbar: View {
                 .fill(Color.primary.opacity(0.1))
                 .frame(width: 1, height: 16)
 
+            // Appearance toggle
+            IconButton(icon: appearanceIcon, size: iconSize) {
+                cycleAppearance()
+            }
+            .help(appearanceMode.displayName)
+
             if isConnected {
                 IconButton(icon: "rectangle.portrait.and.arrow.right", size: iconSize) {
                     onLogout?()
                 }
                 .help("Log out")
             }
-
-            // Appearance toggle
-            IconButton(icon: appearanceIcon, size: iconSize) {
-                cycleAppearance()
-            }
-            .help(appearanceMode.displayName)
         }
         .frame(height: itemHeight)
     }
@@ -112,42 +119,51 @@ struct Topbar: View {
 
     private var previewControls: some View {
         HStack(spacing: 8) {
-            // Version dots + label (only when versions exist)
             if !pageVersions.isEmpty {
-                VersionDots(
+                TopbarVersionPicker(
                     versions: pageVersions,
                     currentVersion: currentVersion,
                     onSelect: { version in
                         onRestoreVersion?(version)
                     }
                 )
+                .fixedSize(horizontal: true, vertical: false)
 
                 Text("v\(currentVersion)")
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary.opacity(0.5))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize()
             }
+
+            // Device width label
+            Text(deviceWidthLabel)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.tertiary)
 
             // Device picker
             HStack(spacing: 2) {
                 deviceButton(.desktop, icon: "desktopcomputer")
+                deviceButton(.laptop, icon: "laptopcomputer")
                 deviceButton(.tablet, icon: "ipad")
                 deviceButton(.mobile, icon: "iphone")
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
-            .background(Color.primary.opacity(0.05))
+            .background(Color.secondary.opacity(0.08))
             .cornerRadius(6)
 
             // Open in browser
-            Button {
+            IconButton(icon: "safari", size: iconSize) {
                 onOpenInBrowser?()
-            } label: {
-                Image(systemName: "safari")
-                    .font(.system(size: iconSize))
-                    .foregroundColor(.secondary)
             }
-            .buttonStyle(.plain)
             .help("Open in Browser")
+        }
+    }
+
+    private var deviceWidthLabel: String {
+        switch selectedDevice {
+        case .desktop: return "1280"
+        case .laptop: return "1024"
+        case .tablet: return "768"
+        case .mobile: return "375"
         }
     }
 
@@ -155,7 +171,7 @@ struct Topbar: View {
         Button { selectedDevice = device } label: {
             Image(systemName: icon)
                 .font(.system(size: 12))
-                .foregroundColor(selectedDevice == device ? .blue : .secondary)
+                .foregroundStyle(selectedDevice == device ? .blue : .secondary)
                 .frame(width: 28, height: 22)
                 .background(selectedDevice == device ? Color.blue.opacity(0.12) : Color.clear)
                 .cornerRadius(5)

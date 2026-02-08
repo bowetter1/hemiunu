@@ -11,28 +11,17 @@ struct ToolsPanel: View {
     let onProjectCreated: (String) -> Void
     var onOpenFloatingChat: (() -> Void)? = nil
 
-    @State private var toolsHeight: CGFloat = 400
+    @State private var toolsHeight: CGFloat = 320
     @State private var isDraggingDivider = false
 
     private let panelWidth: CGFloat = 300
-    private let minToolsHeight: CGFloat = 200
+    private let minToolsHeight: CGFloat = 180
     private let minChatHeight: CGFloat = 150
 
     var body: some View {
-        VStack(spacing: 0) {
-            if isExpanded {
-                expandedPanel
-            } else {
-                collapsedPanel
-            }
-        }
-        .frame(width: isExpanded ? panelWidth : 44)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-        )
+        expandedPanel
+            .frame(width: panelWidth)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12, style: .continuous))
     }
 
     private var expandedPanel: some View {
@@ -44,33 +33,30 @@ struct ToolsPanel: View {
                 HStack {
                     Image(systemName: "wrench.and.screwdriver")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     Text("Tools")
                         .font(.system(size: 13, weight: .semibold))
                     Spacer()
                     Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded = false } }) {
                         Image(systemName: "sidebar.right")
                             .font(.system(size: 14))
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
 
-                Divider()
+                Divider().opacity(0.5)
 
                 // Tools content (scrollable, fixed height)
                 ScrollView {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 2) {
                         // New Project - always at top
                         NewProjectCard(appState: appState, chatViewModel: chatViewModel, onProjectCreated: onProjectCreated)
 
                         // Build full site from existing page
                         BuildSiteCard(appState: appState, chatViewModel: chatViewModel)
-
-                        Divider()
-                            .padding(.vertical, 4)
 
                         // Settings
                         SettingsToolCard(appState: appState)
@@ -97,14 +83,14 @@ struct ToolsPanel: View {
                 HStack {
                     Image(systemName: "bubble.left.and.bubble.right")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     Text("Chat")
                         .font(.system(size: 13, weight: .semibold))
                     Spacer()
                     Button(action: { onOpenFloatingChat?() }) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                     .help("Open in floating window")
@@ -112,7 +98,7 @@ struct ToolsPanel: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
 
-                Divider()
+                Divider().opacity(0.5)
 
                 // Chat section (takes remaining space)
                 ChatTabContent(
@@ -122,61 +108,6 @@ struct ToolsPanel: View {
             }
         }
     }
-
-    private var collapsedPanel: some View {
-        VStack(spacing: 12) {
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true } }) {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 12)
-
-            Divider()
-                .frame(width: 20)
-
-            // Collapsed tool icons
-            VStack(spacing: 8) {
-                // New project button - expands panel
-                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true } }) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.blue, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 28, height: 28)
-
-                        Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                // Build site button
-                CollapsedToolButton(icon: "rectangle.stack", color: .purple)
-
-                Divider()
-                    .frame(width: 20)
-
-                CollapsedToolButton(icon: "gearshape", color: .gray)
-
-                Divider()
-                    .frame(width: 20)
-
-                // Chat button
-                CollapsedToolButton(icon: "bubble.left.and.bubble.right", color: .blue)
-            }
-
-            Spacer()
-        }
-    }
-
 }
 
 // MARK: - Tools Panel Divider

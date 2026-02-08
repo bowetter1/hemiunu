@@ -18,6 +18,7 @@ class BossCoordinator {
     enum WorkspaceRole {
         case solo
         case research
+        case researchDesign
         case builder
     }
 

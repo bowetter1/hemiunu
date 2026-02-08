@@ -59,7 +59,7 @@ class AppState: ObservableObject {
 
     // MARK: - Preview
 
-    @Published var selectedDevice: PreviewDevice = .desktop
+    @Published var selectedDevice: PreviewDevice = .laptop
     @Published var pageVersions: [PageVersion] = []
     @Published var currentVersionNumber: Int = 1
 
@@ -84,7 +84,8 @@ class AppState: ObservableObject {
     // MARK: - AI
 
     @Published var selectedProvider: AIProvider = .cerebras
-    let cerebrasService = CerebrasService()
+    let cerebrasService = CerebrasService(provider: .cerebras)
+    let glmService = CerebrasService(provider: .glm)
     let groqService = GroqService()
     let claudeService = ClaudeService()
 
@@ -92,6 +93,7 @@ class AppState: ObservableObject {
     var activeAIService: any AIService {
         switch selectedProvider {
         case .cerebras: return cerebrasService
+        case .glm: return glmService
         case .groq: return groqService
         case .claude: return claudeService
         }
@@ -184,6 +186,7 @@ class AppState: ObservableObject {
         }
 
         localPreviewURL = workspace.projectPath(name)
+        await syncLocalVersionState(projectName: name)
     }
 
     /// URL for local project preview
@@ -235,5 +238,26 @@ class AppState: ObservableObject {
 
     func refreshPreview() {
         previewRefreshToken = UUID()
+    }
+
+    // MARK: - Local Versioning
+
+    private func syncLocalVersionState(projectName: String) async {
+        do {
+            let initResult = try await workspace.ensureGitRepository(project: projectName)
+            let commitResult = try await workspace.gitCommit(project: projectName, message: "Initial import")
+            let versions = try await workspace.gitVersions(project: projectName)
+            pageVersions = versions
+            currentVersionNumber = versions.last?.version ?? 1
+#if DEBUG
+            print("[Versions][AppState] syncLocalVersionState project=\(projectName) init=\(initResult.exitCode) commit=\(commitResult.exitCode) count=\(versions.count) current=\(currentVersionNumber)")
+#endif
+        } catch {
+#if DEBUG
+            print("[Versions][AppState] syncLocalVersionState FAILED project=\(projectName) error=\(error.localizedDescription)")
+#endif
+            pageVersions = []
+            currentVersionNumber = 1
+        }
     }
 }

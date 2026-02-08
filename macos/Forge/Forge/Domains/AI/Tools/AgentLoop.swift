@@ -1,0 +1,202 @@
+import Foundation
+
+/// Events emitted during an agent loop iteration
+enum AgentEvent: Sendable {
+    case thinking
+    case toolStart(name: String, args: String)
+    case toolDone(name: String, summary: String)
+    case text(String)
+    case error(String)
+}
+
+/// Runs an agentic tool-use loop: call LLM → execute tools → repeat until text response
+@MainActor
+class AgentLoop {
+    private let maxIterations = 10
+
+    func run(
+        userMessage: String,
+        history: [AIMessage],
+        systemPrompt: String,
+        service: any AIService,
+        executor: ToolExecutor,
+        onEvent: @escaping (AgentEvent) -> Void
+    ) async throws -> AgentResult {
+        let isAnthropic = service.provider == .claude
+        var totalInput = 0
+        var totalOutput = 0
+
+        // Build initial message list in provider-specific format
+        var messages: [[String: Any]] = buildInitialMessages(
+            history: history,
+            userMessage: userMessage,
+            systemPrompt: systemPrompt,
+            isAnthropic: isAnthropic
+        )
+
+        let tools: [[String: Any]] = isAnthropic
+            ? ForgeTools.anthropicFormat()
+            : ForgeTools.openAIFormat()
+
+        for _ in 0..<maxIterations {
+            guard !Task.isCancelled else { throw AIError.cancelled }
+
+            onEvent(.thinking)
+
+            let response = try await service.generateWithTools(
+                messages: messages,
+                systemPrompt: systemPrompt,
+                tools: tools
+            )
+
+            totalInput += response.inputTokens
+            totalOutput += response.outputTokens
+
+            // No tool calls — we have a final text response
+            if response.toolCalls.isEmpty {
+                let text = response.text ?? ""
+                onEvent(.text(text))
+                return AgentResult(text: text, totalInputTokens: totalInput, totalOutputTokens: totalOutput)
+            }
+
+            // Execute each tool call
+            var toolResults: [(call: ToolCall, result: String)] = []
+            for call in response.toolCalls {
+                onEvent(.toolStart(name: call.name, args: call.arguments))
+                do {
+                    let result = try await executor.execute(call)
+                    toolResults.append((call, result))
+                    onEvent(.toolDone(name: call.name, summary: summarize(result)))
+                } catch {
+                    let errorMsg = "Error: \(error.localizedDescription)"
+                    toolResults.append((call, errorMsg))
+                    onEvent(.toolDone(name: call.name, summary: errorMsg))
+                }
+            }
+
+            // Append assistant message + tool results to conversation
+            if isAnthropic {
+                appendAnthropicTurn(
+                    messages: &messages,
+                    response: response,
+                    toolResults: toolResults
+                )
+            } else {
+                appendOpenAITurn(
+                    messages: &messages,
+                    response: response,
+                    toolResults: toolResults
+                )
+            }
+        }
+
+        onEvent(.error("Reached maximum iterations (\(maxIterations))"))
+        return AgentResult(text: "I ran out of steps. Please try a more specific request.", totalInputTokens: totalInput, totalOutputTokens: totalOutput)
+    }
+
+    // MARK: - Message Building
+
+    private func buildInitialMessages(
+        history: [AIMessage],
+        userMessage: String,
+        systemPrompt: String,
+        isAnthropic: Bool
+    ) -> [[String: Any]] {
+        if isAnthropic {
+            // Anthropic: system is separate (handled by service), messages are user/assistant
+            var msgs: [[String: Any]] = []
+            for msg in history {
+                msgs.append(["role": msg.role, "content": msg.content])
+            }
+            msgs.append(["role": "user", "content": userMessage])
+            return msgs
+        } else {
+            // OpenAI: system message + history + user
+            var msgs: [[String: Any]] = [
+                ["role": "system", "content": systemPrompt]
+            ]
+            for msg in history {
+                msgs.append(["role": msg.role, "content": msg.content])
+            }
+            msgs.append(["role": "user", "content": userMessage])
+            return msgs
+        }
+    }
+
+    /// Append assistant + tool_result messages in Anthropic format
+    private func appendAnthropicTurn(
+        messages: inout [[String: Any]],
+        response: ToolResponse,
+        toolResults: [(call: ToolCall, result: String)]
+    ) {
+        // Assistant message with tool_use blocks
+        var contentBlocks: [[String: Any]] = []
+        if let text = response.text, !text.isEmpty {
+            contentBlocks.append(["type": "text", "text": text])
+        }
+        for call in response.toolCalls {
+            let inputData = call.arguments.data(using: .utf8) ?? Data()
+            let input = (try? JSONSerialization.jsonObject(with: inputData)) as? [String: Any] ?? [:]
+            contentBlocks.append([
+                "type": "tool_use",
+                "id": call.id,
+                "name": call.name,
+                "input": input,
+            ])
+        }
+        messages.append(["role": "assistant", "content": contentBlocks])
+
+        // User message with tool_result blocks
+        let resultBlocks: [[String: Any]] = toolResults.map { item in
+            [
+                "type": "tool_result",
+                "tool_use_id": item.call.id,
+                "content": item.result,
+            ]
+        }
+        messages.append(["role": "user", "content": resultBlocks])
+    }
+
+    /// Append assistant + tool messages in OpenAI format
+    private func appendOpenAITurn(
+        messages: inout [[String: Any]],
+        response: ToolResponse,
+        toolResults: [(call: ToolCall, result: String)]
+    ) {
+        // Assistant message with tool_calls array
+        let toolCallsPayload: [[String: Any]] = response.toolCalls.map { call in
+            [
+                "id": call.id,
+                "type": "function",
+                "function": [
+                    "name": call.name,
+                    "arguments": call.arguments,
+                ] as [String: Any],
+            ]
+        }
+        var assistantMsg: [String: Any] = [
+            "role": "assistant",
+            "tool_calls": toolCallsPayload,
+        ]
+        if let text = response.text, !text.isEmpty {
+            assistantMsg["content"] = text
+        }
+        messages.append(assistantMsg)
+
+        // One "tool" message per result
+        for item in toolResults {
+            messages.append([
+                "role": "tool",
+                "tool_call_id": item.call.id,
+                "content": item.result,
+            ])
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func summarize(_ text: String) -> String {
+        if text.count <= 100 { return text }
+        return String(text.prefix(97)) + "..."
+    }
+}

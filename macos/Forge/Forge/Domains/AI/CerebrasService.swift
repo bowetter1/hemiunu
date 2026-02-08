@@ -1,9 +1,13 @@
 import Foundation
 
-/// Cerebras API service — OpenAI-compatible streaming endpoint
+/// Cerebras API service — OpenAI-compatible streaming endpoint (supports multiple models)
 final class CerebrasService: AIService, @unchecked Sendable {
-    let provider: AIProvider = .cerebras
+    let provider: AIProvider
     private let baseURL = URL(string: "https://api.cerebras.ai/v1/chat/completions")!
+
+    init(provider: AIProvider = .cerebras) {
+        self.provider = provider
+    }
 
     func generate(
         messages: [AIMessage],
@@ -38,6 +42,45 @@ final class CerebrasService: AIService, @unchecked Sendable {
                 }
             }
         }
+    }
+
+    func generateWithTools(
+        messages: [[String: Any]],
+        systemPrompt: String,
+        tools: [[String: Any]]
+    ) async throws -> ToolResponse {
+        guard let apiKey = KeychainHelper.load(key: provider.keychainKey), !apiKey.isEmpty else {
+            throw AIError.noAPIKey(provider: .cerebras)
+        }
+
+        var payload: [String: Any] = [
+            "model": provider.modelName,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 8192,
+            "stream": false,
+        ]
+        if !tools.isEmpty {
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        }
+
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            throw AIError.invalidResponse
+        }
+
+        let headers = [
+            "Authorization": "Bearer \(apiKey)",
+            "Content-Type": "application/json",
+        ]
+
+        let (data, response) = try await HTTPClient.post(url: baseURL, headers: headers, body: body)
+        guard (200...299).contains(response.statusCode) else {
+            let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw AIError.apiError(status: response.statusCode, message: msg)
+        }
+
+        return try OpenAIToolResponseParser.parse(data)
     }
 
     private func buildRequestBody(messages: [AIMessage], systemPrompt: String) -> Data {

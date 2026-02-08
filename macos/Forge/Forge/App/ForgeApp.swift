@@ -61,6 +61,16 @@ struct WindowAccessor: NSViewRepresentable {
                 window.standardWindowButton(.closeButton)?.isHidden = false
                 window.standardWindowButton(.miniaturizeButton)?.isHidden = false
                 window.standardWindowButton(.zoomButton)?.isHidden = false
+
+                // Move traffic lights inward to align with sidebar
+                let offset: CGFloat = 8
+                for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                    if let btn = window.standardWindowButton(button) {
+                        var frame = btn.frame
+                        frame.origin.x += offset
+                        btn.frame = frame
+                    }
+                }
             }
         }
         return view

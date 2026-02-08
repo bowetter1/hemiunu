@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    background: #000;
+    color: #fff;
+    overflow-x: hidden;
+  }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 40%, rgba(99, 102, 241, 0.5) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 80% 30%, rgba(236, 72, 153, 0.4) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 50% at 50% 80%, rgba(14, 165, 233, 0.3) 0%, transparent 60%);
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  @keyframes drift {
+    0% { transform: scale(1) translate(0, 0); }
+    100% { transform: scale(1.1) translate(-2%, 3%); }
+  }
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    max-width: 800px;
+    padding: 0 40px;
+  }
+  .hero h1 {
+    font-size: clamp(48px, 8vw, 96px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    margin-top: 24px;
+    font-size: clamp(16px, 2vw, 22px);
+    color: rgba(255,255,255,0.6);
+    line-height: 1.6;
+  }
+
+  /* Image grid */
+  .grid-section {
+    padding: 80px 40px;
+    background: linear-gradient(180deg, #000 0%, #0a0a0a 100%);
+  }
+  .grid-section h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 40px;
+  }
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .image-grid .card {
+    aspect-ratio: 4/3;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+  .image-grid .card:first-child {
+    grid-column: span 2;
+    grid-row: span 2;
+    aspect-ratio: auto;
+  }
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+  }
+  .card:hover img {
+    transform: scale(1.05);
+  }
+
+  /* Color band */
+  .color-band {
+    display: flex;
+    height: 320px;
+  }
+  .color-band .swatch {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    padding: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: rgba(0,0,0,0.5);
+    transition: flex 0.4s ease;
+  }
+  .color-band .swatch:hover { flex: 2; }
+  .swatch:nth-child(1) { background: #6366f1; }
+  .swatch:nth-child(2) { background: #ec4899; }
+  .swatch:nth-child(3) { background: #0ea5e9; }
+  .swatch:nth-child(4) { background: #10b981; }
+  .swatch:nth-child(5) { background: #f59e0b; }
+  .swatch:nth-child(6) { background: #ef4444; }
+
+  /* Full image */
+  .full-image {
+    height: 80vh;
+    position: relative;
+    overflow: hidden;
+  }
+  .full-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .full-image .overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
+    display: flex;
+    align-items: flex-end;
+    padding: 60px;
+  }
+  .full-image .overlay h2 {
+    font-size: clamp(32px, 5vw, 64px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    max-width: 600px;
+  }
+
+  /* Features */
+  .features {
+    padding: 120px 40px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 60px;
+    background: #0a0a0a;
+  }
+  .feature {
+    padding: 48px;
+    border-radius: 24px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .feature .icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 24px;
+  }
+  .feature:nth-child(1) .icon { background: rgba(99,102,241,0.15); }
+  .feature:nth-child(2) .icon { background: rgba(236,72,153,0.15); }
+  .feature:nth-child(3) .icon { background: rgba(14,165,233,0.15); }
+  .feature:nth-child(4) .icon { background: rgba(16,185,129,0.15); }
+  .feature h3 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .feature p {
+    font-size: 15px;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* Footer */
+  .footer {
+    padding: 80px 40px;
+    text-align: center;
+    background: linear-gradient(180deg, #0a0a0a 0%, #111 100%);
+  }
+  .footer p {
+    color: rgba(255,255,255,0.3);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-content">
+    <h1>Design with intention</h1>
+    <p>Every pixel matters. Every interaction tells a story. Build experiences that resonate.</p>
+  </div>
+</section>
+
+<section class="grid-section">
+  <h2>Featured Work</h2>
+  <div class="image-grid">
+    <div class="card"><img src="https://picsum.photos/seed/forge1/1200/900" alt=""></div>
+    <div class="card"><img src="https://picsum.photos/seed/forge2/600/450" alt=""></div>
+    <div class="card"><img src="https://picsum.photos/seed/forge3/600/450" alt=""></div>
+    <div class="card"><img src="https://picsum.photos/seed/forge4/600/450" alt=""></div>
+    <div class="card"><img src="https://picsum.photos/seed/forge5/600/450" alt=""></div>
+  </div>
+</section>
+
+<section class="color-band">
+  <div class="swatch">Indigo</div>
+  <div class="swatch">Pink</div>
+  <div class="swatch">Sky</div>
+  <div class="swatch">Emerald</div>
+  <div class="swatch">Amber</div>
+  <div class="swatch">Red</div>
+</section>
+
+<section class="full-image">
+  <img src="https://picsum.photos/seed/forge-hero/1920/1080" alt="">
+  <div class="overlay">
+    <h2>Where craft meets technology</h2>
+  </div>
+</section>
+
+<section class="features">
+  <div class="feature">
+    <div class="icon">✦</div>
+    <h3>AI-Powered Design</h3>
+    <p>Describe what you want. Watch it materialize. Iterate with natural language until every detail is perfect.</p>
+  </div>
+  <div class="feature">
+    <div class="icon">◎</div>
+    <h3>Live Preview</h3>
+    <p>See changes instantly. Desktop, tablet, mobile — all at once. No refresh, no waiting.</p>
+  </div>
+  <div class="feature">
+    <div class="icon">⬡</div>
+    <h3>Code-First</h3>
+    <p>Clean, semantic HTML and CSS. No bloated frameworks. Ship-ready from the start.</p>
+  </div>
+  <div class="feature">
+    <div class="icon">◆</div>
+    <h3>Version History</h3>
+    <p>Every iteration saved. Compare versions side by side. Roll back with one click.</p>
+  </div>
+</section>
+
+<section class="footer">
+  <p>Built with Forge</p>
+</section>
+
+</body>
+</html>

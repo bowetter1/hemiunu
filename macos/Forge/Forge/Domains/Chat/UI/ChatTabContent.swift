@@ -11,7 +11,7 @@ struct ChatTabContent: View {
     var body: some View {
         VStack(spacing: 0) {
             messagesView
-            Divider()
+            Divider().opacity(0.5)
             chatInput
         }
         .onChange(of: appState.currentProject?.id) { oldId, newId in
@@ -156,6 +156,7 @@ struct ChatTabContent: View {
             .padding(.bottom, 12)
         }
         .frame(minHeight: 70)
+        .glassEffect(.regular, in: .rect(cornerRadius: 10, style: .continuous))
     }
 
     private func sendMessage() {

@@ -10,23 +10,21 @@ struct SettingsToolCard: View {
         VStack(spacing: 0) {
             // Header
             Button(action: { withAnimation(.spring(response: 0.3)) { isExpanded.toggle() } }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                        .frame(width: 28, height: 28)
-                        .background(Color.gray.opacity(0.15))
-                        .cornerRadius(6)
+                HStack(spacing: 10) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.gray)
+                        .frame(width: 32)
 
                     Text("Settings")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.primary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
 
                     Spacer()
 
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.tertiary)
                 }
                 .padding(10)
                 .contentShape(Rectangle())
@@ -34,6 +32,9 @@ struct SettingsToolCard: View {
             .buttonStyle(.plain)
 
             if isExpanded {
+                Divider().opacity(0.35)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
                 VStack(spacing: 8) {
                     // AI Provider picker
                     HStack(spacing: 10) {
@@ -90,7 +91,5 @@ struct SettingsToolCard: View {
                 .padding(.bottom, 10)
             }
         }
-        .background(Color.secondary.opacity(0.05))
-        .cornerRadius(8)
     }
 }

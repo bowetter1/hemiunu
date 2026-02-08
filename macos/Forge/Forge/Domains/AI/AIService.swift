@@ -9,6 +9,15 @@ protocol AIService: Sendable {
         messages: [AIMessage],
         systemPrompt: String
     ) -> AsyncThrowingStream<String, Error>
+
+    /// Generate a non-streaming response with tool use support.
+    /// Messages are raw dictionaries because OpenAI and Anthropic have different shapes
+    /// for tool call/result messages.
+    func generateWithTools(
+        messages: [[String: Any]],
+        systemPrompt: String,
+        tools: [[String: Any]]
+    ) async throws -> ToolResponse
 }
 
 /// A message in the AI conversation (provider-agnostic)

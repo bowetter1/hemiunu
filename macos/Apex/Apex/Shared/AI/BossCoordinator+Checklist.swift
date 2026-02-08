@@ -34,6 +34,16 @@ extension BossCoordinator {
             - [ ] RESEARCH — \(researchDesc)
             """
 
+        case .researchDesign:
+            return """
+            # Research + Design Checklist
+
+            - [ ] UNDERSTAND — Extract info from user message, write brief.md
+            - [ ] RESEARCH — \(researchDesc)
+            - [ ] DESIGN — Describe 3 distinct design alternatives in designs.md
+            - [ ] WIREFRAME — Generate wireframe mockup for each design (wireframe-1.png, 2, 3)
+            """
+
         case .builder:
             return """
             # Builder Checklist
