@@ -101,30 +101,6 @@ struct ChatTabContent: View {
 
     private var chatInput: some View {
         VStack(spacing: 6) {
-            // AI Provider selector
-            HStack(spacing: 4) {
-                ForEach(AIProvider.allCases, id: \.self) { provider in
-                    Button {
-                        appState.selectedProvider = provider
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: provider.icon)
-                                .font(.system(size: 9))
-                            Text(provider.shortLabel)
-                                .font(.system(size: 9, weight: .medium))
-                        }
-                        .foregroundStyle(appState.selectedProvider == provider ? .white : .secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(appState.selectedProvider == provider ? Color.blue : Color.clear, in: .rect(cornerRadius: 4))
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 6)
-
             HStack(alignment: .bottom, spacing: 8) {
                 TextField("Describe what to build...", text: $inputText, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -150,9 +126,9 @@ struct ChatTabContent: View {
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.bottom, 12)
+            .padding(.vertical, 10)
         }
-        .frame(minHeight: 70)
+        .frame(minHeight: 50)
         .glassEffect(.regular, in: .rect(cornerRadius: 10, style: .continuous))
     }
 

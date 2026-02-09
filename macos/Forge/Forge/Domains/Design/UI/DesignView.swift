@@ -8,7 +8,6 @@ struct DesignView: View {
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedPageId: String?
-    var onProjectCreated: ((String) -> Void)? = nil
 
     var selectedPage: Page? {
         guard let pageId = selectedPageId else { return nil }

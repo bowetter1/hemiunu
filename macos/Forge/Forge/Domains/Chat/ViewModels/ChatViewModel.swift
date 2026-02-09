@@ -9,6 +9,7 @@ class ChatViewModel {
     var isLoading = false
 
     let appState: AppState
+    let checklist = ChecklistModel()
     private var streamTask: Task<Void, Never>?
     private let agentLoop = AgentLoop()
     private let contentExtractor = ContentExtractor()
@@ -43,9 +44,27 @@ class ChatViewModel {
         let service = appState.activeAIService
         let promptText = text
 
-        // Use agent loop with tools when a project is selected
-        if let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
-           let projectName = appState.localProjectName(from: projectId) {
+        // Resolve project name (may be nil if no project yet)
+        let projectName: String? = {
+            if let projectId = appState.selectedProjectId ?? appState.currentProject?.id {
+                return appState.localProjectName(from: projectId)
+            }
+            return nil
+        }()
+
+        // Boss mode: always use tools when Claude key is available
+        if appState.hasClaudeKey {
+            sendWithTools(
+                text: text,
+                aiMessages: Array(aiMessages),
+                assistantIndex: assistantIndex,
+                service: service,
+                provider: provider,
+                projectName: projectName ?? "",
+                promptText: promptText
+            )
+        } else if let projectName {
+            // Non-Boss tool mode: requires existing project
             sendWithTools(
                 text: text,
                 aiMessages: Array(aiMessages),
@@ -77,24 +96,81 @@ class ChatViewModel {
         projectName: String,
         promptText: String
     ) {
-        let executor = ToolExecutor(
-            workspace: appState.workspace,
-            projectName: projectName
-        )
+        // Boss mode: use Claude as orchestrator when API key is available
+        let useBossMode = appState.hasClaudeKey
+        let bossService: any AIService = useBossMode ? appState.claudeService : service
+        let bossProvider: AIProvider = useBossMode ? .claude : provider
+
+        let executor: any ToolExecuting
+        let bossExecutor: BossToolExecutor?
+        let systemPrompt: String
+        let tools: [[String: Any]]?
+
+        if useBossMode {
+            let boss = BossToolExecutor(
+                workspace: appState.workspace,
+                projectName: projectName,
+                serviceResolver: { [weak appState] provider in
+                    appState?.resolveService(for: provider) ?? service
+                },
+                onChecklistUpdate: { [weak self] items in
+                    self?.checklist.update(items)
+                },
+                onSubAgentEvent: { [weak self] role, event in
+                    guard let self else { return }
+                    switch event {
+                    case .toolStart(let name, _):
+                        let icon = self.toolIcon(name)
+                        messages[assistantIndex].content = "[\(role.rawValue)] \(icon) \(self.toolLabel(name))..."
+                    case .toolDone(let name, let summary):
+                        let icon = self.toolIcon(name)
+                        messages[assistantIndex].content = "[\(role.rawValue)] \(icon) \(self.toolLabel(name)) — done\n\(summary)"
+                    default:
+                        break
+                    }
+                },
+                onProjectCreate: { [weak self] name in
+                    guard let appState = self?.appState else { return }
+                    let projectId = "local:\(name)"
+                    appState.setSelectedProjectId(projectId)
+                    appState.setLocalPreviewURL(appState.workspace.projectPath(name))
+                    appState.setLocalFiles(appState.workspace.listFiles(project: name))
+                    appState.refreshLocalProjects()
+                    Task { _ = try? await appState.workspace.ensureGitRepository(project: name) }
+                }
+            )
+            executor = boss
+            bossExecutor = boss
+            let hasProject = !projectName.isEmpty
+            systemPrompt = BossSystemPrompts.boss + (hasProject
+                ? "\n\nCONTEXT: Project '\(projectName)' already exists. Do NOT call create_project."
+                : "\n\nCONTEXT: No project exists yet. You MUST call create_project first.")
+            tools = ForgeTools.bossAnthropicFormat()
+        } else {
+            executor = ToolExecutor(
+                workspace: appState.workspace,
+                projectName: projectName
+            )
+            bossExecutor = nil
+            systemPrompt = SystemPrompts.websiteBuilderWithTools
+            tools = nil
+        }
 
         streamTask = Task {
             let startTime = CFAbsoluteTimeGetCurrent()
 
             do {
                 isLoading = false
-                messages[assistantIndex].content = "Thinking..."
+                messages[assistantIndex].content = useBossMode ? "Planning..." : "Thinking..."
+                if useBossMode { checklist.reset() }
 
                 let result = try await agentLoop.run(
                     userMessage: text,
                     history: Array(aiMessages.dropLast()), // exclude the current user message
-                    systemPrompt: SystemPrompts.websiteBuilderWithTools,
-                    service: service,
-                    executor: executor
+                    systemPrompt: systemPrompt,
+                    service: bossService,
+                    executor: executor,
+                    tools: tools
                 ) { [weak self] event in
                     guard let self else { return }
                     switch event {
@@ -117,9 +193,13 @@ class ChatViewModel {
                 messages[assistantIndex].content = result.text.isEmpty ? "Done." : result.text
 
                 let totalTime = CFAbsoluteTimeGetCurrent() - startTime
-                requestLogger.log(provider: provider, projectId: appState.selectedProjectId, prompt: promptText, totalTime: totalTime, ttft: 0, chunks: 0, chars: result.text.count, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens)
+                requestLogger.log(provider: bossProvider, projectId: appState.selectedProjectId, prompt: promptText, totalTime: totalTime, ttft: 0, chunks: 0, chars: result.text.count, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens)
 
-                await projectUpdater.commitAndRefresh(projectName: projectName, commitMessage: text)
+                // Use the (potentially updated) project name from BossToolExecutor
+                let finalProjectName = bossExecutor?.projectName ?? projectName
+                if !finalProjectName.isEmpty {
+                    await projectUpdater.commitAndRefresh(projectName: finalProjectName, commitMessage: text)
+                }
 
                 saveChatHistory()
             } catch {
@@ -187,6 +267,9 @@ class ChatViewModel {
         case "edit_file": return "✏️"
         case "delete_file": return "🗑️"
         case "web_search": return "🔍"
+        case "delegate_task": return "👥"
+        case "update_checklist": return "📋"
+        case "create_project": return "🏗️"
         default: return "🔧"
         }
     }
@@ -199,6 +282,9 @@ class ChatViewModel {
         case "edit_file": return "Editing file"
         case "delete_file": return "Deleting file"
         case "web_search": return "Searching the web"
+        case "delegate_task": return "Delegating task"
+        case "update_checklist": return "Updating checklist"
+        case "create_project": return "Creating project"
         default: return name
         }
     }

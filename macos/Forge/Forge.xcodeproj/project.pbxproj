@@ -74,6 +74,11 @@
 		A1000100000000000000004A /* ContentExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004A /* ContentExtractor.swift */; };
 		A1000100000000000000004B /* ChatHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004B /* ChatHistoryService.swift */; };
 		A1000100000000000000004C /* ChatProjectCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004C /* ChatProjectCoordinator.swift */; };
+		A1000100000000000000004D /* SubAgentRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004D /* SubAgentRole.swift */; };
+		A1000100000000000000004E /* ChecklistModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004E /* ChecklistModel.swift */; };
+		A1000100000000000000004F /* BossSystemPrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004F /* BossSystemPrompts.swift */; };
+		A10001000000000000000050 /* BossToolExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000050 /* BossToolExecutor.swift */; };
+		A10001000000000000000051 /* ChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000051 /* ChecklistView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -145,6 +150,11 @@
 		B1000100000000000000004A /* ContentExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentExtractor.swift; sourceTree = "<group>"; };
 		B1000100000000000000004B /* ChatHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistoryService.swift; sourceTree = "<group>"; };
 		B1000100000000000000004C /* ChatProjectCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatProjectCoordinator.swift; sourceTree = "<group>"; };
+		B1000100000000000000004D /* SubAgentRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubAgentRole.swift; sourceTree = "<group>"; };
+		B1000100000000000000004E /* ChecklistModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistModel.swift; sourceTree = "<group>"; };
+		B1000100000000000000004F /* BossSystemPrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossSystemPrompts.swift; sourceTree = "<group>"; };
+		B10001000000000000000050 /* BossToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossToolExecutor.swift; sourceTree = "<group>"; };
+		B10001000000000000000051 /* ChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -326,6 +336,7 @@
 				B10001000000000000000011 /* ClaudeService.swift */,
 				B10001000000000000000044 /* CerebrasService.swift */,
 				B10001000000000000000045 /* TogetherService.swift */,
+				D10001000000000000000093 /* Boss */,
 				D10001000000000000000091 /* Tools */,
 			);
 			path = AI;
@@ -339,6 +350,18 @@
 				B10001000000000000000048 /* AgentLoop.swift */,
 			);
 			path = Tools;
+			sourceTree = "<group>";
+		};
+		D10001000000000000000093 /* Boss */ = {
+			isa = PBXGroup;
+			children = (
+				B1000100000000000000004D /* SubAgentRole.swift */,
+				B1000100000000000000004E /* ChecklistModel.swift */,
+				B1000100000000000000004F /* BossSystemPrompts.swift */,
+				B10001000000000000000050 /* BossToolExecutor.swift */,
+				B10001000000000000000051 /* ChecklistView.swift */,
+			);
+			path = Boss;
 			sourceTree = "<group>";
 		};
 		D10001000000000000000059 /* Chat */ = {
@@ -727,6 +750,11 @@
 				A1000100000000000000004A /* ContentExtractor.swift in Sources */,
 				A1000100000000000000004B /* ChatHistoryService.swift in Sources */,
 				A1000100000000000000004C /* ChatProjectCoordinator.swift in Sources */,
+				A1000100000000000000004D /* SubAgentRole.swift in Sources */,
+				A1000100000000000000004E /* ChecklistModel.swift in Sources */,
+				A1000100000000000000004F /* BossSystemPrompts.swift in Sources */,
+				A10001000000000000000050 /* BossToolExecutor.swift in Sources */,
+				A10001000000000000000051 /* ChecklistView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -12,17 +12,20 @@ enum AgentEvent: Sendable {
 /// Runs an agentic tool-use loop: call LLM → execute tools → repeat until text response
 @MainActor
 class AgentLoop {
-    private let maxIterations = 10
+    private let defaultMaxIterations = 10
 
     func run(
         userMessage: String,
         history: [AIMessage],
         systemPrompt: String,
         service: any AIService,
-        executor: ToolExecutor,
+        executor: any ToolExecuting,
+        tools overrideTools: [[String: Any]]? = nil,
+        maxIterations overrideMax: Int? = nil,
         onEvent: @escaping (AgentEvent) -> Void
     ) async throws -> AgentResult {
         let isAnthropic = service.provider == .claude
+        let maxIterations = overrideMax ?? defaultMaxIterations
         var totalInput = 0
         var totalOutput = 0
 
@@ -34,9 +37,9 @@ class AgentLoop {
             isAnthropic: isAnthropic
         )
 
-        let tools: [[String: Any]] = isAnthropic
+        nonisolated(unsafe) let tools: [[String: Any]] = overrideTools ?? (isAnthropic
             ? ForgeTools.anthropicFormat()
-            : ForgeTools.openAIFormat()
+            : ForgeTools.openAIFormat())
 
         for _ in 0..<maxIterations {
             guard !Task.isCancelled else { throw AIError.cancelled }
@@ -59,33 +62,59 @@ class AgentLoop {
                 return AgentResult(text: text, totalInputTokens: totalInput, totalOutputTokens: totalOutput)
             }
 
-            // Execute each tool call
-            var toolResults: [(call: ToolCall, result: String)] = []
+            // Emit tool start events
             for call in response.toolCalls {
                 onEvent(.toolStart(name: call.name, args: call.arguments))
+            }
+
+            // Execute tool calls concurrently using async let where possible,
+            // falling back to sequential for single calls
+            var toolResults: [(call: ToolCall, result: String)] = []
+            if response.toolCalls.count == 1 {
+                let call = response.toolCalls[0]
                 do {
                     let result = try await executor.execute(call)
                     toolResults.append((call, result))
-                    onEvent(.toolDone(name: call.name, summary: summarize(result)))
                 } catch {
-                    let errorMsg = "Error: \(error.localizedDescription)"
-                    toolResults.append((call, errorMsg))
-                    onEvent(.toolDone(name: call.name, summary: errorMsg))
+                    toolResults.append((call, "Error: \(error.localizedDescription)"))
+                }
+            } else {
+                // Run multiple tool calls concurrently via child tasks
+                let tasks: [Task<(ToolCall, String), Never>] = response.toolCalls.map { call in
+                    nonisolated(unsafe) let exec = executor
+                    return Task { @MainActor in
+                        do {
+                            let result = try await exec.execute(call)
+                            return (call, result)
+                        } catch {
+                            return (call, "Error: \(error.localizedDescription)")
+                        }
+                    }
+                }
+                for task in tasks {
+                    let result = await task.value
+                    toolResults.append(result)
                 }
             }
 
+            // Emit tool done events
+            for item in toolResults {
+                onEvent(.toolDone(name: item.0.name, summary: summarize(item.1)))
+            }
+
             // Append assistant message + tool results to conversation
+            let mappedResults = toolResults.map { (call: $0.0, result: $0.1) }
             if isAnthropic {
                 appendAnthropicTurn(
                     messages: &messages,
                     response: response,
-                    toolResults: toolResults
+                    toolResults: mappedResults
                 )
             } else {
                 appendOpenAITurn(
                     messages: &messages,
                     response: response,
-                    toolResults: toolResults
+                    toolResults: mappedResults
                 )
             }
         }

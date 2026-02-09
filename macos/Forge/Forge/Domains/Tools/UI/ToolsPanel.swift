@@ -8,7 +8,6 @@ struct ToolsPanel: View {
     var chatViewModel: ChatViewModel
     let selectedPageId: String?
     @Binding var isExpanded: Bool
-    let onProjectCreated: (String) -> Void
     var onOpenFloatingChat: (() -> Void)? = nil
 
     @State private var toolsHeight: CGFloat = 320
@@ -52,11 +51,8 @@ struct ToolsPanel: View {
                 // Tools content (scrollable, fixed height)
                 ScrollView {
                     VStack(spacing: 2) {
-                        // New Project - always at top
-                        NewProjectCard(appState: appState, chatViewModel: chatViewModel, onProjectCreated: onProjectCreated)
-
-                        // Build full site from existing page
-                        BuildSiteCard(appState: appState, chatViewModel: chatViewModel)
+                        // Boss checklist progress
+                        ChecklistView(checklist: chatViewModel.checklist)
 
                         // Settings
                         SettingsToolCard(appState: appState)

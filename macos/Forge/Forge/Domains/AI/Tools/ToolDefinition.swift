@@ -1,5 +1,11 @@
 import Foundation
 
+/// Protocol for executing tool calls — allows swapping in BossToolExecutor
+@MainActor
+protocol ToolExecuting {
+    func execute(_ call: ToolCall) async throws -> String
+}
+
 /// A tool call returned by an LLM
 struct ToolCall: Sendable {
     let id: String
@@ -138,6 +144,75 @@ enum ForgeTools {
                 ] as [String: Any],
             ],
         ]
+    }
+
+    /// Boss-mode tool definitions in Anthropic format — includes delegate_task + update_checklist
+    static func bossAnthropicFormat() -> [[String: Any]] {
+        var tools = anthropicFormat()
+        tools.append([
+            "name": "delegate_task",
+            "description": "Delegate a task to a sub-agent. The sub-agent will execute the task using its own tools and return a result. Available roles: coder (file operations), researcher (web search + file read/create), reviewer (read-only file inspection).",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "role": [
+                        "type": "string",
+                        "enum": ["coder", "researcher", "reviewer"],
+                        "description": "The sub-agent role to delegate to",
+                    ] as [String: Any],
+                    "instructions": [
+                        "type": "string",
+                        "description": "Detailed instructions for the sub-agent",
+                    ],
+                    "context": [
+                        "type": "string",
+                        "description": "Optional context from previous steps (e.g. file contents, search results)",
+                    ],
+                ] as [String: Any],
+                "required": ["role", "instructions"],
+            ] as [String: Any],
+        ])
+        tools.append([
+            "name": "create_project",
+            "description": "Create a new project workspace. Call this first if no project exists yet. The name should be a short kebab-case slug derived from the user's request (e.g. 'coffee-shop-site', 'portfolio-site').",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "name": [
+                        "type": "string",
+                        "description": "Short kebab-case project name (e.g. 'coffee-shop-site', 'restaurant-menu')",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["name"],
+            ] as [String: Any],
+        ])
+        tools.append([
+            "name": "update_checklist",
+            "description": "Create or update the task checklist. Use this to break down the user's request into steps and track progress. Always call this before starting work.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "items": [
+                        "type": "array",
+                        "items": [
+                            "type": "object",
+                            "properties": [
+                                "step": ["type": "string", "description": "Description of this step"] as [String: Any],
+                                "status": [
+                                    "type": "string",
+                                    "enum": ["pending", "in_progress", "done", "error"],
+                                    "description": "Current status of this step",
+                                ] as [String: Any],
+                            ] as [String: Any],
+                            "required": ["step", "status"],
+                        ] as [String: Any],
+                        "description": "List of checklist items with their status",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["items"],
+            ] as [String: Any],
+        ])
+        return tools
     }
 
     /// All tool definitions in Anthropic format (Claude)

@@ -2,7 +2,7 @@ import Foundation
 
 /// Executes tool calls against the local workspace
 @MainActor
-struct ToolExecutor {
+struct ToolExecutor: ToolExecuting {
     let workspace: LocalWorkspaceService
     let projectName: String
 

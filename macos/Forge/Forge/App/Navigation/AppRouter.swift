@@ -93,10 +93,6 @@ struct AppRouter: View {
                                     chatViewModel: appState.chatViewModel,
                                     selectedPageId: appState.selectedPageId,
                                     isExpanded: $showToolsPanel,
-                                    onProjectCreated: { projectId in
-                                        appState.selectedProjectId = projectId
-                                        appState.currentMode = .design
-                                    },
                                     onOpenFloatingChat: {
                                         appState.showFloatingChat = true
                                     }
@@ -151,12 +147,7 @@ struct AppRouter: View {
                 viewModel: designViewModel,
                 sidebarVisible: appState.showSidebar,
                 toolsPanelVisible: showToolsPanel,
-                selectedPageId: appState.selectedPageId,
-                onProjectCreated: { projectId in
-                    Task {
-                        await appState.loadProject(id: projectId)
-                    }
-                }
+                selectedPageId: appState.selectedPageId
             )
         case .code:
             CodeModeView(appState: appState, selectedPageId: $appState.selectedPageId)

@@ -93,13 +93,24 @@ class AppState {
 
     /// Returns the active AI service based on the selected provider
     var activeAIService: any AIService {
-        switch selectedProvider {
+        resolveService(for: selectedProvider)
+    }
+
+    /// Resolve an AI service for any provider
+    func resolveService(for provider: AIProvider) -> any AIService {
+        switch provider {
         case .cerebras: return cerebrasService
         case .glm: return glmService
         case .groq: return groqService
         case .claude: return claudeService
         case .together: return togetherService
         }
+    }
+
+    /// Whether the Claude API key is configured (needed for Boss mode)
+    var hasClaudeKey: Bool {
+        guard let key = KeychainHelper.load(key: AIProvider.claude.keychainKey) else { return false }
+        return !key.isEmpty
     }
 
     // MARK: - Services
