@@ -15,7 +15,7 @@ struct ChatTabContent: View {
             chatInput
         }
         .onChange(of: appState.currentProject?.id) { oldId, newId in
-            if oldId != newId {
+            if oldId != newId && !chatViewModel.isStreaming {
                 chatViewModel.resetForProject()
                 inputText = ""
             }
