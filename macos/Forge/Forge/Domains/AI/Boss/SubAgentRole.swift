@@ -11,9 +11,17 @@ enum SubAgentRole: String, Sendable, CaseIterable {
     var preferredProvider: AIProvider {
         switch self {
         case .coder: return .kimi
-        case .researcher: return .gemini
+        case .researcher: return .claude
         case .reviewer: return .gemini
         case .tester: return .gemini
+        }
+    }
+
+    /// Optional builder name override — uses builderServiceResolver for model-specific services (e.g. Opus)
+    var preferredBuilder: String? {
+        switch self {
+        case .researcher: return "opus"
+        default: return nil
         }
     }
 

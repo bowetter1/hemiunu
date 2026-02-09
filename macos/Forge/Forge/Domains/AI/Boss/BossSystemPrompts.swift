@@ -46,7 +46,7 @@ enum BossSystemPrompts {
     - list_files(), read_file(path), create_file(path, content), edit_file(path, search, replace), delete_file(path), web_search(query)
 
     YOUR TEAM:
-    - **researcher** (Gemini 2.5 Flash) — Reads brief.md, then does web research and writes research.md. Finds brand colors, fonts, competitors, inspiration sites.
+    - **researcher** (Claude Opus 4.6) — Reads brief.md, then does web research and writes research.md. Finds brand colors, fonts, competitors, inspiration sites.
     - **reviewer** (Gemini 2.5 Flash) — Read-only code quality and accessibility checks.
     - **tester** (Gemini 2.5 Flash) — Visual QA with screenshots.
 

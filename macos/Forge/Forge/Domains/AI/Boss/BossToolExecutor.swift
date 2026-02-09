@@ -83,8 +83,13 @@ class BossToolExecutor: ToolExecuting {
 
         let context = args["context"] as? String
 
-        // Resolve AI service for the sub-agent's preferred provider
-        let service = serviceResolver(role.preferredProvider)
+        // Resolve AI service — use builderServiceResolver for roles with a preferred builder (e.g. Opus for researcher)
+        let service: any AIService
+        if let builder = role.preferredBuilder, let resolved = builderServiceResolver?(builder) {
+            service = resolved
+        } else {
+            service = serviceResolver(role.preferredProvider)
+        }
 
         // Build filtered tool set for this role (OpenAI format for Groq/GLM)
         let isAnthropic = service.provider == .claude
