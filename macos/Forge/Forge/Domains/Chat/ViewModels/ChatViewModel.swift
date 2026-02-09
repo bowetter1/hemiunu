@@ -11,9 +11,13 @@ class ChatViewModel {
     let appState: AppState
     private var streamTask: Task<Void, Never>?
     private let agentLoop = AgentLoop()
+    private let contentExtractor = ContentExtractor()
+    private let chatHistory = ChatHistoryService()
+    private let requestLogger: RequestLogger
 
     init(appState: AppState) {
         self.appState = appState
+        self.requestLogger = RequestLogger(logDirectory: appState.workspace.rootDirectory)
     }
 
     func sendMessage(_ text: String) {
@@ -111,9 +115,10 @@ class ChatViewModel {
                 messages[assistantIndex].content = result.text.isEmpty ? "Done." : result.text
 
                 let totalTime = CFAbsoluteTimeGetCurrent() - startTime
-                logRequest(provider: provider, prompt: promptText, totalTime: totalTime, ttft: 0, chunks: 0, chars: result.text.count, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens)
+                requestLogger.log(provider: provider, projectId: appState.selectedProjectId, prompt: promptText, totalTime: totalTime, ttft: 0, chunks: 0, chars: result.text.count, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens)
 
-                await commitWorkspaceVersion(projectName: projectName, message: text)
+                _ = try? await appState.workspace.gitCommit(project: projectName, message: text)
+                await appState.syncLocalVersionState(projectName: projectName)
 
                 // Refresh project state
                 appState.setPages(appState.workspace.loadPages(project: projectName))
@@ -163,7 +168,7 @@ class ChatViewModel {
                 let contentLength = messages[assistantIndex].content.count
 
                 await handleGeneratedContent(messages[assistantIndex].content)
-                logRequest(provider: provider, prompt: promptText, totalTime: totalTime, ttft: ttft, chunks: tokenCount, chars: contentLength, inputTokens: 0, outputTokens: 0)
+                requestLogger.log(provider: provider, projectId: appState.selectedProjectId, prompt: promptText, totalTime: totalTime, ttft: ttft, chunks: tokenCount, chars: contentLength)
                 saveChatHistory()
             } catch {
                 if !Task.isCancelled {
@@ -225,27 +230,26 @@ class ChatViewModel {
     // MARK: - Content Extraction
 
     private func handleGeneratedContent(_ content: String) async {
-        guard let html = extractHTML(from: content) else { return }
-
-        // Strip code blocks from chat display — keep only conversational text
-        if let lastAssistantIndex = messages.lastIndex(where: { $0.role == .assistant }) {
-            let chatText = stripCodeBlocks(from: content).trimmingCharacters(in: .whitespacesAndNewlines)
-            messages[lastAssistantIndex].content = chatText.isEmpty
-                ? "Site updated."
-                : chatText + "\n\n\u{2705} Site updated."
-        }
-
         guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
               let projectName = appState.localProjectName(from: projectId) else {
             return // No project — streaming without project, HTML stays in chat only
         }
 
         do {
-            try appState.workspace.writeFile(project: projectName, path: "index.html", content: html)
-            await commitWorkspaceVersion(
+            let commitMessage = messages.last(where: { $0.role == .user })?.content ?? "Update"
+            if let displayText = try contentExtractor.processAndSave(
+                content: content,
+                workspace: appState.workspace,
                 projectName: projectName,
-                message: messages.last(where: { $0.role == .user })?.content ?? "Update"
-            )
+                commitMessage: commitMessage
+            ) {
+                if let lastAssistantIndex = messages.lastIndex(where: { $0.role == .assistant }) {
+                    messages[lastAssistantIndex].content = displayText
+                }
+            }
+
+            _ = try? await appState.workspace.gitCommit(project: projectName, message: messages.last(where: { $0.role == .user })?.content ?? "Update")
+            await appState.syncLocalVersionState(projectName: projectName)
             appState.setPages(appState.workspace.loadPages(project: projectName))
             appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
             appState.refreshPreview()
@@ -256,110 +260,23 @@ class ChatViewModel {
         }
     }
 
-    private func commitWorkspaceVersion(projectName: String, message: String) async {
-        _ = try? await appState.workspace.gitCommit(project: projectName, message: message)
-        await refreshLocalVersionState(projectName: projectName)
-    }
-
-    private func refreshLocalVersionState(projectName: String) async {
-        guard let versions = try? await appState.workspace.gitVersions(project: projectName) else { return }
-        appState.pageVersions = versions
-        appState.currentVersionNumber = versions.last?.version ?? 1
-    }
-
     // MARK: - Chat History Persistence
 
     private var chatHistoryURL: URL? {
-        guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
-              let projectName = appState.localProjectName(from: projectId) else { return nil }
-        return appState.workspace.projectPath(projectName).appendingPathComponent("chat-history.json")
+        chatHistory.historyURL(
+            workspace: appState.workspace,
+            projectId: appState.selectedProjectId ?? appState.currentProject?.id,
+            projectNameResolver: { appState.localProjectName(from: $0) }
+        )
     }
 
     private func saveChatHistory() {
         guard let url = chatHistoryURL else { return }
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = .prettyPrinted
-        guard let data = try? encoder.encode(messages) else { return }
-        try? data.write(to: url, options: .atomic)
+        chatHistory.save(messages, to: url)
     }
 
     private func loadChatHistory() {
-        guard let url = chatHistoryURL,
-              FileManager.default.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url) else { return }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        if let loaded = try? decoder.decode([ChatMessage].self, from: data) {
-            messages = loaded
-        }
-    }
-
-    // MARK: - Request Logging
-
-    private func logRequest(provider: AIProvider, prompt: String, totalTime: Double, ttft: Double, chunks: Int, chars: Int, inputTokens: Int = 0, outputTokens: Int = 0) {
-        let logURL = appState.workspace.rootDirectory.appendingPathComponent("ai-log.md")
-        let dateStr = ISO8601DateFormatter().string(from: Date())
-        let projectName = (appState.selectedProjectId ?? "none").replacingOccurrences(of: "local:", with: "")
-        let promptPreview = String(prompt.prefix(80)).replacingOccurrences(of: "\n", with: " ")
-        let tokensStr = inputTokens + outputTokens > 0
-            ? "\(inputTokens)→\(outputTokens)"
-            : "-"
-        let costStr: String
-        if inputTokens + outputTokens > 0 {
-            let cost = (Double(inputTokens) * provider.inputCostPerMillion + Double(outputTokens) * provider.outputCostPerMillion) / 1_000_000
-            costStr = String(format: "$%.2f", cost)
-        } else {
-            costStr = "-"
-        }
-
-        let entry = """
-        | \(dateStr) | \(provider.shortLabel) | \(provider.modelName) | \(projectName) | \(promptPreview) | \(String(format: "%.1f", ttft))s | \(String(format: "%.1f", totalTime))s | \(chunks) | \(chars) | \(tokensStr) | \(costStr) |
-
-        """
-
-        // Create file with header if it doesn't exist
-        if !FileManager.default.fileExists(atPath: logURL.path) {
-            let header = """
-            # Forge AI Log
-
-            | Timestamp | Provider | Model | Project | Prompt | TTFT | Total | Chunks | Chars | Tokens | Cost |
-            |-----------|----------|-------|---------|--------|------|-------|--------|-------|--------|------|
-
-            """
-            try? header.write(to: logURL, atomically: true, encoding: .utf8)
-        }
-
-        if let handle = try? FileHandle(forWritingTo: logURL) {
-            handle.seekToEndOfFile()
-            if let data = entry.data(using: .utf8) {
-                handle.write(data)
-            }
-            handle.closeFile()
-        }
-    }
-
-    /// Remove all ``` code blocks from a string, keeping surrounding text
-    private func stripCodeBlocks(from content: String) -> String {
-        let pattern = "```[\\w]*\\s*\\n[\\s\\S]*?\\n```"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return content }
-        let range = NSRange(content.startIndex..., in: content)
-        return regex.stringByReplacingMatches(in: content, range: range, withTemplate: "")
-    }
-
-    private func extractHTML(from content: String) -> String? {
-        let pattern = "```html\\s*\\n([\\s\\S]*?)\\n```"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
-              let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-              let range = Range(match.range(at: 1), in: content) else {
-            let fallbackPattern = "```\\s*\\n(<!DOCTYPE[\\s\\S]*?)\\n```"
-            if let fallbackRegex = try? NSRegularExpression(pattern: fallbackPattern, options: [.caseInsensitive]),
-               let fallbackMatch = fallbackRegex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
-               let fallbackRange = Range(fallbackMatch.range(at: 1), in: content) {
-                return String(content[fallbackRange])
-            }
-            return nil
-        }
-        return String(content[range])
+        guard let url = chatHistoryURL else { return }
+        messages = chatHistory.load(from: url)
     }
 }

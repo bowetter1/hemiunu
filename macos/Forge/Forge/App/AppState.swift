@@ -88,6 +88,7 @@ class AppState: ObservableObject {
     let glmService = CerebrasService(provider: .glm)
     let groqService = GroqService()
     let claudeService = ClaudeService()
+    let togetherService = TogetherService()
 
     /// Returns the active AI service based on the selected provider
     var activeAIService: any AIService {
@@ -96,6 +97,7 @@ class AppState: ObservableObject {
         case .glm: return glmService
         case .groq: return groqService
         case .claude: return claudeService
+        case .together: return togetherService
         }
     }
 
@@ -242,7 +244,7 @@ class AppState: ObservableObject {
 
     // MARK: - Local Versioning
 
-    private func syncLocalVersionState(projectName: String) async {
+    func syncLocalVersionState(projectName: String) async {
         do {
             let initResult = try await workspace.ensureGitRepository(project: projectName)
             let commitResult = try await workspace.gitCommit(project: projectName, message: "Initial import")
