@@ -67,20 +67,36 @@ class AgentLoop {
                 onEvent(.toolStart(name: call.name, args: call.arguments))
             }
 
-            // Execute tool calls concurrently using async let where possible,
-            // falling back to sequential for single calls
+            // Execute tool calls: priority tools first (sequential), then rest in parallel
+            let priority = executor.priorityToolNames
             var toolResults: [(call: ToolCall, result: String)] = []
-            if response.toolCalls.count == 1 {
-                let call = response.toolCalls[0]
+
+            // Partition into priority and normal calls
+            let priorityCalls = response.toolCalls.filter { priority.contains($0.name) }
+            let normalCalls = response.toolCalls.filter { !priority.contains($0.name) }
+
+            // Priority tools run first, sequentially (e.g. create_project before create_file)
+            for call in priorityCalls {
                 do {
                     let result = try await executor.execute(call)
                     toolResults.append((call, result))
                 } catch {
                     toolResults.append((call, "Error: \(error.localizedDescription)"))
                 }
-            } else {
-                // Run multiple tool calls concurrently via child tasks
-                let tasks: [Task<(ToolCall, String), Never>] = response.toolCalls.map { call in
+                onEvent(.toolDone(name: call.name, summary: summarize(toolResults.last!.result)))
+            }
+
+            // Normal tools run in parallel (or sequentially if only one)
+            if normalCalls.count == 1 {
+                let call = normalCalls[0]
+                do {
+                    let result = try await executor.execute(call)
+                    toolResults.append((call, result))
+                } catch {
+                    toolResults.append((call, "Error: \(error.localizedDescription)"))
+                }
+            } else if normalCalls.count > 1 {
+                let tasks: [Task<(ToolCall, String), Never>] = normalCalls.map { call in
                     nonisolated(unsafe) let exec = executor
                     return Task { @MainActor in
                         do {
@@ -97,9 +113,11 @@ class AgentLoop {
                 }
             }
 
-            // Emit tool done events
+            // Emit tool done events (skip priority tools — already emitted above)
             for item in toolResults {
-                onEvent(.toolDone(name: item.0.name, summary: summarize(item.1)))
+                if !priority.contains(item.0.name) {
+                    onEvent(.toolDone(name: item.0.name, summary: summarize(item.1)))
+                }
             }
 
             // Append assistant message + tool results to conversation

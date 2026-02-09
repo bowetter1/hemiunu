@@ -4,6 +4,12 @@ import Foundation
 @MainActor
 protocol ToolExecuting {
     func execute(_ call: ToolCall) async throws -> String
+    /// Tool names that must execute before other tools in the same batch (e.g. create_project)
+    var priorityToolNames: Set<String> { get }
+}
+
+extension ToolExecuting {
+    var priorityToolNames: Set<String> { [] }
 }
 
 /// A tool call returned by an LLM

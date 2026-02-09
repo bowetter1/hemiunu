@@ -29,6 +29,8 @@ class BossToolExecutor: ToolExecuting {
         self.onProjectCreate = onProjectCreate
     }
 
+    var priorityToolNames: Set<String> { ["create_project"] }
+
     /// Inner executor for standard file/search tools
     private var standardExecutor: ToolExecutor {
         ToolExecutor(workspace: workspace, projectName: projectName)
