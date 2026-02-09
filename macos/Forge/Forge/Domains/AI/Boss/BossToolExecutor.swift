@@ -37,6 +37,8 @@ class BossToolExecutor: ToolExecuting {
             return executeCreateProject(call)
         case "delegate_task":
             return try await executeDelegateTask(call)
+        case "build_version":
+            return try await executeBuildVersion(call)
         case "update_checklist":
             return executeUpdateChecklist(call)
         default:
@@ -113,6 +115,89 @@ class BossToolExecutor: ToolExecuting {
         return "[\(role.rawValue)] \(result.text)"
     }
 
+    // MARK: - Build Version
+
+    private func executeBuildVersion(_ call: ToolCall) async throws -> String {
+        let args = parseArguments(call.arguments)
+        guard let builderName = args["builder"] as? String,
+              let version = args["version"] as? Int,
+              let instructions = args["instructions"] as? String,
+              let designDirection = args["design_direction"] as? String else {
+            throw ToolError.missingParameter("builder, version, instructions, and design_direction")
+        }
+
+        let researchContext = args["research_context"] as? String
+
+        // Map builder name to AI provider
+        let builderProvider: AIProvider
+        switch builderName {
+        case "opus": builderProvider = .claude
+        case "gemini": builderProvider = .gemini
+        case "kimi": builderProvider = .kimi
+        default: return "Error: unknown builder '\(builderName)'. Use opus, gemini, or kimi."
+        }
+
+        // Create version-specific project: e.g. "coffee-shop-v1"
+        let versionProjectName = "\(projectName)-v\(version)"
+        _ = try? workspace.createProject(name: versionProjectName)
+
+        // Copy research files from base project to version project
+        copyResearchFiles(to: versionProjectName)
+
+        // Notify host about the new version project
+        onProjectCreate?(versionProjectName)
+
+        // Resolve AI service for this builder
+        let service = serviceResolver(builderProvider)
+
+        // Build tools for coder role + web_search (OpenAI format for Kimi/Gemini, Anthropic for Claude)
+        let isAnthropic = service.provider == .claude
+        let allTools: [[String: Any]] = isAnthropic
+            ? ForgeTools.anthropicFormat()
+            : ForgeTools.openAIFormat()
+        var builderTools = SubAgentRole.coder.allowedTools
+        builderTools.insert("web_search") // builders can search for images
+        let filteredTools = filterTools(allTools, allowed: builderTools, isAnthropic: isAnthropic)
+
+        // Build system prompt with design direction (like Apex's vector injection)
+        let systemPrompt = """
+        \(BossSystemPrompts.builder)
+
+        ## ASSIGNED DESIGN DIRECTION
+        Your creative direction: [\(designDirection)]
+        Push the design toward [\(designDirection)]. This is your angle — own it.
+        Build a complete, polished website following this direction.
+        """
+
+        var fullInstructions = instructions
+        if let researchContext {
+            fullInstructions += "\n\nRESEARCH CONTEXT:\n\(researchContext)"
+        }
+        fullInstructions += "\n\nStart by reading brief.md and research.md, then build."
+
+        // Run nested agent loop targeting the version project
+        let subExecutor = ToolExecutor(workspace: workspace, projectName: versionProjectName)
+        let agentLoop = AgentLoop()
+
+        let result = try await agentLoop.run(
+            userMessage: fullInstructions,
+            history: [],
+            systemPrompt: systemPrompt,
+            service: service,
+            executor: subExecutor,
+            tools: filteredTools,
+            maxIterations: SubAgentRole.coder.maxIterations
+        ) { [onSubAgentEvent] event in
+            onSubAgentEvent(.coder, event)
+        }
+
+        // Commit the version project
+        _ = try? await workspace.ensureGitRepository(project: versionProjectName)
+        _ = try? await workspace.gitCommit(project: versionProjectName, message: "v\(version) built by \(builderName)")
+
+        return "[v\(version)/\(builderName)] \(result.text)"
+    }
+
     // MARK: - Update Checklist
 
     private func executeUpdateChecklist(_ call: ToolCall) -> String {
@@ -147,6 +232,18 @@ class BossToolExecutor: ToolExecuting {
         try? workspace.writeFile(project: projectName, path: "checklist.md", content: "# Task Checklist\n\n\(markdown)\n")
 
         return "Checklist updated: \(items.count) items"
+    }
+
+    // MARK: - Research File Copying
+
+    /// Copy brief.md and research.md from base project to a version project
+    private func copyResearchFiles(to versionProject: String) {
+        let researchFiles = ["brief.md", "research.md", "checklist.md"]
+        for file in researchFiles {
+            if let content = try? workspace.readFile(project: projectName, path: file) {
+                try? workspace.writeFile(project: versionProject, path: file, content: content)
+            }
+        }
     }
 
     // MARK: - Helpers

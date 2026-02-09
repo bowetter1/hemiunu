@@ -31,7 +31,7 @@ struct AgentResult: Sendable {
 /// Tool schemas for Forge's file-management tools
 enum ForgeTools {
 
-    /// All tool definitions in OpenAI function-calling format (Groq, GLM)
+    /// All tool definitions in OpenAI function-calling format (Groq, Kimi, Gemini)
     static func openAIFormat() -> [[String: Any]] {
         [
             [
@@ -143,6 +143,44 @@ enum ForgeTools {
                     ] as [String: Any],
                 ] as [String: Any],
             ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "take_screenshot",
+                    "description": "Take a screenshot of the project's main HTML page rendered in a WebView. Returns an image description from visual analysis.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "width": [
+                                "type": "integer",
+                                "description": "Viewport width in pixels (default 1280)",
+                            ],
+                            "height": [
+                                "type": "integer",
+                                "description": "Viewport height in pixels (default 800)",
+                            ],
+                        ] as [String: Any],
+                        "required": [String](),
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "review_screenshot",
+                    "description": "Analyze a previously taken screenshot for visual quality, layout issues, and usability problems. Returns detailed feedback.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "focus": [
+                                "type": "string",
+                                "description": "What to focus on: 'layout', 'colors', 'typography', 'responsiveness', 'overall' (default: 'overall')",
+                            ],
+                        ] as [String: Any],
+                        "required": [String](),
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
         ]
     }
 
@@ -151,13 +189,13 @@ enum ForgeTools {
         var tools = anthropicFormat()
         tools.append([
             "name": "delegate_task",
-            "description": "Delegate a task to a sub-agent. The sub-agent will execute the task using its own tools and return a result. Available roles: coder (file operations), researcher (web search + file read/create), reviewer (read-only file inspection).",
+            "description": "Delegate a task to a sub-agent. The sub-agent will execute the task using its own tools and return a result. Available roles: coder (builds HTML/CSS/JS), researcher (web search + files), reviewer (read-only inspection), tester (screenshot + visual QA).",
             "input_schema": [
                 "type": "object",
                 "properties": [
                     "role": [
                         "type": "string",
-                        "enum": ["coder", "researcher", "reviewer"],
+                        "enum": ["coder", "researcher", "reviewer", "tester"],
                         "description": "The sub-agent role to delegate to",
                     ] as [String: Any],
                     "instructions": [
@@ -210,6 +248,37 @@ enum ForgeTools {
                     ] as [String: Any],
                 ] as [String: Any],
                 "required": ["items"],
+            ] as [String: Any],
+        ])
+        tools.append([
+            "name": "build_version",
+            "description": "Build a version of the website using a specific AI builder. Call this multiple times in parallel to create different versions. Each version gets its own project workspace. Available builders: opus (Claude — polished, architectural), gemini (Gemini — analytical, research-driven), kimi (Kimi — fast, creative).",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "builder": [
+                        "type": "string",
+                        "enum": ["opus", "gemini", "kimi"],
+                        "description": "Which AI builder to use for this version",
+                    ] as [String: Any],
+                    "version": [
+                        "type": "integer",
+                        "description": "Version number (1, 2, or 3)",
+                    ] as [String: Any],
+                    "instructions": [
+                        "type": "string",
+                        "description": "Build instructions including what to create",
+                    ] as [String: Any],
+                    "design_direction": [
+                        "type": "string",
+                        "description": "Unique creative direction for this version (e.g. 'Luxury minimalist aesthetic', 'Tech-forward and futuristic', 'Warm and community-focused')",
+                    ] as [String: Any],
+                    "research_context": [
+                        "type": "string",
+                        "description": "Research results to pass to the builder (brief, findings, image URLs, etc.)",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["builder", "version", "instructions", "design_direction"],
             ] as [String: Any],
         ])
         return tools
@@ -309,13 +378,45 @@ enum ForgeTools {
                     "required": ["query"],
                 ] as [String: Any],
             ],
+            [
+                "name": "take_screenshot",
+                "description": "Take a screenshot of the project's main HTML page rendered in a WebView. Returns an image description from visual analysis.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "width": [
+                            "type": "integer",
+                            "description": "Viewport width in pixels (default 1280)",
+                        ],
+                        "height": [
+                            "type": "integer",
+                            "description": "Viewport height in pixels (default 800)",
+                        ],
+                    ] as [String: Any],
+                    "required": [String](),
+                ] as [String: Any],
+            ],
+            [
+                "name": "review_screenshot",
+                "description": "Analyze a previously taken screenshot for visual quality, layout issues, and usability problems. Returns detailed feedback.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "focus": [
+                            "type": "string",
+                            "description": "What to focus on: 'layout', 'colors', 'typography', 'responsiveness', 'overall' (default: 'overall')",
+                        ],
+                    ] as [String: Any],
+                    "required": [String](),
+                ] as [String: Any],
+            ],
         ]
     }
 }
 
 // MARK: - Response Parsers
 
-/// Parses non-streaming OpenAI-format responses (Groq, GLM)
+/// Parses non-streaming OpenAI-format responses (Groq, Kimi, Gemini)
 enum OpenAIToolResponseParser {
     static func parse(_ data: Data) throws -> ToolResponse {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

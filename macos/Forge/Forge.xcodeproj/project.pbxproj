@@ -24,7 +24,8 @@
 		A1000100000000000000000F /* AIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000000F /* AIError.swift */; };
 		A10001000000000000000010 /* GroqService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000010 /* GroqService.swift */; };
 		A10001000000000000000011 /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000011 /* ClaudeService.swift */; };
-		A10001000000000000000045 /* TogetherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000045 /* TogetherService.swift */; };
+		A10001000000000000000060 /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000060 /* GeminiService.swift */; };
+		A10001000000000000000061 /* KimiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000061 /* KimiService.swift */; };
 		A10001000000000000000046 /* ToolDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000046 /* ToolDefinition.swift */; };
 		A10001000000000000000047 /* ToolExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000047 /* ToolExecutor.swift */; };
 		A10001000000000000000048 /* AgentLoop.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000048 /* AgentLoop.swift */; };
@@ -99,7 +100,8 @@
 		B1000100000000000000000F /* AIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIError.swift; sourceTree = "<group>"; };
 		B10001000000000000000010 /* GroqService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroqService.swift; sourceTree = "<group>"; };
 		B10001000000000000000011 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
-		B10001000000000000000045 /* TogetherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TogetherService.swift; sourceTree = "<group>"; };
+		B10001000000000000000060 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
+		B10001000000000000000061 /* KimiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KimiService.swift; sourceTree = "<group>"; };
 		B10001000000000000000046 /* ToolDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDefinition.swift; sourceTree = "<group>"; };
 		B10001000000000000000047 /* ToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolExecutor.swift; sourceTree = "<group>"; };
 		B10001000000000000000048 /* AgentLoop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLoop.swift; sourceTree = "<group>"; };
@@ -332,7 +334,8 @@
 				B10001000000000000000049 /* RequestLogger.swift */,
 				B10001000000000000000010 /* GroqService.swift */,
 				B10001000000000000000011 /* ClaudeService.swift */,
-				B10001000000000000000045 /* TogetherService.swift */,
+				B10001000000000000000060 /* GeminiService.swift */,
+				B10001000000000000000061 /* KimiService.swift */,
 				D10001000000000000000093 /* Boss */,
 				D10001000000000000000091 /* Tools */,
 			);
@@ -704,7 +707,8 @@
 				A10001000000000000000046 /* ToolDefinition.swift in Sources */,
 				A10001000000000000000047 /* ToolExecutor.swift in Sources */,
 				A10001000000000000000048 /* AgentLoop.swift in Sources */,
-				A10001000000000000000045 /* TogetherService.swift in Sources */,
+				A10001000000000000000060 /* GeminiService.swift in Sources */,
+				A10001000000000000000061 /* KimiService.swift in Sources */,
 				A10001000000000000000009 /* Project.swift in Sources */,
 				A1000100000000000000000A /* Page.swift in Sources */,
 				A1000100000000000000000B /* PageFilters.swift in Sources */,

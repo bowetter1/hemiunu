@@ -270,6 +270,9 @@ class ChatViewModel {
         case "delegate_task": return "👥"
         case "update_checklist": return "📋"
         case "create_project": return "🏗️"
+        case "build_version": return "🏗️"
+        case "take_screenshot": return "📸"
+        case "review_screenshot": return "🔎"
         default: return "🔧"
         }
     }
@@ -285,6 +288,9 @@ class ChatViewModel {
         case "delegate_task": return "Delegating task"
         case "update_checklist": return "Updating checklist"
         case "create_project": return "Creating project"
+        case "build_version": return "Building version"
+        case "take_screenshot": return "Taking screenshot"
+        case "review_screenshot": return "Reviewing screenshot"
         default: return name
         }
     }

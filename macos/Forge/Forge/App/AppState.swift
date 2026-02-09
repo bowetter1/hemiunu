@@ -87,7 +87,8 @@ class AppState {
     var selectedProvider: AIProvider = .groq
     let groqService = GroqService()
     let claudeService = ClaudeService()
-    let togetherService = TogetherService()
+    let geminiService = GeminiService()
+    let kimiService = KimiService()
 
     /// Returns the active AI service based on the selected provider
     var activeAIService: any AIService {
@@ -99,7 +100,8 @@ class AppState {
         switch provider {
         case .groq: return groqService
         case .claude: return claudeService
-        case .together: return togetherService
+        case .gemini: return geminiService
+        case .kimi: return kimiService
         }
     }
 

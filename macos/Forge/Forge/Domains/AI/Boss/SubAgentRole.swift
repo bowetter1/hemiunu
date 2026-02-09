@@ -5,13 +5,15 @@ enum SubAgentRole: String, Sendable, CaseIterable {
     case coder
     case researcher
     case reviewer
+    case tester
 
     /// Which AI provider this role prefers
     var preferredProvider: AIProvider {
         switch self {
-        case .coder: return .groq
-        case .researcher: return .groq
-        case .reviewer: return .groq
+        case .coder: return .kimi
+        case .researcher: return .gemini
+        case .reviewer: return .gemini
+        case .tester: return .gemini
         }
     }
 
@@ -24,6 +26,8 @@ enum SubAgentRole: String, Sendable, CaseIterable {
             return ["web_search", "read_file", "create_file", "list_files"]
         case .reviewer:
             return ["list_files", "read_file"]
+        case .tester:
+            return ["list_files", "read_file", "take_screenshot", "review_screenshot"]
         }
     }
 
@@ -33,6 +37,7 @@ enum SubAgentRole: String, Sendable, CaseIterable {
         case .coder: return 15
         case .researcher: return 8
         case .reviewer: return 5
+        case .tester: return 6
         }
     }
 }

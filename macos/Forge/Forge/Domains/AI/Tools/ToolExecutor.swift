@@ -47,6 +47,15 @@ struct ToolExecutor: ToolExecuting {
             }
             return try await executeWebSearch(query: query)
 
+        case "take_screenshot":
+            let width = args["width"] as? Int ?? 1280
+            let height = args["height"] as? Int ?? 800
+            return executeTakeScreenshot(width: width, height: height)
+
+        case "review_screenshot":
+            let focus = args["focus"] as? String ?? "overall"
+            return executeReviewScreenshot(focus: focus)
+
         default:
             throw ToolError.unknownTool(call.name)
         }
@@ -162,6 +171,19 @@ struct ToolExecutor: ToolExecuting {
         }
 
         return text.isEmpty ? "No results found." : text
+    }
+
+    // MARK: - Screenshot Tools (stub — WKWebView implementation coming)
+
+    private func executeTakeScreenshot(width: Int, height: Int) -> String {
+        // TODO: Implement WKWebView snapshot capture
+        let mainHTML = workspace.findMainHTML(project: projectName) ?? "index.html"
+        return "Screenshot taken of \(mainHTML) at \(width)x\(height). (Screenshot capture not yet implemented — use read_file to inspect the HTML directly.)"
+    }
+
+    private func executeReviewScreenshot(focus: String) -> String {
+        // TODO: Implement Gemini vision analysis of screenshot
+        return "Visual review (\(focus)): Screenshot analysis not yet implemented. Use read_file to review the HTML/CSS code directly for now."
     }
 
     // MARK: - Helpers

@@ -1,16 +1,16 @@
 import Foundation
 
-/// Together AI service — OpenAI-compatible streaming endpoint
-final class TogetherService: AIService, Sendable {
-    let provider: AIProvider = .together
-    private let baseURL = URL(string: "https://api.together.xyz/v1/chat/completions")!
+/// Kimi API service — OpenAI-compatible endpoint (Kimi K2.5 via Moonshot)
+final class KimiService: AIService, Sendable {
+    let provider: AIProvider = .kimi
+    private let baseURL = URL(string: "https://api.moonshot.ai/v1/chat/completions")!
 
     func generate(
         messages: [AIMessage],
         systemPrompt: String
     ) -> AsyncThrowingStream<String, Error> {
         guard let apiKey = KeychainHelper.load(key: provider.keychainKey), !apiKey.isEmpty else {
-            return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: .together)) }
+            return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: .kimi)) }
         }
 
         let body = buildRequestBody(messages: messages, systemPrompt: systemPrompt)
@@ -46,7 +46,7 @@ final class TogetherService: AIService, Sendable {
         tools: [[String: Any]]
     ) async throws -> ToolResponse {
         guard let apiKey = KeychainHelper.load(key: provider.keychainKey), !apiKey.isEmpty else {
-            throw AIError.noAPIKey(provider: .together)
+            throw AIError.noAPIKey(provider: .kimi)
         }
 
         var payload: [String: Any] = [
