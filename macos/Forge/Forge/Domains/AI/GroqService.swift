@@ -1,16 +1,13 @@
 import Foundation
 
 /// Groq API service — OpenAI-compatible streaming endpoint
-/// Use maxTokens to control output length (Llama 3.3 70B max: 32768)
 final class GroqService: AIService, Sendable {
     let provider: AIProvider = .groq
     private let modelName: String
-    private let maxTokens: Int
     private let baseURL = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
 
-    init(modelOverride: String? = nil, maxTokens: Int = 32768) {
+    init(modelOverride: String? = nil) {
         self.modelName = modelOverride ?? AIProvider.groq.modelName
-        self.maxTokens = maxTokens
     }
 
     func generate(
@@ -61,7 +58,6 @@ final class GroqService: AIService, Sendable {
             "model": modelName,
             "messages": messages,
             "temperature": 0.7,
-            "max_tokens": maxTokens,
             "stream": false,
         ]
         if !tools.isEmpty {
@@ -100,7 +96,6 @@ final class GroqService: AIService, Sendable {
             "messages": apiMessages,
             "stream": true,
             "temperature": 0.7,
-            "max_tokens": maxTokens,
         ]
 
         return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()

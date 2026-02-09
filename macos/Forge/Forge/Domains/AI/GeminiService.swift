@@ -5,12 +5,10 @@ import Foundation
 final class GeminiService: AIService, Sendable {
     let provider: AIProvider = .gemini
     private let modelName: String
-    private let maxTokens: Int
     private let baseURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")!
 
-    init(modelOverride: String? = nil, maxTokens: Int = 8192) {
+    init(modelOverride: String? = nil) {
         self.modelName = modelOverride ?? AIProvider.gemini.modelName
-        self.maxTokens = maxTokens
     }
 
     func generate(
@@ -61,7 +59,6 @@ final class GeminiService: AIService, Sendable {
             "model": modelName,
             "messages": messages,
             "temperature": 0.7,
-            "max_tokens": maxTokens,
             "stream": false,
         ]
         if !tools.isEmpty {
@@ -100,7 +97,6 @@ final class GeminiService: AIService, Sendable {
             "messages": apiMessages,
             "stream": true,
             "temperature": 0.7,
-            "max_tokens": maxTokens,
         ]
 
         return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
