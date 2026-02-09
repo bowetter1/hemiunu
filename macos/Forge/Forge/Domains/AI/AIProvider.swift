@@ -10,7 +10,7 @@ enum AIProvider: String, CaseIterable, Codable {
     var displayName: String {
         switch self {
         case .groq: return "Llama 3.3 70B"
-        case .claude: return "Claude Haiku 3.5"
+        case .claude: return "Claude Haiku 4.5"
         case .gemini: return "Gemini 2.5 Flash"
         case .kimi: return "Kimi K2.5"
         }
@@ -37,7 +37,7 @@ enum AIProvider: String, CaseIterable, Codable {
     var modelName: String {
         switch self {
         case .groq: return "llama-3.3-70b-versatile"
-        case .claude: return "claude-3-5-haiku-latest"
+        case .claude: return "claude-haiku-4-5-20251001"
         case .gemini: return "gemini-2.5-flash"
         case .kimi: return "kimi-k2-0711"
         }

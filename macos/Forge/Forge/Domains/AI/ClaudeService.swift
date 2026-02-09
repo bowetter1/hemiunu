@@ -8,7 +8,7 @@ final class ClaudeService: AIService, Sendable {
     private let maxTokens: Int
     private let baseURL = URL(string: "https://api.anthropic.com/v1/messages")!
 
-    init(modelOverride: String? = nil, maxTokens: Int = 8192) {
+    init(modelOverride: String? = nil, maxTokens: Int = 64000) {
         self.modelName = modelOverride ?? AIProvider.claude.modelName
         self.maxTokens = maxTokens
     }
