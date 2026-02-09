@@ -20,6 +20,7 @@ final class AppStateChatProjectCoordinator: ChatProjectUpdating {
         await appState.syncLocalVersionState(projectName: projectName)
         appState.setPages(appState.workspace.loadPages(project: projectName))
         appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
+        appState.refreshLocalProjects()
         appState.refreshPreview()
     }
 }
