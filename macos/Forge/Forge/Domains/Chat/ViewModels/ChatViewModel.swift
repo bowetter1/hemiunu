@@ -13,10 +13,12 @@ class ChatViewModel {
     private let agentLoop = AgentLoop()
     private let contentExtractor = ContentExtractor()
     private let chatHistory = ChatHistoryService()
+    private let projectUpdater: any ChatProjectUpdating
     private let requestLogger: RequestLogger
 
-    init(appState: AppState) {
+    init(appState: AppState, projectUpdater: (any ChatProjectUpdating)? = nil) {
         self.appState = appState
+        self.projectUpdater = projectUpdater ?? AppStateChatProjectCoordinator(appState: appState)
         self.requestLogger = RequestLogger(logDirectory: appState.workspace.rootDirectory)
     }
 
@@ -117,13 +119,7 @@ class ChatViewModel {
                 let totalTime = CFAbsoluteTimeGetCurrent() - startTime
                 requestLogger.log(provider: provider, projectId: appState.selectedProjectId, prompt: promptText, totalTime: totalTime, ttft: 0, chunks: 0, chars: result.text.count, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens)
 
-                _ = try? await appState.workspace.gitCommit(project: projectName, message: text)
-                await appState.syncLocalVersionState(projectName: projectName)
-
-                // Refresh project state
-                appState.setPages(appState.workspace.loadPages(project: projectName))
-                appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
-                appState.refreshPreview()
+                await projectUpdater.commitAndRefresh(projectName: projectName, commitMessage: text)
 
                 saveChatHistory()
             } catch {
@@ -220,13 +216,6 @@ class ChatViewModel {
         loadChatHistory()
     }
 
-    func selectedPage(for pageId: String?) -> Page? {
-        if let pageId = pageId {
-            return appState.pages.first { $0.id == pageId }
-        }
-        return appState.pages.first { $0.layoutVariant == nil }
-    }
-
     // MARK: - Content Extraction
 
     private func handleGeneratedContent(_ content: String) async {
@@ -240,21 +229,16 @@ class ChatViewModel {
             if let displayText = try contentExtractor.processAndSave(
                 content: content,
                 workspace: appState.workspace,
-                projectName: projectName,
-                commitMessage: commitMessage
+                projectName: projectName
             ) {
                 if let lastAssistantIndex = messages.lastIndex(where: { $0.role == .assistant }) {
                     messages[lastAssistantIndex].content = displayText
                 }
             }
 
-            _ = try? await appState.workspace.gitCommit(project: projectName, message: messages.last(where: { $0.role == .user })?.content ?? "Update")
-            await appState.syncLocalVersionState(projectName: projectName)
-            appState.setPages(appState.workspace.loadPages(project: projectName))
-            appState.setLocalFiles(appState.workspace.listFiles(project: projectName))
-            appState.refreshPreview()
+            await projectUpdater.commitAndRefresh(projectName: projectName, commitMessage: commitMessage)
         } catch {
-            #if DEBUG
+#if DEBUG
             print("[Chat] Failed to save HTML: \(error)")
             #endif
         }

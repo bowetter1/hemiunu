@@ -73,6 +73,7 @@
 		A10001000000000000000049 /* RequestLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000049 /* RequestLogger.swift */; };
 		A1000100000000000000004A /* ContentExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004A /* ContentExtractor.swift */; };
 		A1000100000000000000004B /* ChatHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004B /* ChatHistoryService.swift */; };
+		A1000100000000000000004C /* ChatProjectCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004C /* ChatProjectCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -143,6 +144,7 @@
 		B10001000000000000000049 /* RequestLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestLogger.swift; sourceTree = "<group>"; };
 		B1000100000000000000004A /* ContentExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentExtractor.swift; sourceTree = "<group>"; };
 		B1000100000000000000004B /* ChatHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistoryService.swift; sourceTree = "<group>"; };
+		B1000100000000000000004C /* ChatProjectCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatProjectCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -353,8 +355,9 @@
 		D10001000000000000000092 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				B1000100000000000000004A /* ContentExtractor.swift */,
 				B1000100000000000000004B /* ChatHistoryService.swift */,
+				B1000100000000000000004C /* ChatProjectCoordinator.swift */,
+				B1000100000000000000004A /* ContentExtractor.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -723,6 +726,7 @@
 				A10001000000000000000049 /* RequestLogger.swift in Sources */,
 				A1000100000000000000004A /* ContentExtractor.swift in Sources */,
 				A1000100000000000000004B /* ChatHistoryService.swift in Sources */,
+				A1000100000000000000004C /* ChatProjectCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

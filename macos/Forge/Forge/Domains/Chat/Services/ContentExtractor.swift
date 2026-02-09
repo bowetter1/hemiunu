@@ -30,7 +30,7 @@ struct ContentExtractor {
 
     /// Extract HTML, write to workspace, return display text or nil if no HTML found
     @MainActor func processAndSave(content: String, workspace: LocalWorkspaceService,
-                                   projectName: String, commitMessage: String) throws -> String? {
+                                   projectName: String) throws -> String? {
         guard let html = extractHTML(from: content) else { return nil }
 
         try workspace.writeFile(project: projectName, path: "index.html", content: html)
