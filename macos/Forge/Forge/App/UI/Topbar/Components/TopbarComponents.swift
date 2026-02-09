@@ -206,6 +206,85 @@ struct LogsPopover: View {
     }
 }
 
+// MARK: - Topbar Settings Button
+
+struct TopbarSettingsButton: View {
+    @Bindable var appState: AppState
+    let iconSize: CGFloat
+    @State private var isOpen = false
+
+    var body: some View {
+        Button {
+            isOpen.toggle()
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: iconSize, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Settings")
+        .popover(isPresented: $isOpen, arrowEdge: .bottom) {
+            settingsPopover
+        }
+    }
+
+    private var settingsPopover: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Settings")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            // AI Provider picker
+            HStack(spacing: 8) {
+                Image(systemName: "brain")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.blue)
+                    .frame(width: 16)
+
+                Text("Provider")
+                    .font(.system(size: 11, weight: .medium))
+
+                Spacer()
+
+                Picker("", selection: $appState.selectedProvider) {
+                    ForEach(AIProvider.allCases, id: \.self) { provider in
+                        Text(provider.shortLabel).tag(provider)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 140)
+            }
+
+            // API key status
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(AIProvider.allCases, id: \.self) { provider in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(hasKey(for: provider) ? .green : .red.opacity(0.5))
+                            .frame(width: 6, height: 6)
+                        Text(provider.displayName)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(hasKey(for: provider) ? "Active" : "No key")
+                            .font(.system(size: 9))
+                            .foregroundStyle(hasKey(for: provider) ? Color.green : Color.secondary.opacity(0.5))
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: 240)
+    }
+
+    private func hasKey(for provider: AIProvider) -> Bool {
+        guard let key = KeychainHelper.load(key: provider.keychainKey) else { return false }
+        return !key.isEmpty
+    }
+}
+
 // MARK: - Pulse Modifier
 
 struct PulseModifier: ViewModifier {

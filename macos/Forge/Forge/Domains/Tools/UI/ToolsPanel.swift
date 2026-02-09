@@ -53,9 +53,6 @@ struct ToolsPanel: View {
                     VStack(spacing: 2) {
                         // Boss checklist progress
                         ChecklistView(checklist: chatViewModel.checklist)
-
-                        // Settings
-                        SettingsToolCard(appState: appState)
                     }
                     .padding(12)
                 }

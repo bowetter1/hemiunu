@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Unified topbar with consistent alignment
 struct Topbar: View {
+    var appState: AppState
     @Binding var showSidebar: Bool
     @Binding var showToolsPanel: Bool
     @Binding var selectedMode: AppMode
@@ -110,6 +111,9 @@ struct Topbar: View {
             Capsule()
                 .fill(Color.primary.opacity(0.1))
                 .frame(width: 1, height: 16)
+
+            // Settings
+            TopbarSettingsButton(appState: appState, iconSize: iconSize)
 
             // Appearance toggle
             IconButton(icon: appearanceIcon, size: iconSize) {

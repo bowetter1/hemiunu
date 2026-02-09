@@ -25,6 +25,7 @@ struct AppRouter: View {
                 VStack(spacing: 0) {
                     // Topbar spanning full width - flows into title bar area
                     Topbar(
+                        appState: appState,
                         showSidebar: $appState.showSidebar,
                         showToolsPanel: $showToolsPanel,
                         selectedMode: $appState.currentMode,
