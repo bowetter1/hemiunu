@@ -87,7 +87,7 @@ class AppState {
     var selectedProvider: AIProvider = .groq
     let groqService = GroqService()
     let claudeService = ClaudeService()
-    let claudeOpusService = ClaudeService(modelOverride: "claude-opus-4-6", maxTokens: 16384)
+    let claudeOpusService = ClaudeService(modelOverride: "claude-opus-4-6", maxTokens: 128000)
     let geminiService = GeminiService()
     let geminiProService = GeminiService(modelOverride: "gemini-3-pro-preview", maxTokens: 16384)
     let kimiService = KimiService()
