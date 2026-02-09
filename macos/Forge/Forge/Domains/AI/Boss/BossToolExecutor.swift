@@ -147,6 +147,12 @@ class BossToolExecutor: ToolExecuting {
         // Copy research files from base project to version project
         copyResearchFiles(to: versionProjectName)
 
+        // Verify research.md was copied — warn builder if missing
+        let hasResearch = (try? workspace.readFile(project: versionProjectName, path: "research.md")) != nil
+        #if DEBUG
+        print("[BossToolExecutor] build_version v\(version)/\(builderName) — research.md: \(hasResearch ? "copied" : "MISSING")")
+        #endif
+
         // Notify host about the new version project
         onProjectCreate?(versionProjectName)
 
@@ -176,7 +182,11 @@ class BossToolExecutor: ToolExecuting {
         if let researchContext {
             fullInstructions += "\n\nRESEARCH CONTEXT:\n\(researchContext)"
         }
-        fullInstructions += "\n\nStart by reading brief.md and research.md, then build."
+        if hasResearch {
+            fullInstructions += "\n\nStart by reading brief.md and research.md, then build."
+        } else {
+            fullInstructions += "\n\nStart by reading brief.md, then build. Note: research.md is not available — use web_search to find brand colors and fonts yourself."
+        }
 
         // Run nested agent loop targeting the version project
         let subExecutor = ToolExecutor(workspace: workspace, projectName: versionProjectName)

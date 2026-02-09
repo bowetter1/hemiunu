@@ -157,8 +157,8 @@ class ChatViewModel {
             bossExecutor = boss
             let hasProject = !projectName.isEmpty
             systemPrompt = BossSystemPrompts.boss + (hasProject
-                ? "\n\nCONTEXT: Project '\(projectName)' already exists. Do NOT call create_project."
-                : "\n\nCONTEXT: No project exists yet. You MUST call create_project first.")
+                ? "\n\nCONTEXT: Project '\(projectName)' already exists. Do NOT call create_project. Skip discovery if the user is giving follow-up instructions."
+                : "\n\nCONTEXT: No project exists yet. Start with Discovery to understand what the user wants.")
             tools = ForgeTools.bossAnthropicFormat()
         } else {
             executor = ToolExecutor(
