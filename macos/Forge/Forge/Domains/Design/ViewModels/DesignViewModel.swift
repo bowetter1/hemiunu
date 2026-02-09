@@ -1,13 +1,13 @@
 import SwiftUI
-import Combine
 
 /// DesignViewModel — owns version tracking state for the design view
 @MainActor
-class DesignViewModel: ObservableObject {
-    @Published var pageVersions: [PageVersion] = [] {
+@Observable
+class DesignViewModel {
+    var pageVersions: [PageVersion] = [] {
         didSet { appState.pageVersions = pageVersions }
     }
-    @Published var lastKnownVersion: Int = 1 {
+    var lastKnownVersion: Int = 1 {
         didSet { appState.currentVersionNumber = lastKnownVersion }
     }
 

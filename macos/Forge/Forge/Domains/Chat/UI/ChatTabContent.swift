@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Chat Tab Content
 
 struct ChatTabContent: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     var chatViewModel: ChatViewModel
 
     @State private var inputText = ""

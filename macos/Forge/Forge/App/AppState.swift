@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 /// App navigation modes
 enum AppMode: String, CaseIterable {
@@ -43,47 +42,49 @@ extension AppearanceMode: RawRepresentable {
 
 /// Global app state - single source of truth
 @MainActor
-class AppState: ObservableObject {
+@Observable
+class AppState {
     static let shared = AppState()
 
     // MARK: - Appearance
 
+    @ObservationIgnored
     @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
 
     // MARK: - Navigation
 
-    @Published var currentMode: AppMode = .design
-    @Published var showFloatingChat: Bool = false
-    @Published var showSidebar: Bool = true
-    @Published var showResearchJSON: Bool = false
+    var currentMode: AppMode = .design
+    var showFloatingChat: Bool = false
+    var showSidebar: Bool = true
+    var showResearchJSON: Bool = false
 
     // MARK: - Preview
 
-    @Published var selectedDevice: PreviewDevice = .laptop
-    @Published var pageVersions: [PageVersion] = []
-    @Published var currentVersionNumber: Int = 1
+    var selectedDevice: PreviewDevice = .laptop
+    var pageVersions: [PageVersion] = []
+    var currentVersionNumber: Int = 1
 
     // MARK: - Auth
 
-    @Published var isConnected: Bool = false
-    @Published var errorMessage: String?
+    var isConnected: Bool = false
+    var errorMessage: String?
 
     // MARK: - Selection
 
-    @Published var selectedProjectId: String?
-    @Published var selectedPageId: String?
+    var selectedProjectId: String?
+    var selectedPageId: String?
 
     // MARK: - Domain Data
 
-    @Published var projects: [Project] = []
-    @Published var currentProject: Project?
-    @Published var pages: [Page] = []
-    @Published var localFiles: [LocalFileInfo] = []
-    @Published var localProjects: [LocalProject] = []
+    var projects: [Project] = []
+    var currentProject: Project?
+    var pages: [Page] = []
+    var localFiles: [LocalFileInfo] = []
+    var localProjects: [LocalProject] = []
 
     // MARK: - AI
 
-    @Published var selectedProvider: AIProvider = .cerebras
+    var selectedProvider: AIProvider = .cerebras
     let cerebrasService = CerebrasService(provider: .cerebras)
     let glmService = CerebrasService(provider: .glm)
     let groqService = GroqService()
@@ -108,6 +109,7 @@ class AppState: ObservableObject {
 
     // MARK: - View Models
 
+    @ObservationIgnored
     lazy var chatViewModel = ChatViewModel(appState: self)
 
     // MARK: - Initialization
@@ -192,9 +194,9 @@ class AppState: ObservableObject {
     }
 
     /// URL for local project preview
-    @Published var localPreviewURL: URL?
+    var localPreviewURL: URL?
     /// Token to force WebView refresh when file content changes
-    @Published var previewRefreshToken: UUID = UUID()
+    var previewRefreshToken: UUID = UUID()
 
     func scheduleLoadProject(id: String, delayMilliseconds: UInt64 = 300) {
         loadProjectTask?.cancel()

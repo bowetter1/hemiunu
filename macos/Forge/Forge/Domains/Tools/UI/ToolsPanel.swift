@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Right-side tools panel for actions, settings, and chat
 struct ToolsPanel: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     var chatViewModel: ChatViewModel
     let selectedPageId: String?
     @Binding var isExpanded: Bool

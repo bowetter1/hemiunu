@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - New Project Card
 
 struct NewProjectCard: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     var chatViewModel: ChatViewModel
     let onProjectCreated: (String) -> Void
 

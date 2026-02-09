@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Settings Tool Card
 
 struct SettingsToolCard: View {
-    @ObservedObject var appState: AppState
+    @Bindable var appState: AppState
     @State private var isExpanded = false
 
     var body: some View {

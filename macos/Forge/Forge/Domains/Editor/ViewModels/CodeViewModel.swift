@@ -1,16 +1,16 @@
 import SwiftUI
-import Combine
 
 /// CodeViewModel — owns file tree state and code editing logic
 @MainActor
-class CodeViewModel: ObservableObject {
-    @Published var files: [FileTreeNode] = []
-    @Published var selectedFilePath: String?
-    @Published var currentFileContent: String = ""
-    @Published var isLoadingFiles = false
-    @Published var isLoadingContent = false
-    @Published var isSaving = false
-    @Published var errorMessage: String?
+@Observable
+class CodeViewModel {
+    var files: [FileTreeNode] = []
+    var selectedFilePath: String?
+    var currentFileContent: String = ""
+    var isLoadingFiles = false
+    var isLoadingContent = false
+    var isSaving = false
+    var errorMessage: String?
 
     private let appState: AppState
     private var workspace: LocalWorkspaceService { appState.workspace }

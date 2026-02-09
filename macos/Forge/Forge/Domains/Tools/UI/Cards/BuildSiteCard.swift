@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Build Site Card
 
 struct BuildSiteCard: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     var chatViewModel: ChatViewModel
     @State private var showSheet = false
 

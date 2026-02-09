@@ -3,8 +3,8 @@ import AppKit
 
 /// Main app router - handles navigation between modes
 struct AppRouter: View {
-    @StateObject private var appState = AppState.shared
-    @StateObject private var designViewModel = DesignViewModel(appState: AppState.shared)
+    @State private var appState = AppState.shared
+    @State private var designViewModel = DesignViewModel(appState: AppState.shared)
     @State private var showToolsPanel = true
 
     /// Auth gate — show login when not connected

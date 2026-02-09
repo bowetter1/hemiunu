@@ -3,8 +3,8 @@ import AppKit
 
 /// Main design mode container
 struct DesignView: View {
-    @ObservedObject var appState: AppState
-    @ObservedObject var viewModel: DesignViewModel
+    var appState: AppState
+    var viewModel: DesignViewModel
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedPageId: String?

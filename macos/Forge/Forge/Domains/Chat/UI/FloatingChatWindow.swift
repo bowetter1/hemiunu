@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Floating Chat Bar
 
 struct FloatingChatWindow: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     var chatViewModel: ChatViewModel
     let onClose: () -> Void
 

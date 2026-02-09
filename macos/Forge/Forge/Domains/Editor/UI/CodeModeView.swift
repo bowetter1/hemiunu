@@ -2,16 +2,16 @@ import SwiftUI
 
 /// Main Code Mode view with file tree, editor, and preview
 struct CodeModeView: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     @Binding var selectedPageId: String?
-    @StateObject private var viewModel: CodeViewModel
+    @State private var viewModel: CodeViewModel
 
     private let fileTreeWidth: CGFloat = 240
 
     init(appState: AppState, selectedPageId: Binding<String?>) {
         self.appState = appState
         _selectedPageId = selectedPageId
-        _viewModel = StateObject(wrappedValue: CodeViewModel(appState: appState))
+        _viewModel = State(wrappedValue: CodeViewModel(appState: appState))
     }
 
     var body: some View {
@@ -40,12 +40,12 @@ struct CodeModeView: View {
             HStack {
                 Text("Files")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Button(action: viewModel.loadFiles) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.isLoadingFiles)
@@ -95,10 +95,10 @@ struct CodeModeView: View {
             Spacer()
             Image(systemName: "doc.text")
                 .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.4))
+                .foregroundStyle(.secondary.opacity(0.4))
             Text("Select a file to edit")
                 .font(.system(size: 14))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -112,12 +112,12 @@ struct CodeModeView: View {
             HStack {
                 Text("Preview")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Button(action: {}) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
@@ -134,13 +134,13 @@ struct CodeModeView: View {
                     Spacer()
                     Image(systemName: "eye.slash")
                         .font(.system(size: 32))
-                        .foregroundColor(.secondary.opacity(0.4))
+                        .foregroundStyle(.secondary.opacity(0.4))
                     Text("Preview not available")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     Text("Select an HTML file to preview")
                         .font(.system(size: 11))
-                        .foregroundColor(.secondary.opacity(0.7))
+                        .foregroundStyle(.secondary.opacity(0.7))
                     Spacer()
                 }
             }

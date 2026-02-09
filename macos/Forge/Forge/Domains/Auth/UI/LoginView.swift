@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Login screen — Google Sign-In and error handling
 struct LoginView: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     @State private var isLoading = false
     @State private var errorMessage: String?
 

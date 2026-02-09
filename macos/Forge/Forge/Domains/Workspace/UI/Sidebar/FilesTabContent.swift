@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Files Tab Content
 
 struct FilesTabContent: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     let currentMode: AppMode
     @Binding var selectedProjectId: String?
     @Binding var selectedPageId: String?

@@ -5,7 +5,7 @@ import AppKit
 @main
 struct ForgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var appState = AppState.shared
+    @State private var appState = AppState.shared
 
     init() {
         FirebaseApp.configure()
