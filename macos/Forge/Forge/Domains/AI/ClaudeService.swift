@@ -54,7 +54,7 @@ final class ClaudeService: AIService, Sendable {
             "model": provider.modelName,
             "system": systemPrompt,
             "messages": messages,
-            "max_tokens": 32768,
+            "max_tokens": 8192,
         ]
         if !tools.isEmpty {
             payload["tools"] = tools
@@ -103,7 +103,7 @@ final class ClaudeService: AIService, Sendable {
             "system": systemPrompt,
             "messages": apiMessages,
             "stream": true,
-            "max_tokens": 32768,
+            "max_tokens": 8192,
         ]
 
         return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
