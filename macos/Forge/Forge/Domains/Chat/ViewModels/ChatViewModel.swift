@@ -10,12 +10,14 @@ class ChatViewModel {
 
     let appState: AppState
     let checklist = ChecklistModel()
+    let activityLog = ActivityLog()
     private var streamTask: Task<Void, Never>?
     private let agentLoop = AgentLoop()
     private let contentExtractor = ContentExtractor()
     private let chatHistory = ChatHistoryService()
     private let projectUpdater: any ChatProjectUpdating
     private let requestLogger: RequestLogger
+    private let memoryService = MemoryService()
 
     init(appState: AppState, projectUpdater: (any ChatProjectUpdating)? = nil) {
         self.appState = appState
@@ -105,8 +107,13 @@ class ChatViewModel {
         let bossExecutor: BossToolExecutor?
         let systemPrompt: String
         let tools: [[String: Any]]?
+        let buildLogger: BuildLogger?
 
         if useBossMode {
+            let logger = BuildLogger(workspace: appState.workspace, projectName: projectName)
+            logger.logBuildStart(prompt: text)
+            buildLogger = logger
+
             let boss = BossToolExecutor(
                 workspace: appState.workspace,
                 projectName: projectName,
@@ -114,13 +121,7 @@ class ChatViewModel {
                     appState?.resolveService(for: provider) ?? service
                 },
                 builderServiceResolver: { [weak appState] builderName in
-                    guard let appState else { return service }
-                    switch builderName {
-                    case "opus": return appState.claudeOpusService
-                    case "gemini": return appState.geminiProService
-                    case "kimi": return appState.kimiService
-                    default: return appState.kimiService
-                    }
+                    appState?.resolveBuilderService(for: builderName) ?? service
                 },
                 onChecklistUpdate: { [weak self] items in
                     self?.checklist.update(items)
@@ -131,9 +132,13 @@ class ChatViewModel {
                     case .toolStart(let name, _):
                         let icon = self.toolIcon(name)
                         messages[assistantIndex].content = "[\(role.rawValue)] \(icon) \(self.toolLabel(name))..."
+                        self.activityLog.append(icon, self.toolLabel(name) + "...", role: role.rawValue)
                     case .toolDone(let name, let summary):
                         let icon = self.toolIcon(name)
                         messages[assistantIndex].content = "[\(role.rawValue)] \(icon) \(self.toolLabel(name)) — done\n\(summary)"
+                        self.activityLog.append(icon, self.toolLabel(name) + " — done", role: role.rawValue)
+                    case .apiResponse:
+                        break // logged by BossToolExecutor's BuildLogger
                     default:
                         break
                     }
@@ -147,12 +152,20 @@ class ChatViewModel {
                         appState.setSelectedProjectId(projectId)
                         appState.setLocalPreviewURL(appState.workspace.projectPath(name))
                         appState.setLocalFiles(appState.workspace.listFiles(project: name))
+                    } else if name.hasSuffix("/v1") {
+                        // First version project: point preview to it for live progress
+                        appState.setLocalPreviewURL(appState.workspace.projectPath(name))
                     }
                     // Always refresh sidebar so version projects show up
                     appState.refreshLocalProjects()
                     Task { _ = try? await appState.workspace.ensureGitRepository(project: name) }
+                },
+                onFileWrite: { [weak self] in
+                    self?.appState.refreshPreview()
                 }
             )
+            boss.buildLogger = logger
+            boss.memoryService = memoryService
             executor = boss
             bossExecutor = boss
             let hasProject = !projectName.isEmpty
@@ -163,9 +176,13 @@ class ChatViewModel {
         } else {
             executor = ToolExecutor(
                 workspace: appState.workspace,
-                projectName: projectName
+                projectName: projectName,
+                onFileWrite: { [weak self] in
+                    self?.appState.refreshPreview()
+                }
             )
             bossExecutor = nil
+            buildLogger = nil
             systemPrompt = SystemPrompts.websiteBuilderWithTools
             tools = nil
         }
@@ -176,7 +193,11 @@ class ChatViewModel {
             do {
                 isLoading = false
                 messages[assistantIndex].content = useBossMode ? "Planning..." : "Thinking..."
-                if useBossMode { checklist.reset() }
+                if useBossMode {
+                    checklist.reset()
+                    activityLog.reset()
+                    activityLog.append("🚀", "Build started")
+                }
 
                 let result = try await agentLoop.run(
                     userMessage: text,
@@ -193,13 +214,20 @@ class ChatViewModel {
                     case .toolStart(let name, _):
                         let icon = self.toolIcon(name)
                         messages[assistantIndex].content = "\(icon) \(self.toolLabel(name))..."
+                        self.activityLog.append(icon, self.toolLabel(name) + "...")
+                        buildLogger?.logEvent(icon, self.toolLabel(name))
                     case .toolDone(let name, let summary):
                         let icon = self.toolIcon(name)
                         messages[assistantIndex].content = "\(icon) \(self.toolLabel(name)) — done\n\(summary)"
+                        self.activityLog.append(icon, self.toolLabel(name) + " — done")
                     case .text:
                         break // final text handled below
+                    case .apiResponse(let input, let output):
+                        buildLogger?.logEvent("📡", "Boss API", tokens: "\(input)→\(output)")
                     case .error(let msg):
                         messages[assistantIndex].content = "Error: \(msg)"
+                        self.activityLog.append("❌", msg)
+                        buildLogger?.logEvent("❌", msg)
                     }
                 }
 
@@ -207,6 +235,10 @@ class ChatViewModel {
                 messages[assistantIndex].content = result.text.isEmpty ? "Done." : result.text
 
                 let totalTime = CFAbsoluteTimeGetCurrent() - startTime
+                if useBossMode {
+                    activityLog.append("✅", String(format: "Done in %.0fs — %d input, %d output tokens", totalTime, result.totalInputTokens, result.totalOutputTokens))
+                    buildLogger?.logBuildDone(totalInput: result.totalInputTokens, totalOutput: result.totalOutputTokens)
+                }
                 requestLogger.log(provider: bossProvider, projectId: appState.selectedProjectId, prompt: promptText, totalTime: totalTime, ttft: 0, chunks: 0, chars: result.text.count, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens)
 
                 // Use the (potentially updated) project name from BossToolExecutor
@@ -285,6 +317,9 @@ class ChatViewModel {
         case "update_checklist": return "📋"
         case "create_project": return "🏗️"
         case "build_version": return "🏗️"
+        case "generate_image": return "🎨"
+        case "restyle_image": return "🖌️"
+        case "download_image": return "⬇️"
         case "take_screenshot": return "📸"
         case "review_screenshot": return "🔎"
         default: return "🔧"
@@ -303,6 +338,9 @@ class ChatViewModel {
         case "update_checklist": return "Updating checklist"
         case "create_project": return "Creating project"
         case "build_version": return "Building version"
+        case "generate_image": return "Generating image"
+        case "restyle_image": return "Restyling image"
+        case "download_image": return "Downloading image"
         case "take_screenshot": return "Taking screenshot"
         case "review_screenshot": return "Reviewing screenshot"
         default: return name

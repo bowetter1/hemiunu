@@ -31,6 +31,28 @@ struct Topbar: View {
         hasProject && selectedMode == .design
     }
 
+    /// All project groups sorted by most recent
+    private var projectGroups: [LocalProjectGroup] {
+        LocalProjectGroup.group(appState.localProjects)
+    }
+
+    /// Current group's session name
+    private var currentSessionName: String? {
+        guard let selectedId = appState.selectedProjectId,
+              selectedId.hasPrefix("local:") else { return nil }
+        let projectName = String(selectedId.dropFirst(6))
+        let parts = projectName.components(separatedBy: "/")
+        return parts.count == 2 ? parts[0] : projectName
+    }
+
+    /// Sibling versions for the current project (e.g. v1, v2, v3 under same session)
+    private var versionSiblings: [LocalProject] {
+        guard let session = currentSessionName else { return [] }
+        return appState.localProjects
+            .filter { $0.name.hasPrefix("\(session)/") }
+            .sorted { $0.name < $1.name }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             // Space for traffic lights when inline
@@ -68,6 +90,32 @@ struct Topbar: View {
                 IconButton(icon: "sidebar.left", size: iconSize) {
                     withAnimation(.easeInOut(duration: 0.2)) { showSidebar = true }
                 }
+
+                // Version dots — switch between v1/v2/v3 without sidebar
+                if versionSiblings.count > 1 {
+                    ProjectDots(
+                        projects: versionSiblings,
+                        selectedProjectId: appState.selectedProjectId,
+                        onSelect: { project in
+                            let projectId = "local:\(project.name)"
+                            appState.setSelectedProjectId(projectId)
+                            Task { await appState.loadProject(id: projectId) }
+                        },
+                        onNavigateGroup: { delta in
+                            let groups = projectGroups
+                            guard let session = currentSessionName,
+                                  let idx = groups.firstIndex(where: { $0.sessionName == session })
+                            else { return }
+                            let newIdx = idx + delta
+                            guard groups.indices.contains(newIdx) else { return }
+                            let target = groups[newIdx].projects.first
+                            guard let target else { return }
+                            let projectId = "local:\(target.name)"
+                            appState.setSelectedProjectId(projectId)
+                            Task { await appState.loadProject(id: projectId) }
+                        }
+                    )
+                }
             }
 
             // Version picker on the left (Opus-style)
@@ -93,10 +141,6 @@ struct Topbar: View {
                     .layoutPriority(2)
             }
 
-            // Activity indicator
-            ActivityPill(chatViewModel: chatViewModel)
-                .frame(height: itemHeight)
-
             // Show tools button when panel is hidden
             if !showToolsPanel {
                 IconButton(icon: "sidebar.right", size: iconSize) {
@@ -106,11 +150,6 @@ struct Topbar: View {
 
             // Logs button
             TopbarLogsButton(chatViewModel: chatViewModel, iconSize: iconSize)
-
-            // Divider
-            Capsule()
-                .fill(Color.primary.opacity(0.1))
-                .frame(width: 1, height: 16)
 
             // Settings
             TopbarSettingsButton(appState: appState, iconSize: iconSize)
@@ -195,5 +234,64 @@ struct Topbar: View {
             case .dark: appearanceMode = .system
             }
         }
+    }
+}
+
+// MARK: - Version Dots
+
+private struct ProjectDots: View {
+    let projects: [LocalProject]
+    let selectedProjectId: String?
+    let onSelect: (LocalProject) -> Void
+    var onNavigateGroup: ((Int) -> Void)? = nil
+
+    private var currentIndex: Int? {
+        guard let selectedId = selectedProjectId else { return nil }
+        return projects.firstIndex { "local:\($0.name)" == selectedId }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(projects) { project in
+                let isSelected = selectedProjectId == "local:\(project.name)"
+                Circle()
+                    .fill(isSelected ? Color.blue : Color.secondary.opacity(0.35))
+                    .frame(width: 7, height: 7)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            onSelect(project)
+                        }
+                    }
+                    .help(project.agentName ?? project.name.components(separatedBy: "/").last ?? project.name)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(Capsule())
+        .focusable()
+        .onKeyPress(.leftArrow) { navigateVersion(-1) }
+        .onKeyPress(.rightArrow) { navigateVersion(1) }
+        .onKeyPress(.upArrow) { navigateGroup(-1) }
+        .onKeyPress(.downArrow) { navigateGroup(1) }
+    }
+
+    private func navigateVersion(_ delta: Int) -> KeyPress.Result {
+        guard let index = currentIndex else { return .ignored }
+        let newIndex = index + delta
+        guard projects.indices.contains(newIndex) else { return .ignored }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            onSelect(projects[newIndex])
+        }
+        return .handled
+    }
+
+    private func navigateGroup(_ delta: Int) -> KeyPress.Result {
+        guard let onNavigateGroup else { return .ignored }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            onNavigateGroup(delta)
+        }
+        return .handled
     }
 }

@@ -25,6 +25,16 @@ struct ToolResponse: Sendable {
     let toolCalls: [ToolCall]
     let inputTokens: Int
     let outputTokens: Int
+    /// Raw assistant message JSON — preserves provider-specific fields like Gemini thought_signature
+    let rawAssistantMessage: Data?
+
+    init(text: String?, toolCalls: [ToolCall], inputTokens: Int, outputTokens: Int, rawAssistantMessage: Data? = nil) {
+        self.text = text
+        self.toolCalls = toolCalls
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.rawAssistantMessage = rawAssistantMessage
+    }
 }
 
 /// Result from a complete agent loop run
@@ -146,6 +156,94 @@ enum ForgeTools {
                             ],
                         ],
                         "required": ["query"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "search_images",
+                    "description": "Search for high-quality stock photos via Pexels. Returns direct image URLs you can use in <img> tags. Use short, specific queries (2-4 words) for best results.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "query": [
+                                "type": "string",
+                                "description": "Short search query (e.g. 'coffee shop interior', 'mountain landscape', 'team meeting')",
+                            ],
+                            "count": [
+                                "type": "integer",
+                                "description": "Number of images to return (1-5, default 3)",
+                            ],
+                        ],
+                        "required": ["query"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "generate_image",
+                    "description": "Generate an AI image from a text description using GPT-Image-1. The image is saved locally in the project's images/ folder. Use the returned path as src in <img> tags. Best for hero images, custom illustrations, or brand-specific visuals.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "prompt": [
+                                "type": "string",
+                                "description": "Detailed description of the image to generate (e.g. 'A warm cozy Swedish hotel room with wooden furniture, soft lighting, and a view of the archipelago')",
+                            ],
+                            "filename": [
+                                "type": "string",
+                                "description": "Filename for the saved image (e.g. 'hero.png', 'room.png'). Saved to images/ folder.",
+                            ],
+                        ],
+                        "required": ["prompt"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "restyle_image",
+                    "description": "Restyle an existing image while keeping its content. Downloads the reference image, then generates a new version with a different visual style. Only describe the desired STYLE, not the content.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "reference_url": [
+                                "type": "string",
+                                "description": "URL of the reference image to restyle",
+                            ],
+                            "style_prompt": [
+                                "type": "string",
+                                "description": "Style description ONLY (e.g. 'warm golden lighting, editorial photography, soft contrast'). Do NOT describe objects.",
+                            ],
+                            "filename": [
+                                "type": "string",
+                                "description": "Filename for the saved image (e.g. 'hero-restyled.png')",
+                            ],
+                        ],
+                        "required": ["reference_url", "style_prompt"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "download_image",
+                    "description": "Download an image from a URL and save it locally in the project's images/ folder. Use this to save stock photos, brand logos, or any web image for use in the website. Returns the local path to use in <img> tags.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "url": [
+                                "type": "string",
+                                "description": "The image URL to download",
+                            ],
+                            "filename": [
+                                "type": "string",
+                                "description": "Filename to save as (e.g. 'hero.jpg', 'logo.png')",
+                            ],
+                        ],
+                        "required": ["url", "filename"],
                     ] as [String: Any],
                 ] as [String: Any],
             ],
@@ -385,6 +483,82 @@ enum ForgeTools {
                 ] as [String: Any],
             ],
             [
+                "name": "search_images",
+                "description": "Search for high-quality stock photos via Pexels. Returns direct image URLs you can use in <img> tags. Use short, specific queries (2-4 words) for best results.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "query": [
+                            "type": "string",
+                            "description": "Short search query (e.g. 'coffee shop interior', 'mountain landscape', 'team meeting')",
+                        ],
+                        "count": [
+                            "type": "integer",
+                            "description": "Number of images to return (1-5, default 3)",
+                        ],
+                    ] as [String: Any],
+                    "required": ["query"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "generate_image",
+                "description": "Generate an AI image from a text description using GPT-Image-1. The image is saved locally in the project's images/ folder. Use the returned path as src in <img> tags. Best for hero images, custom illustrations, or brand-specific visuals.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "prompt": [
+                            "type": "string",
+                            "description": "Detailed description of the image to generate",
+                        ],
+                        "filename": [
+                            "type": "string",
+                            "description": "Filename for the saved image (e.g. 'hero.png'). Saved to images/ folder.",
+                        ],
+                    ] as [String: Any],
+                    "required": ["prompt"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "restyle_image",
+                "description": "Restyle an existing image while keeping its content. Downloads the reference image, then generates a new version with a different visual style. Only describe the desired STYLE, not the content.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "reference_url": [
+                            "type": "string",
+                            "description": "URL of the reference image to restyle",
+                        ],
+                        "style_prompt": [
+                            "type": "string",
+                            "description": "Style description ONLY (e.g. 'warm golden lighting, editorial photography'). Do NOT describe objects.",
+                        ],
+                        "filename": [
+                            "type": "string",
+                            "description": "Filename for the saved image (e.g. 'hero-restyled.png')",
+                        ],
+                    ] as [String: Any],
+                    "required": ["reference_url", "style_prompt"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "download_image",
+                "description": "Download an image from a URL and save it locally in the project's images/ folder. Returns the local path to use in <img> tags.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "url": [
+                            "type": "string",
+                            "description": "The image URL to download",
+                        ],
+                        "filename": [
+                            "type": "string",
+                            "description": "Filename to save as (e.g. 'hero.jpg', 'logo.png')",
+                        ],
+                    ] as [String: Any],
+                    "required": ["url", "filename"],
+                ] as [String: Any],
+            ],
+            [
                 "name": "take_screenshot",
                 "description": "Take a screenshot of the project's main HTML page rendered in a WebView. Returns an image description from visual analysis.",
                 "input_schema": [
@@ -448,7 +622,10 @@ enum OpenAIToolResponseParser {
         let inputTokens = usage?["prompt_tokens"] as? Int ?? 0
         let outputTokens = usage?["completion_tokens"] as? Int ?? 0
 
-        return ToolResponse(text: text, toolCalls: toolCalls, inputTokens: inputTokens, outputTokens: outputTokens)
+        // Preserve raw message so provider-specific fields (e.g. Gemini thought_signature) survive round-trips
+        let rawMessage = try? JSONSerialization.data(withJSONObject: message)
+
+        return ToolResponse(text: text, toolCalls: toolCalls, inputTokens: inputTokens, outputTokens: outputTokens, rawAssistantMessage: rawMessage)
     }
 }
 

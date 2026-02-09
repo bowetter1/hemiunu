@@ -3,6 +3,13 @@ import Foundation
 /// Minimal streaming HTTP client for AI API calls
 enum HTTPClient {
 
+    private static func aiConfig() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 600
+        return config
+    }
+
     /// Perform a streaming POST request, yielding data chunks as they arrive
     static func stream(
         url: URL,
@@ -10,11 +17,8 @@ enum HTTPClient {
         body: Data
     ) -> AsyncThrowingStream<Data, Error> {
         AsyncThrowingStream { continuation in
-            let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 300
-            config.timeoutIntervalForResource = 600
             let delegate = StreamDelegate(continuation: continuation)
-            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(configuration: aiConfig(), delegate: delegate, delegateQueue: nil)
 
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -33,6 +37,25 @@ enum HTTPClient {
         }
     }
 
+    /// Perform a non-streaming GET request
+    static func get(
+        url: URL,
+        headers: [String: String]
+    ) async throws -> (Data, HTTPURLResponse) {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 30
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        return (data, httpResponse)
+    }
+
     /// Perform a non-streaming POST request
     static func post(
         url: URL,
@@ -47,10 +70,7 @@ enum HTTPClient {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 300
-        config.timeoutIntervalForResource = 600
-        let session = URLSession(configuration: config)
+        let session = URLSession(configuration: aiConfig())
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)

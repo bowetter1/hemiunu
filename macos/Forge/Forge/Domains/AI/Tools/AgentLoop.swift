@@ -7,6 +7,7 @@ enum AgentEvent: Sendable {
     case toolDone(name: String, summary: String)
     case text(String)
     case error(String)
+    case apiResponse(inputTokens: Int, outputTokens: Int)
 }
 
 /// Runs an agentic tool-use loop: call LLM → execute tools → repeat until text response
@@ -54,6 +55,7 @@ class AgentLoop {
 
             totalInput += response.inputTokens
             totalOutput += response.outputTokens
+            onEvent(.apiResponse(inputTokens: response.inputTokens, outputTokens: response.outputTokens))
 
             // No tool calls — we have a final text response
             if response.toolCalls.isEmpty {
@@ -210,25 +212,31 @@ class AgentLoop {
         response: ToolResponse,
         toolResults: [(call: ToolCall, result: String)]
     ) {
-        // Assistant message with tool_calls array
-        let toolCallsPayload: [[String: Any]] = response.toolCalls.map { call in
-            [
-                "id": call.id,
-                "type": "function",
-                "function": [
-                    "name": call.name,
-                    "arguments": call.arguments,
-                ] as [String: Any],
+        // Use raw message if available (preserves Gemini thought_signature and other provider fields)
+        if let rawData = response.rawAssistantMessage,
+           let rawMsg = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any] {
+            messages.append(rawMsg)
+        } else {
+            // Fallback: reconstruct from parsed fields
+            let toolCallsPayload: [[String: Any]] = response.toolCalls.map { call in
+                [
+                    "id": call.id,
+                    "type": "function",
+                    "function": [
+                        "name": call.name,
+                        "arguments": call.arguments,
+                    ] as [String: Any],
+                ]
+            }
+            var assistantMsg: [String: Any] = [
+                "role": "assistant",
+                "tool_calls": toolCallsPayload,
             ]
+            if let text = response.text, !text.isEmpty {
+                assistantMsg["content"] = text
+            }
+            messages.append(assistantMsg)
         }
-        var assistantMsg: [String: Any] = [
-            "role": "assistant",
-            "tool_calls": toolCallsPayload,
-        ]
-        if let text = response.text, !text.isEmpty {
-            assistantMsg["content"] = text
-        }
-        messages.append(assistantMsg)
 
         // One "tool" message per result
         for item in toolResults {

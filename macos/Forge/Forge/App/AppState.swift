@@ -107,6 +107,16 @@ class AppState {
         }
     }
 
+    /// Resolve AI service for a builder name (opus gets Opus-specific service, etc.)
+    func resolveBuilderService(for name: String) -> any AIService {
+        switch name {
+        case "opus": return claudeOpusService
+        case "gemini": return geminiProService
+        case "kimi": return kimiService
+        default: return kimiService
+        }
+    }
+
     /// Whether the Claude API key is configured (needed for Boss mode)
     var hasClaudeKey: Bool {
         guard let key = KeychainHelper.load(key: AIProvider.claude.keychainKey) else { return false }

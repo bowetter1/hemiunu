@@ -30,10 +30,10 @@ struct ToolsPanel: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Image(systemName: "wrench.and.screwdriver")
+                    Image(systemName: "chart.bar.doc.horizontal")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Text("Tools")
+                    Text("Activity")
                         .font(.system(size: 13, weight: .semibold))
                     Spacer()
                     Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded = false } }) {
@@ -50,9 +50,12 @@ struct ToolsPanel: View {
 
                 // Tools content (scrollable, fixed height)
                 ScrollView {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 8) {
                         // Boss checklist progress
                         ChecklistView(checklist: chatViewModel.checklist)
+
+                        // Boss activity log
+                        ActivityLogView(log: chatViewModel.activityLog)
                     }
                     .padding(12)
                 }

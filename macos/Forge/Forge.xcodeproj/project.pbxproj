@@ -79,6 +79,11 @@
 		A1000100000000000000004F /* BossSystemPrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004F /* BossSystemPrompts.swift */; };
 		A10001000000000000000050 /* BossToolExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000050 /* BossToolExecutor.swift */; };
 		A10001000000000000000051 /* ChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000051 /* ChecklistView.swift */; };
+		A10001000000000000000062 /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000062 /* ActivityLog.swift */; };
+		A10001000000000000000063 /* ActivityLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000063 /* ActivityLogView.swift */; };
+		A10001000000000000000064 /* BuildLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000064 /* BuildLogger.swift */; };
+		A10001000000000000000065 /* MemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000065 /* MemoryService.swift */; };
+		A10001000000000000000066 /* PromptLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000066 /* PromptLoader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -102,6 +107,11 @@
 		B10001000000000000000011 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
 		B10001000000000000000060 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		B10001000000000000000061 /* KimiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KimiService.swift; sourceTree = "<group>"; };
+		B10001000000000000000062 /* ActivityLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
+		B10001000000000000000063 /* ActivityLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLogView.swift; sourceTree = "<group>"; };
+		B10001000000000000000064 /* BuildLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildLogger.swift; sourceTree = "<group>"; };
+		B10001000000000000000065 /* MemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryService.swift; sourceTree = "<group>"; };
+		B10001000000000000000066 /* PromptLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptLoader.swift; sourceTree = "<group>"; };
 		B10001000000000000000046 /* ToolDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDefinition.swift; sourceTree = "<group>"; };
 		B10001000000000000000047 /* ToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolExecutor.swift; sourceTree = "<group>"; };
 		B10001000000000000000048 /* AgentLoop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLoop.swift; sourceTree = "<group>"; };
@@ -360,6 +370,11 @@
 				B1000100000000000000004F /* BossSystemPrompts.swift */,
 				B10001000000000000000050 /* BossToolExecutor.swift */,
 				B10001000000000000000051 /* ChecklistView.swift */,
+				B10001000000000000000062 /* ActivityLog.swift */,
+				B10001000000000000000063 /* ActivityLogView.swift */,
+				B10001000000000000000064 /* BuildLogger.swift */,
+				B10001000000000000000065 /* MemoryService.swift */,
+				B10001000000000000000066 /* PromptLoader.swift */,
 			);
 			path = Boss;
 			sourceTree = "<group>";
@@ -755,6 +770,11 @@
 				A1000100000000000000004F /* BossSystemPrompts.swift in Sources */,
 				A10001000000000000000050 /* BossToolExecutor.swift in Sources */,
 				A10001000000000000000051 /* ChecklistView.swift in Sources */,
+				A10001000000000000000062 /* ActivityLog.swift in Sources */,
+				A10001000000000000000063 /* ActivityLogView.swift in Sources */,
+				A10001000000000000000064 /* BuildLogger.swift in Sources */,
+				A10001000000000000000065 /* MemoryService.swift in Sources */,
+				A10001000000000000000066 /* PromptLoader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

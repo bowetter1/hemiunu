@@ -10,6 +10,9 @@ class BossToolExecutor: ToolExecuting {
     let onChecklistUpdate: ([ChecklistItem]) -> Void
     let onSubAgentEvent: (SubAgentRole, AgentEvent) -> Void
     let onProjectCreate: ((String) -> Void)?
+    let onFileWrite: (() -> Void)?
+    var buildLogger: BuildLogger?
+    var memoryService: MemoryService?
 
     init(
         workspace: LocalWorkspaceService,
@@ -18,7 +21,8 @@ class BossToolExecutor: ToolExecuting {
         builderServiceResolver: ((String) -> any AIService)? = nil,
         onChecklistUpdate: @escaping ([ChecklistItem]) -> Void,
         onSubAgentEvent: @escaping (SubAgentRole, AgentEvent) -> Void,
-        onProjectCreate: ((String) -> Void)? = nil
+        onProjectCreate: ((String) -> Void)? = nil,
+        onFileWrite: (() -> Void)? = nil
     ) {
         self.workspace = workspace
         self.projectName = projectName
@@ -27,13 +31,14 @@ class BossToolExecutor: ToolExecuting {
         self.onChecklistUpdate = onChecklistUpdate
         self.onSubAgentEvent = onSubAgentEvent
         self.onProjectCreate = onProjectCreate
+        self.onFileWrite = onFileWrite
     }
 
     var priorityToolNames: Set<String> { ["create_project"] }
 
     /// Inner executor for standard file/search tools
     private var standardExecutor: ToolExecutor {
-        ToolExecutor(workspace: workspace, projectName: projectName)
+        ToolExecutor(workspace: workspace, projectName: projectName, onFileWrite: onFileWrite)
     }
 
     func execute(_ call: ToolCall) async throws -> String {
@@ -65,6 +70,11 @@ class BossToolExecutor: ToolExecuting {
         // Update our projectName so subsequent tools use the new project
         projectName = name
 
+        // Update logger to write to the new project
+        buildLogger?.updateProjectName(name)
+        buildLogger?.logPhase("Phase 1 — Setup")
+        buildLogger?.logEvent("🏗️", "Project created: \(name)")
+
         // Notify the host (ChatViewModel) to wire up AppState
         onProjectCreate?(name)
 
@@ -83,7 +93,10 @@ class BossToolExecutor: ToolExecuting {
 
         // Researcher: use fast programmatic pipeline (web search + Groq summary)
         if role == .researcher {
-            return try await executeProgrammaticResearch(instructions)
+            buildLogger?.logPhase("Phase 2 — Research")
+            let result = try await executeProgrammaticResearch(instructions)
+            buildLogger?.logEvent("✅", "Research complete")
+            return result
         }
 
         let context = args["context"] as? String
@@ -155,7 +168,7 @@ class BossToolExecutor: ToolExecuting {
         var searchResults: [String] = Array(repeating: "", count: 3)
 
         let tasks: [Task<(Int, String), Never>] = queries.enumerated().map { (i, query) in
-            nonisolated(unsafe) let exec = executor
+            let exec = executor
             return Task { @MainActor in
                 let argsDict = ["query": query]
                 guard let argsData = try? JSONSerialization.data(withJSONObject: argsDict),
@@ -265,6 +278,9 @@ class BossToolExecutor: ToolExecuting {
         // Copy research files from base project to version project
         copyResearchFiles(to: versionProjectName)
 
+        // Copy persistent memory to version project so builder can read/update it
+        memoryService?.copyToProject(workspace: workspace, projectName: versionProjectName, role: .builder)
+
         // Verify research.md was copied — warn builder if missing
         let hasResearch = (try? workspace.readFile(project: versionProjectName, path: "research.md")) != nil
         #if DEBUG
@@ -276,6 +292,10 @@ class BossToolExecutor: ToolExecuting {
 
         // Resolve AI service for this builder (use builderServiceResolver for model-specific services like Opus)
         let service = builderServiceResolver?(builderName) ?? serviceResolver(builderProvider)
+        let modelName = builderProvider.modelName
+
+        // Log builder start
+        buildLogger?.logBuilderStart(builder: builderName, version: version, direction: designDirection, model: modelName)
 
         // Build tools for coder role + web_search (OpenAI format for Kimi/Gemini, Anthropic for Claude)
         let isAnthropic = service.provider == .claude
@@ -283,7 +303,8 @@ class BossToolExecutor: ToolExecuting {
             ? ForgeTools.anthropicFormat()
             : ForgeTools.openAIFormat()
         var builderTools = SubAgentRole.coder.allowedTools
-        builderTools.insert("web_search") // builders can search for images
+        builderTools.insert("web_search")
+        builderTools.insert("search_images")
         let filteredTools = filterTools(allTools, allowed: builderTools, isAnthropic: isAnthropic)
 
         // Build system prompt with design direction (like Apex's vector injection)
@@ -296,30 +317,70 @@ class BossToolExecutor: ToolExecuting {
         Build a complete, polished website following this direction.
         """
 
+        // Inject brief+research content directly — eliminates 2-3 file-reading iterations per builder
+        let briefContent = try? workspace.readFile(project: projectName, path: "brief.md")
+        let researchFileContent = try? workspace.readFile(project: versionProjectName, path: "research.md")
+
         var fullInstructions = instructions
+        if let briefContent {
+            fullInstructions += "\n\n--- PROJECT BRIEF (brief.md) ---\n\(briefContent)"
+        }
+        if let researchFileContent {
+            fullInstructions += "\n\n--- RESEARCH (research.md) ---\n\(researchFileContent)"
+        }
         if let researchContext {
-            fullInstructions += "\n\nRESEARCH CONTEXT:\n\(researchContext)"
+            fullInstructions += "\n\n--- ADDITIONAL CONTEXT ---\n\(researchContext)"
         }
-        if hasResearch {
-            fullInstructions += "\n\nStart by reading brief.md and research.md, then build."
-        } else {
-            fullInstructions += "\n\nStart by reading brief.md, then build. Note: research.md is not available — use web_search to find brand colors and fonts yourself."
+        // Inject persistent memory (accumulated learnings from previous projects)
+        let memoryContent = try? workspace.readFile(project: versionProjectName, path: "memory.md")
+        if let memoryContent, !memoryContent.isEmpty {
+            fullInstructions += "\n\n--- YOUR MEMORY (learnings from previous projects) ---\n\(memoryContent)"
         }
+        fullInstructions += "\n\nIMPORTANT: The brief, research, and memory content is provided above. Do NOT waste iterations calling read_file on brief.md, research.md, or memory.md — the content is already here. Start building immediately with create_file(\"index.html\", ...)."
 
         // Run nested agent loop targeting the version project
-        let subExecutor = ToolExecutor(workspace: workspace, projectName: versionProjectName)
+        let subExecutor = ToolExecutor(workspace: workspace, projectName: versionProjectName, onFileWrite: onFileWrite)
         let agentLoop = AgentLoop()
+        let builderStartTime = CFAbsoluteTimeGetCurrent()
 
-        let result = try await agentLoop.run(
-            userMessage: fullInstructions,
-            history: [],
-            systemPrompt: systemPrompt,
-            service: service,
-            executor: subExecutor,
-            tools: filteredTools,
-            maxIterations: SubAgentRole.coder.maxIterations
-        ) { [onSubAgentEvent] event in
-            onSubAgentEvent(.coder, event)
+        let result: AgentResult
+        do {
+            result = try await agentLoop.run(
+                userMessage: fullInstructions,
+                history: [],
+                systemPrompt: systemPrompt,
+                service: service,
+                executor: subExecutor,
+                tools: filteredTools,
+                maxIterations: SubAgentRole.coder.maxIterations
+            ) { [onSubAgentEvent, weak buildLogger] event in
+                onSubAgentEvent(.coder, event)
+                let tag = "[v\(version)/\(builderName)]"
+                switch event {
+                case .toolStart(let name, let args):
+                    let preview = String(args.prefix(80))
+                    buildLogger?.logEvent("🔧", "\(tag) `\(name)` — \(preview)")
+                case .toolDone(let name, let summary):
+                    buildLogger?.logEvent("✓", "\(tag) `\(name)` → \(String(summary.prefix(80)))")
+                case .apiResponse(let input, let output):
+                    buildLogger?.logEvent("📡", "\(tag) API call", tokens: "\(input)→\(output)")
+                case .error(let msg):
+                    buildLogger?.logEvent("❌", "\(tag) \(msg)")
+                default:
+                    break
+                }
+            }
+
+            let builderTime = CFAbsoluteTimeGetCurrent() - builderStartTime
+            buildLogger?.logBuilderDone(builder: builderName, version: version, success: true, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens, duration: builderTime)
+
+            // Persist builder memory (accumulated learnings) back to ~/Forge/memories/
+            memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName, role: .builder)
+        } catch {
+            let builderTime = CFAbsoluteTimeGetCurrent() - builderStartTime
+            buildLogger?.logEvent("❌", "[v\(version)/\(builderName)] Builder error: \(error.localizedDescription)")
+            buildLogger?.logBuilderDone(builder: builderName, version: version, success: false, inputTokens: 0, outputTokens: 0, duration: builderTime)
+            throw error
         }
 
         // Commit the version project
