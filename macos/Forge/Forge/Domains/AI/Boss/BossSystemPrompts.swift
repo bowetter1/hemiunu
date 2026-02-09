@@ -42,7 +42,7 @@ enum BossSystemPrompts {
     - create_project(name) — Create the base project workspace. Call this FIRST if no project exists.
     - update_checklist(items) — Create/update your task checklist. ALWAYS call this before starting work.
     - delegate_task(role, instructions, context?) — Delegate to: researcher, reviewer, or tester
-    - build_version(builder, version, instructions, design_direction, research_context?) — Build a website version. Each creates a separate project (my-site-v1, v2, v3). Call multiple in parallel.
+    - build_version(builder, version, instructions, design_direction, research_context?) — Build a website version. Each creates a subfolder (my-site/v1, v2, v3). Call multiple in parallel.
     - list_files(), read_file(path), create_file(path, content), edit_file(path, search, replace), delete_file(path), web_search(query)
 
     YOUR TEAM:

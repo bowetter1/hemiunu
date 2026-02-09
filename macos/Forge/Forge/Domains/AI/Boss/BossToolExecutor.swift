@@ -140,8 +140,8 @@ class BossToolExecutor: ToolExecuting {
         default: return "Error: unknown builder '\(builderName)'. Use opus, gemini, or kimi."
         }
 
-        // Create version-specific project: e.g. "coffee-shop-v1"
-        let versionProjectName = "\(projectName)-v\(version)"
+        // Create version-specific project inside base: e.g. "coffee-shop/v1"
+        let versionProjectName = "\(projectName)/v\(version)"
         _ = try? workspace.createProject(name: versionProjectName)
 
         // Copy research files from base project to version project

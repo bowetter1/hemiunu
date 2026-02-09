@@ -140,7 +140,7 @@ class ChatViewModel {
                 },
                 onProjectCreate: { [weak self] name in
                     guard let appState = self?.appState else { return }
-                    let isVersionProject = name.contains("-v") && name.last?.isNumber == true
+                    let isVersionProject = name.contains("/v")
                     if !isVersionProject {
                         // Base project: select it and set preview
                         let projectId = "local:\(name)"
