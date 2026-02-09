@@ -1,7 +1,7 @@
 import Foundation
 
 /// Together AI service — OpenAI-compatible streaming endpoint
-final class TogetherService: AIService, @unchecked Sendable {
+final class TogetherService: AIService, Sendable {
     let provider: AIProvider = .together
     private let baseURL = URL(string: "https://api.together.xyz/v1/chat/completions")!
 

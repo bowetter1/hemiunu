@@ -53,11 +53,11 @@ struct DesignView: View {
             VStack(spacing: 8) {
                 Text("Welcome to Forge")
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
 
                 Text("Build anything. Just describe it.")
                     .font(.system(size: 15))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -121,18 +121,18 @@ struct DesignView: View {
             VStack(spacing: 16) {
                 Image(systemName: "folder")
                     .font(.system(size: 48))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Text("No HTML file found")
                     .font(.title3)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Text("The local project at \(baseURL.path) has no index.html")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Button("Open in Finder") {
                     NSWorkspace.shared.open(baseURL)
                 }
                 .buttonStyle(.plain)
-                .foregroundColor(.blue)
+                .foregroundStyle(.blue)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -150,7 +150,7 @@ struct GeneratingView: View {
                 .scaleEffect(1.5)
             Text(message)
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

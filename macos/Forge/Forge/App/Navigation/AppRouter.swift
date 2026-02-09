@@ -123,10 +123,8 @@ struct AppRouter: View {
                 }
             }
         }
-        .onAppear {
-            Task {
-                await appState.connect()
-            }
+        .task {
+            await appState.connect()
         }
         .onChange(of: appState.isConnected) { _, newValue in
 #if DEBUG

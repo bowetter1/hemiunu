@@ -22,11 +22,11 @@ struct BuildSiteSheet: View {
                 if navLinks.isEmpty {
                     Text("Add pages to generate. They'll match the style of your current page.")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 } else {
                     Text("Pages from your navigation. Deselect any you don't need, or add more below.")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(20)
@@ -44,10 +44,10 @@ struct BuildSiteSheet: View {
                         HStack(spacing: 8) {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 11))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                             Text("No navigation links found in index.html")
                                 .font(.system(size: 11))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 4)
@@ -77,7 +77,7 @@ struct BuildSiteSheet: View {
                 Button(action: addCustomPage) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundColor(.purple)
+                        .foregroundStyle(.purple)
                 }
                 .buttonStyle(.plain)
                 .disabled(customPageName.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -98,7 +98,7 @@ struct BuildSiteSheet: View {
 
                 Text("\(totalSelectedCount) pages")
                     .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
                 Button("Build") {
                     buildSite()
@@ -119,7 +119,7 @@ struct BuildSiteSheet: View {
         HStack(spacing: 10) {
             Image(systemName: selectedLinks.contains(link.name) ? "checkmark.square.fill" : "square")
                 .font(.system(size: 14))
-                .foregroundColor(selectedLinks.contains(link.name) ? .purple : .secondary)
+                .foregroundStyle(selectedLinks.contains(link.name) ? .purple : .secondary)
 
             Text(link.name)
                 .font(.system(size: 13))
@@ -127,15 +127,14 @@ struct BuildSiteSheet: View {
             if link.isAnchor {
                 Text("section")
                     .font(.system(size: 10))
-                    .foregroundColor(.orange)
+                    .foregroundStyle(.orange)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(4)
+                    .background(Color.orange.opacity(0.1), in: .rect(cornerRadius: 4))
             } else if let href = link.href {
                 Text(href)
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.secondary.opacity(0.7))
+                    .foregroundStyle(.secondary.opacity(0.7))
             }
 
             Spacer()
@@ -156,7 +155,7 @@ struct BuildSiteSheet: View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.square.fill")
                 .font(.system(size: 14))
-                .foregroundColor(.purple)
+                .foregroundStyle(.purple)
 
             Text(name)
                 .font(.system(size: 13))
@@ -168,7 +167,7 @@ struct BuildSiteSheet: View {
             } label: {
                 Image(systemName: "xmark.circle")
                     .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
         }

@@ -39,8 +39,7 @@ struct SidebarSessionRow: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(isSelected(group) ? Color.blue.opacity(0.15) : Color.clear)
-                .cornerRadius(5)
+                .background(isSelected(group) ? Color.blue.opacity(0.15) : Color.clear, in: .rect(cornerRadius: 5))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -71,8 +70,7 @@ struct SidebarSessionRow: View {
                                 .padding(.leading, 26)
                                 .padding(.trailing, 10)
                                 .padding(.vertical, 4)
-                                .background(isSelected(project) ? Color.blue.opacity(0.1) : Color.clear)
-                                .cornerRadius(4)
+                                .background(isSelected(project) ? Color.blue.opacity(0.1) : Color.clear, in: .rect(cornerRadius: 4))
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -107,8 +105,7 @@ struct SidebarSessionRow: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 3)
-                    .background(selectedPageId == page.id ? Color.blue.opacity(0.08) : Color.clear)
-                    .cornerRadius(4)
+                    .background(selectedPageId == page.id ? Color.blue.opacity(0.08) : Color.clear, in: .rect(cornerRadius: 4))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

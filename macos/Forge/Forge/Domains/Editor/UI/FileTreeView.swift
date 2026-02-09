@@ -33,13 +33,13 @@ struct FileTreeView: View {
             Spacer()
             Image(systemName: "folder.badge.questionmark")
                 .font(.system(size: 32))
-                .foregroundColor(.secondary.opacity(0.5))
+                .foregroundStyle(.secondary.opacity(0.5))
             Text("No files yet")
                 .font(.system(size: 12))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Text("Generate a project to get started")
                 .font(.system(size: 11))
-                .foregroundColor(.secondary.opacity(0.7))
+                .foregroundStyle(.secondary.opacity(0.7))
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -70,7 +70,7 @@ struct FileTreeRow: View {
                     Button(action: { withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() } }) {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                             .frame(width: 12, height: 12)
                     }
                     .buttonStyle(.plain)
@@ -80,12 +80,12 @@ struct FileTreeRow: View {
 
                 Image(systemName: node.isDirectory ? (isExpanded ? "folder.fill" : "folder") : node.icon)
                     .font(.system(size: 12))
-                    .foregroundColor(iconColor)
+                    .foregroundStyle(iconColor)
                     .frame(width: 16)
 
                 Text(node.name)
                     .font(.system(size: 12))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Spacer()
@@ -93,7 +93,7 @@ struct FileTreeRow: View {
                 if !node.isDirectory && node.size > 0 {
                     Text(formatSize(node.size))
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary.opacity(0.7))
+                        .foregroundStyle(.secondary.opacity(0.7))
                 }
             }
             .padding(.horizontal, 8)

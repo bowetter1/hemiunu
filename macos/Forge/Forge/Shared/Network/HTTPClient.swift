@@ -61,9 +61,10 @@ enum HTTPClient {
 
 // MARK: - Stream Delegate
 
-private final class StreamDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+private final class StreamDelegate: NSObject, URLSessionDataDelegate, Sendable {
     let continuation: AsyncThrowingStream<Data, Error>.Continuation
-    private var httpResponse: HTTPURLResponse?
+    /// Access serialized by URLSession's delegate queue
+    nonisolated(unsafe) private var httpResponse: HTTPURLResponse?
 
     init(continuation: AsyncThrowingStream<Data, Error>.Continuation) {
         self.continuation = continuation

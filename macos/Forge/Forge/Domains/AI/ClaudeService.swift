@@ -1,7 +1,7 @@
 import Foundation
 
 /// Claude (Anthropic) API service — native Anthropic streaming endpoint
-final class ClaudeService: AIService, @unchecked Sendable {
+final class ClaudeService: AIService, Sendable {
     let provider: AIProvider = .claude
     private let baseURL = URL(string: "https://api.anthropic.com/v1/messages")!
 

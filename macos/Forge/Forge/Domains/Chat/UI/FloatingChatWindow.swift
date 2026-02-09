@@ -24,7 +24,7 @@ struct FloatingChatWindow: View {
                 // Drag handle
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 12))
-                    .foregroundColor(isDragging ? .orange : .secondary.opacity(0.5))
+                    .foregroundStyle(isDragging ? .orange : .secondary.opacity(0.5))
                     .frame(width: 30, height: 44)
                     .contentShape(Rectangle())
                     .onHover { hovering in
@@ -39,7 +39,7 @@ struct FloatingChatWindow: View {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14))
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
 
                     TextField("Ask anything...", text: $inputText)
                         .textFieldStyle(.plain)
@@ -53,7 +53,7 @@ struct FloatingChatWindow: View {
                         Button(action: sendMessage) {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 22))
-                                .foregroundColor(inputText.isEmpty ? .secondary.opacity(0.5) : .orange)
+                                .foregroundStyle(inputText.isEmpty ? Color.secondary.opacity(0.5) : Color.orange)
                         }
                         .buttonStyle(.plain)
                         .disabled(inputText.isEmpty)
@@ -66,7 +66,7 @@ struct FloatingChatWindow: View {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                         .frame(width: 30, height: 44)
                 }
                 .buttonStyle(.plain)

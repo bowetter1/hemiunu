@@ -77,10 +77,10 @@ struct FilesTabContent: View {
             HStack {
                 Image(systemName: "folder")
                     .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Text("Files")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Spacer()
             }
             .frame(height: 32)
@@ -178,15 +178,15 @@ struct FilesTabContent: View {
 
                     Image(systemName: "plus.square.dashed")
                         .font(.system(size: 28))
-                        .foregroundColor(.secondary.opacity(0.5))
+                        .foregroundStyle(.secondary.opacity(0.5))
 
                     Text("No projects yet")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
 
                     Text("Create a project from the\ntools panel on the right")
                         .font(.system(size: 11))
-                        .foregroundColor(.secondary.opacity(0.7))
+                        .foregroundStyle(.secondary.opacity(0.7))
                         .multilineTextAlignment(.center)
 
                     Spacer()

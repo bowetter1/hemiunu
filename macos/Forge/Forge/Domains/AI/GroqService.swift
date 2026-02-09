@@ -1,7 +1,7 @@
 import Foundation
 
 /// Groq API service — OpenAI-compatible streaming endpoint
-final class GroqService: AIService, @unchecked Sendable {
+final class GroqService: AIService, Sendable {
     let provider: AIProvider = .groq
     private let baseURL = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
 

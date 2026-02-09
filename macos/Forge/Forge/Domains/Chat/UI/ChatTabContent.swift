@@ -58,13 +58,13 @@ struct ChatTabContent: View {
         VStack(spacing: 12) {
             Image(systemName: "sparkles")
                 .font(.system(size: 28))
-                .foregroundColor(Color.blue.opacity(0.6))
+                .foregroundStyle(Color.blue.opacity(0.6))
             Text("Forge")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Text("AI builds your site locally.\nDescribe what you want to build.")
                 .font(.system(size: 11))
-                .foregroundColor(.secondary.opacity(0.7))
+                .foregroundStyle(.secondary.opacity(0.7))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -76,13 +76,12 @@ struct ChatTabContent: View {
             ProgressView().scaleEffect(0.6)
             Text("Thinking...")
                 .font(.system(size: 11))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .cornerRadius(10)
+        .background(Color(nsColor: .windowBackgroundColor), in: .rect(cornerRadius: 10))
     }
 
     private var streamingIndicator: some View {
@@ -90,13 +89,12 @@ struct ChatTabContent: View {
             PulsingDots()
             Text("Streaming...")
                 .font(.system(size: 11))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color.blue.opacity(0.06))
-        .cornerRadius(10)
+        .background(Color.blue.opacity(0.06), in: .rect(cornerRadius: 10))
     }
 
     // MARK: - Input
@@ -115,11 +113,10 @@ struct ChatTabContent: View {
                             Text(provider.shortLabel)
                                 .font(.system(size: 9, weight: .medium))
                         }
-                        .foregroundColor(appState.selectedProvider == provider ? .white : .secondary)
+                        .foregroundStyle(appState.selectedProvider == provider ? .white : .secondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(appState.selectedProvider == provider ? Color.blue : Color.clear)
-                        .cornerRadius(4)
+                        .background(appState.selectedProvider == provider ? Color.blue : Color.clear, in: .rect(cornerRadius: 4))
                     }
                     .buttonStyle(.plain)
                 }
@@ -139,14 +136,14 @@ struct ChatTabContent: View {
                     Button(action: { chatViewModel.stopStreaming() }) {
                         Image(systemName: "stop.circle.fill")
                             .font(.system(size: 22))
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                     }
                     .buttonStyle(.plain)
                 } else {
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 22))
-                            .foregroundColor(inputText.isEmpty ? .secondary : .blue)
+                            .foregroundStyle(inputText.isEmpty ? Color.secondary : Color.blue)
                     }
                     .buttonStyle(.plain)
                     .disabled(inputText.isEmpty)
@@ -183,8 +180,10 @@ struct PulsingDots: View {
         }
         .onAppear {
             Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    active = (active + 1) % 3
+                Task { @MainActor in
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        active = (active + 1) % 3
+                    }
                 }
             }
         }

@@ -23,7 +23,7 @@ struct SidebarFileRow: View {
 
                 Text(fileName)
                     .font(.system(size: isRoot ? 12 : 11, weight: isRoot ? .semibold : .regular))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Spacer()
@@ -31,8 +31,7 @@ struct SidebarFileRow: View {
             .padding(.leading, isRoot ? 10 : 18)
             .padding(.trailing, 10)
             .padding(.vertical, 5)
-            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
-            .cornerRadius(4)
+            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear, in: .rect(cornerRadius: 4))
         }
         .buttonStyle(.plain)
     }
@@ -52,11 +51,11 @@ struct SidebarPageRow: View {
             HStack(spacing: 5) {
                 Image(systemName: "doc.text")
                     .font(.system(size: 9))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
                 Text(pageName)
                     .font(.system(size: 10))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Spacer()
@@ -64,13 +63,12 @@ struct SidebarPageRow: View {
                 if page.currentVersion > 1 {
                     Text("v\(page.currentVersion)")
                         .font(.system(size: 9))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 3)
-            .background(isSelected ? Color.blue.opacity(0.08) : Color.clear)
-            .cornerRadius(4)
+            .background(isSelected ? Color.blue.opacity(0.08) : Color.clear, in: .rect(cornerRadius: 4))
         }
         .buttonStyle(.plain)
     }
@@ -101,7 +99,7 @@ struct SidebarLayoutPageRow: View {
                         Button(action: { isExpanded.toggle() }) {
                             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                                 .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                                 .frame(width: 10)
                         }
                         .buttonStyle(.plain)
@@ -112,11 +110,11 @@ struct SidebarLayoutPageRow: View {
 
                     Image(systemName: "rectangle.3.group")
                         .font(.system(size: 11))
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
 
                     Text(pageName)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
 
                     Spacer()
@@ -124,17 +122,15 @@ struct SidebarLayoutPageRow: View {
                     if !childPages.isEmpty {
                         Text("\(childPages.count)")
                             .font(.system(size: 10))
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.2))
-                            .cornerRadius(4)
+                            .background(Color.secondary.opacity(0.2), in: .rect(cornerRadius: 4))
                     }
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
-                .cornerRadius(5)
+                .background(isSelected ? Color.blue.opacity(0.15) : Color.clear, in: .rect(cornerRadius: 5))
             }
             .buttonStyle(.plain)
 
@@ -155,11 +151,11 @@ struct SidebarLayoutPageRow: View {
 
                                 Image(systemName: "doc.text")
                                     .font(.system(size: 9))
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(.secondary)
 
                                 Text(child.name)
                                     .font(.system(size: 10))
-                                    .foregroundColor(.primary)
+                                    .foregroundStyle(.primary)
                                     .lineLimit(1)
 
                                 Spacer()
@@ -167,8 +163,7 @@ struct SidebarLayoutPageRow: View {
                             .padding(.leading, 24)
                             .padding(.trailing, 10)
                             .padding(.vertical, 3)
-                            .background(selectedPageId == child.id ? Color.blue.opacity(0.08) : Color.clear)
-                            .cornerRadius(4)
+                            .background(selectedPageId == child.id ? Color.blue.opacity(0.08) : Color.clear, in: .rect(cornerRadius: 4))
                         }
                         .buttonStyle(.plain)
                     }

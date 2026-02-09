@@ -24,12 +24,12 @@ struct CodeFileRow: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: entry.isDirectory ? 11 : 10))
-                    .foregroundColor(iconColor)
+                    .foregroundStyle(iconColor)
                     .frame(width: 14)
 
                 Text(entry.name)
                     .font(.system(size: entry.isDirectory ? 12 : 11, weight: entry.isDirectory ? .medium : .regular))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Spacer()
@@ -37,8 +37,7 @@ struct CodeFileRow: View {
             .padding(.leading, CGFloat(entry.depth * 16) + 10)
             .padding(.trailing, 10)
             .padding(.vertical, 4)
-            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear)
-            .cornerRadius(4)
+            .background(isSelected ? Color.blue.opacity(0.15) : Color.clear, in: .rect(cornerRadius: 4))
         }
         .buttonStyle(.plain)
     }

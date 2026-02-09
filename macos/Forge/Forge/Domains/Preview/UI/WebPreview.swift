@@ -82,7 +82,6 @@ struct VersionDots: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .glassEffect(.regular, in: .rect(cornerRadius: 10, style: .continuous))
-        .cornerRadius(10)
     }
 }
 
@@ -107,9 +106,8 @@ struct HTMLWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
-        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         let webView = WKWebView(frame: .zero, configuration: config)
-        webView.setValue(false, forKey: "drawsBackground")
+        webView.underPageBackgroundColor = .clear
         webView.wantsLayer = true
         webView.layer?.cornerRadius = cornerRadius
         webView.layer?.masksToBounds = true

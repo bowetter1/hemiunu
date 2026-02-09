@@ -4,8 +4,9 @@ import AuthenticationServices
 import FirebaseAuth
 
 /// Keeps ASWebAuthenticationSession alive during the OAuth flow
+@MainActor
 private enum AuthSessionStore {
-    static var current: ASWebAuthenticationSession?
+    nonisolated(unsafe) static var current: ASWebAuthenticationSession?
 }
 
 /// Provides the window for ASWebAuthenticationSession
@@ -16,6 +17,7 @@ private class WebAuthContextProvider: NSObject, ASWebAuthenticationPresentationC
 }
 
 /// Authentication service — Google OAuth via ASWebAuthenticationSession + Firebase
+@MainActor
 struct AuthService {
 
     // MARK: - Google OAuth constants
@@ -27,7 +29,7 @@ struct AuthService {
         let reversedClientID: String
     }
 
-    private static var cachedGoogleConfig: GoogleConfig?
+    nonisolated(unsafe) private static var cachedGoogleConfig: GoogleConfig?
 
     private static func loadGoogleConfig() throws -> GoogleConfig {
         if let cachedGoogleConfig {
@@ -69,23 +71,21 @@ struct AuthService {
 
         let callbackScheme = config.reversedClientID
         let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.main.async {
-                let contextProvider = WebAuthContextProvider()
-                let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) { url, error in
-                    _ = contextProvider
-                    if let error {
-                        continuation.resume(throwing: error)
-                    } else if let url {
-                        continuation.resume(returning: url)
-                    } else {
-                        continuation.resume(throwing: AuthError.noCallbackURL)
-                    }
+            let contextProvider = WebAuthContextProvider()
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) { url, error in
+                _ = contextProvider
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let url {
+                    continuation.resume(returning: url)
+                } else {
+                    continuation.resume(throwing: AuthError.noCallbackURL)
                 }
-                session.prefersEphemeralWebBrowserSession = false
-                session.presentationContextProvider = contextProvider
-                AuthSessionStore.current = session
-                session.start()
             }
+            session.prefersEphemeralWebBrowserSession = false
+            session.presentationContextProvider = contextProvider
+            AuthSessionStore.current = session
+            session.start()
         }
 
         guard let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?

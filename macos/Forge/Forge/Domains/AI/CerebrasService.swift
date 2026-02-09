@@ -1,7 +1,7 @@
 import Foundation
 
 /// Cerebras API service — OpenAI-compatible streaming endpoint (supports multiple models)
-final class CerebrasService: AIService, @unchecked Sendable {
+final class CerebrasService: AIService, Sendable {
     let provider: AIProvider
     private let baseURL = URL(string: "https://api.cerebras.ai/v1/chat/completions")!
 

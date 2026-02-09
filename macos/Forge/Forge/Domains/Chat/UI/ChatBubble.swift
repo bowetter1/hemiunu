@@ -12,9 +12,9 @@ struct ChatBubble: View {
                 .font(.system(size: 13))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(bubbleBackground)
-                .foregroundColor(message.role == .user ? .white : .primary)
-                .cornerRadius(16)
+                .foregroundStyle(message.role == .user ? .white : .primary)
+                .background { bubbleBackground }
+                .clipShape(.rect(cornerRadius: 16))
 
             if message.role == .assistant { Spacer(minLength: 40) }
         }
@@ -42,9 +42,9 @@ struct SidebarChatBubble: View {
                 .font(.system(size: 12))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(sidebarBubbleBackground)
-                .foregroundColor(message.role == .user ? .white : .primary)
-                .cornerRadius(12)
+                .foregroundStyle(message.role == .user ? .white : .primary)
+                .background { sidebarBubbleBackground }
+                .clipShape(.rect(cornerRadius: 12))
 
             if message.role == .assistant { Spacer(minLength: 20) }
         }

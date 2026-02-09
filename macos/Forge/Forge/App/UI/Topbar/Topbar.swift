@@ -68,6 +68,18 @@ struct Topbar: View {
                     withAnimation(.easeInOut(duration: 0.2)) { showSidebar = true }
                 }
             }
+
+            // Version picker on the left (Opus-style)
+            if showPreviewControls && !pageVersions.isEmpty {
+                TopbarVersionPicker(
+                    versions: pageVersions,
+                    currentVersion: currentVersion,
+                    onSelect: { version in
+                        onRestoreVersion?(version)
+                    }
+                )
+                .fixedSize(horizontal: true, vertical: false)
+            }
         }
         .frame(height: itemHeight)
     }
@@ -119,22 +131,6 @@ struct Topbar: View {
 
     private var previewControls: some View {
         HStack(spacing: 8) {
-            if !pageVersions.isEmpty {
-                TopbarVersionPicker(
-                    versions: pageVersions,
-                    currentVersion: currentVersion,
-                    onSelect: { version in
-                        onRestoreVersion?(version)
-                    }
-                )
-                .fixedSize(horizontal: true, vertical: false)
-
-                Text("v\(currentVersion)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .fixedSize()
-            }
-
             // Device width label
             Text(deviceWidthLabel)
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
@@ -147,8 +143,7 @@ struct Topbar: View {
                 deviceButton(.tablet, icon: "ipad")
                 deviceButton(.mobile, icon: "iphone")
             }
-            .background(Color.secondary.opacity(0.08))
-            .cornerRadius(6)
+            .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 6))
 
             // Open in browser
             IconButton(icon: "safari", size: iconSize) {
@@ -173,8 +168,7 @@ struct Topbar: View {
                 .font(.system(size: 12))
                 .foregroundStyle(selectedDevice == device ? .blue : .secondary)
                 .frame(width: 28, height: 22)
-                .background(selectedDevice == device ? Color.blue.opacity(0.12) : Color.clear)
-                .cornerRadius(5)
+                .background(selectedDevice == device ? Color.blue.opacity(0.12) : Color.clear, in: .rect(cornerRadius: 5))
         }
         .buttonStyle(.plain)
     }

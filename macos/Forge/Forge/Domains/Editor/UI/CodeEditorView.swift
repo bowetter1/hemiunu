@@ -28,16 +28,16 @@ struct CodeEditorView: View {
             HStack(spacing: 6) {
                 Image(systemName: iconForFile)
                     .font(.system(size: 11))
-                    .foregroundColor(colorForFile)
+                    .foregroundStyle(colorForFile)
 
                 Text(fileName)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.primary)
+                    .foregroundStyle(.primary)
 
                 Button(action: {}) {
                     Image(systemName: "xmark")
                         .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .opacity(0.6)
@@ -48,7 +48,7 @@ struct CodeEditorView: View {
             .overlay(
                 Rectangle()
                     .frame(height: 2)
-                    .foregroundColor(.accentColor),
+                    .foregroundStyle(Color.accentColor),
                 alignment: .bottom
             )
 
@@ -61,11 +61,10 @@ struct CodeEditorView: View {
                     Text("Save")
                         .font(.system(size: 11))
                 }
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.05))
-                .cornerRadius(4)
+                .background(Color.primary.opacity(0.05), in: .rect(cornerRadius: 4))
             }
             .buttonStyle(.plain)
             .padding(.trailing, 8)
@@ -100,7 +99,7 @@ struct CodeEditorView: View {
                 ForEach(1...max(lineCount, 1), id: \.self) { line in
                     Text("\(line)")
                         .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.secondary.opacity(0.5))
+                        .foregroundStyle(.secondary.opacity(0.5))
                         .frame(height: 18)
                 }
             }
@@ -122,7 +121,7 @@ struct CodeEditorView: View {
             ProgressView().scaleEffect(0.8)
             Text("Loading file...")
                 .font(.system(size: 12))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .padding(.top, 8)
             Spacer()
         }

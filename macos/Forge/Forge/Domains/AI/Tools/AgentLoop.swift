@@ -27,7 +27,7 @@ class AgentLoop {
         var totalOutput = 0
 
         // Build initial message list in provider-specific format
-        var messages: [[String: Any]] = buildInitialMessages(
+        nonisolated(unsafe) var messages: [[String: Any]] = buildInitialMessages(
             history: history,
             userMessage: userMessage,
             systemPrompt: systemPrompt,

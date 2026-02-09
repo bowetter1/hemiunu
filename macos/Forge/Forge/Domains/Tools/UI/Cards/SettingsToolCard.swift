@@ -40,7 +40,7 @@ struct SettingsToolCard: View {
                     HStack(spacing: 10) {
                         Image(systemName: "brain")
                             .font(.system(size: 11))
-                            .foregroundColor(.blue)
+                            .foregroundStyle(.blue)
                             .frame(width: 20)
 
                         VStack(alignment: .leading, spacing: 1) {
@@ -48,7 +48,7 @@ struct SettingsToolCard: View {
                                 .font(.system(size: 11, weight: .medium))
                             Text(appState.selectedProvider.displayName)
                                 .font(.system(size: 9))
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                         }
 
                         Spacer()
@@ -68,7 +68,7 @@ struct SettingsToolCard: View {
                     HStack(spacing: 10) {
                         Image(systemName: "paintpalette")
                             .font(.system(size: 11))
-                            .foregroundColor(.orange)
+                            .foregroundStyle(.orange)
                             .frame(width: 20)
 
                         Text("Appearance")

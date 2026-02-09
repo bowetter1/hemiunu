@@ -38,14 +38,12 @@ struct ModeSelector: View {
                         .font(.system(size: 12))
                         .foregroundStyle(selectedMode == mode ? .blue : .secondary)
                         .frame(width: 28, height: 22)
-                        .background(selectedMode == mode ? Color.blue.opacity(0.12) : Color.clear)
-                        .cornerRadius(5)
+                        .background(selectedMode == mode ? Color.blue.opacity(0.12) : Color.clear, in: .rect(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .background(Color.secondary.opacity(0.08))
-        .cornerRadius(6)
+        .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 6))
     }
 
     private func icon(for mode: AppMode) -> String {
@@ -78,14 +76,12 @@ struct TopbarVersionPicker: View {
                         .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                         .foregroundStyle(isSelected ? .blue : .secondary)
                         .frame(width: 28, height: 22)
-                        .background(isSelected ? Color.blue.opacity(0.12) : Color.clear)
-                        .cornerRadius(5)
+                        .background(isSelected ? Color.blue.opacity(0.12) : Color.clear, in: .rect(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .background(Color.secondary.opacity(0.08))
-        .cornerRadius(6)
+        .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 6))
     }
 }
 
@@ -168,7 +164,7 @@ struct LogsPopover: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Activity")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
 
@@ -177,7 +173,7 @@ struct LogsPopover: View {
             if messages.isEmpty {
                 Text("No activity yet")
                     .font(.system(size: 11))
-                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                    .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
                     .frame(maxWidth: .infinity)
                     .padding(16)
             } else {
@@ -191,11 +187,11 @@ struct LogsPopover: View {
 
                                 Image(systemName: message.role == .user ? "person" : "sparkles")
                                     .font(.system(size: 9))
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(.secondary)
 
                                 Text(message.content.prefix(60) + (message.content.count > 60 ? "\u{2026}" : ""))
                                     .font(.system(size: 10))
-                                    .foregroundColor(.primary)
+                                    .foregroundStyle(.primary)
                                     .lineLimit(1)
                             }
                             .padding(.vertical, 3)
@@ -231,6 +227,3 @@ struct PulseModifier: ViewModifier {
     }
 }
 
-// MARK: - Legacy Support
-
-typealias ToolbarButton = IconButton

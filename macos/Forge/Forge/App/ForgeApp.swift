@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseCore
 import AppKit
+import AppIntents
 
 @main
 struct ForgeApp: App {
@@ -48,7 +49,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 struct WindowAccessor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        DispatchQueue.main.async {
+        Task { @MainActor in
             if let window = view.window {
                 // Enable full-size content view
                 window.styleMask.insert(.fullSizeContentView)

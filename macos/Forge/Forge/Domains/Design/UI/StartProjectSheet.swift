@@ -35,7 +35,7 @@ struct StartProjectSheet: View {
                 Button(action: { isPresented = false }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .disabled(isCreating)
@@ -53,8 +53,7 @@ struct StartProjectSheet: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .padding(10)
-                        .background(Color(nsColor: .textBackgroundColor))
-                        .cornerRadius(8)
+                        .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: 8))
 
                     // Brief
                     sectionLabel("Description", icon: "text.alignleft")
@@ -62,8 +61,7 @@ struct StartProjectSheet: View {
                         .font(.system(size: 12))
                         .frame(minHeight: 200, maxHeight: 400)
                         .padding(6)
-                        .background(Color(nsColor: .textBackgroundColor))
-                        .cornerRadius(8)
+                        .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: 8))
 
                     // URL
                     sectionLabel("Reference URL", icon: "link")
@@ -71,8 +69,7 @@ struct StartProjectSheet: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .padding(10)
-                        .background(Color(nsColor: .textBackgroundColor))
-                        .cornerRadius(8)
+                        .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: 8))
 
                     Divider()
 
@@ -111,11 +108,10 @@ struct StartProjectSheet: View {
                         Text(isCreating ? "Creating..." : "Create")
                             .font(.system(size: 12, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(canCreate ? Color.blue : Color.gray)
-                    .cornerRadius(8)
+                    .background(canCreate ? Color.blue : Color.gray, in: .rect(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
                 .disabled(!canCreate || isCreating)
@@ -135,7 +131,7 @@ struct StartProjectSheet: View {
     private func sectionLabel(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.system(size: 10, weight: .medium))
-            .foregroundColor(.secondary)
+            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
@@ -152,7 +148,7 @@ struct StartProjectSheet: View {
                     Button(action: { selectedImage = nil }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 18))
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                             .shadow(radius: 2)
                     }
                     .buttonStyle(.plain)
@@ -162,14 +158,14 @@ struct StartProjectSheet: View {
                 VStack(spacing: 6) {
                     Image(systemName: isDraggingOver ? "arrow.down.circle.fill" : "photo.badge.plus")
                         .font(.system(size: 20))
-                        .foregroundColor(isDraggingOver ? .blue : .secondary.opacity(0.5))
+                        .foregroundStyle(isDraggingOver ? .blue : .secondary.opacity(0.5))
                     Text("Drop image or click")
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 80)
-                .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+                .background(Color(nsColor: .textBackgroundColor).opacity(0.5), in: .rect(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(
@@ -177,7 +173,6 @@ struct StartProjectSheet: View {
                             style: StrokeStyle(lineWidth: 1, dash: [4])
                         )
                 )
-                .cornerRadius(8)
                 .onTapGesture { openImagePicker() }
             }
         }
@@ -202,9 +197,10 @@ struct StartProjectSheet: View {
     private func handleImageDrop(_ providers: [NSItemProvider]) -> Bool {
         for provider in providers {
             if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                provider.loadObject(ofClass: NSImage.self) { image, _ in
-                    DispatchQueue.main.async {
-                        selectedImage = image as? NSImage
+                provider.loadObject(ofClass: NSImage.self) { object, _ in
+                    guard let image = object as? NSImage else { return }
+                    Task { @MainActor in
+                        selectedImage = image
                     }
                 }
                 return true
