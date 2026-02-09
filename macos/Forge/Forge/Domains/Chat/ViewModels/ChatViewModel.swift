@@ -113,6 +113,15 @@ class ChatViewModel {
                 serviceResolver: { [weak appState] provider in
                     appState?.resolveService(for: provider) ?? service
                 },
+                builderServiceResolver: { [weak appState] builderName in
+                    guard let appState else { return service }
+                    switch builderName {
+                    case "opus": return appState.claudeOpusService
+                    case "gemini": return appState.geminiService
+                    case "kimi": return appState.kimiService
+                    default: return appState.kimiService
+                    }
+                },
                 onChecklistUpdate: { [weak self] items in
                     self?.checklist.update(items)
                 },
@@ -131,10 +140,15 @@ class ChatViewModel {
                 },
                 onProjectCreate: { [weak self] name in
                     guard let appState = self?.appState else { return }
-                    let projectId = "local:\(name)"
-                    appState.setSelectedProjectId(projectId)
-                    appState.setLocalPreviewURL(appState.workspace.projectPath(name))
-                    appState.setLocalFiles(appState.workspace.listFiles(project: name))
+                    let isVersionProject = name.contains("-v") && name.last?.isNumber == true
+                    if !isVersionProject {
+                        // Base project: select it and set preview
+                        let projectId = "local:\(name)"
+                        appState.setSelectedProjectId(projectId)
+                        appState.setLocalPreviewURL(appState.workspace.projectPath(name))
+                        appState.setLocalFiles(appState.workspace.listFiles(project: name))
+                    }
+                    // Always refresh sidebar so version projects show up
                     appState.refreshLocalProjects()
                     Task { _ = try? await appState.workspace.ensureGitRepository(project: name) }
                 }

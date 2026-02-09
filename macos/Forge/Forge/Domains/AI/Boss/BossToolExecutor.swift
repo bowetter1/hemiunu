@@ -6,6 +6,7 @@ class BossToolExecutor: ToolExecuting {
     let workspace: LocalWorkspaceService
     var projectName: String
     let serviceResolver: (AIProvider) -> any AIService
+    let builderServiceResolver: ((String) -> any AIService)?
     let onChecklistUpdate: ([ChecklistItem]) -> Void
     let onSubAgentEvent: (SubAgentRole, AgentEvent) -> Void
     let onProjectCreate: ((String) -> Void)?
@@ -14,6 +15,7 @@ class BossToolExecutor: ToolExecuting {
         workspace: LocalWorkspaceService,
         projectName: String,
         serviceResolver: @escaping (AIProvider) -> any AIService,
+        builderServiceResolver: ((String) -> any AIService)? = nil,
         onChecklistUpdate: @escaping ([ChecklistItem]) -> Void,
         onSubAgentEvent: @escaping (SubAgentRole, AgentEvent) -> Void,
         onProjectCreate: ((String) -> Void)? = nil
@@ -21,6 +23,7 @@ class BossToolExecutor: ToolExecuting {
         self.workspace = workspace
         self.projectName = projectName
         self.serviceResolver = serviceResolver
+        self.builderServiceResolver = builderServiceResolver
         self.onChecklistUpdate = onChecklistUpdate
         self.onSubAgentEvent = onSubAgentEvent
         self.onProjectCreate = onProjectCreate
@@ -147,8 +150,8 @@ class BossToolExecutor: ToolExecuting {
         // Notify host about the new version project
         onProjectCreate?(versionProjectName)
 
-        // Resolve AI service for this builder
-        let service = serviceResolver(builderProvider)
+        // Resolve AI service for this builder (use builderServiceResolver for model-specific services like Opus)
+        let service = builderServiceResolver?(builderName) ?? serviceResolver(builderProvider)
 
         // Build tools for coder role + web_search (OpenAI format for Kimi/Gemini, Anthropic for Claude)
         let isAnthropic = service.provider == .claude

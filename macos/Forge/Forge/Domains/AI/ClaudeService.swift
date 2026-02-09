@@ -1,9 +1,17 @@
 import Foundation
 
 /// Claude (Anthropic) API service — native Anthropic streaming endpoint
+/// Use modelOverride to select a specific model (e.g. "claude-opus-4-6" for builders)
 final class ClaudeService: AIService, Sendable {
     let provider: AIProvider = .claude
+    private let modelName: String
+    private let maxTokens: Int
     private let baseURL = URL(string: "https://api.anthropic.com/v1/messages")!
+
+    init(modelOverride: String? = nil, maxTokens: Int = 8192) {
+        self.modelName = modelOverride ?? AIProvider.claude.modelName
+        self.maxTokens = maxTokens
+    }
 
     func generate(
         messages: [AIMessage],
@@ -51,10 +59,10 @@ final class ClaudeService: AIService, Sendable {
         }
 
         var payload: [String: Any] = [
-            "model": provider.modelName,
+            "model": modelName,
             "system": systemPrompt,
             "messages": messages,
-            "max_tokens": 8192,
+            "max_tokens": maxTokens,
         ]
         if !tools.isEmpty {
             payload["tools"] = tools
@@ -67,7 +75,7 @@ final class ClaudeService: AIService, Sendable {
 
         #if DEBUG
         let toolNames = tools.compactMap { $0["name"] as? String }
-        print("[Claude] generateWithTools — model: \(provider.modelName), tools: \(toolNames), messages: \(messages.count)")
+        print("[Claude] generateWithTools — model: \(modelName), tools: \(toolNames), messages: \(messages.count)")
         #endif
 
         let headers = [
@@ -99,11 +107,11 @@ final class ClaudeService: AIService, Sendable {
         }
 
         let payload: [String: Any] = [
-            "model": provider.modelName,
+            "model": modelName,
             "system": systemPrompt,
             "messages": apiMessages,
             "stream": true,
-            "max_tokens": 8192,
+            "max_tokens": maxTokens,
         ]
 
         return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
