@@ -10,8 +10,8 @@ enum SubAgentRole: String, Sendable, CaseIterable {
     var preferredProvider: AIProvider {
         switch self {
         case .coder: return .groq
-        case .researcher: return .cerebras
-        case .reviewer: return .cerebras
+        case .researcher: return .groq
+        case .reviewer: return .groq
         }
     }
 

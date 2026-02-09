@@ -84,8 +84,7 @@ class AppState {
 
     // MARK: - AI
 
-    var selectedProvider: AIProvider = .cerebras
-    let cerebrasService = CerebrasService(provider: .cerebras)
+    var selectedProvider: AIProvider = .groq
     let glmService = CerebrasService(provider: .glm)
     let groqService = GroqService()
     let claudeService = ClaudeService()
@@ -99,7 +98,6 @@ class AppState {
     /// Resolve an AI service for any provider
     func resolveService(for provider: AIProvider) -> any AIService {
         switch provider {
-        case .cerebras: return cerebrasService
         case .glm: return glmService
         case .groq: return groqService
         case .claude: return claudeService

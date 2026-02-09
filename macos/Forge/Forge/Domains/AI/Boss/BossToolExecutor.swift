@@ -79,7 +79,7 @@ class BossToolExecutor: ToolExecuting {
         // Resolve AI service for the sub-agent's preferred provider
         let service = serviceResolver(role.preferredProvider)
 
-        // Build filtered tool set for this role (OpenAI format for Groq/Cerebras)
+        // Build filtered tool set for this role (OpenAI format for Groq/GLM)
         let isAnthropic = service.provider == .claude
         let allTools: [[String: Any]] = isAnthropic
             ? ForgeTools.anthropicFormat()

@@ -31,7 +31,7 @@ struct AgentResult: Sendable {
 /// Tool schemas for Forge's file-management tools
 enum ForgeTools {
 
-    /// All tool definitions in OpenAI function-calling format (Cerebras, Groq)
+    /// All tool definitions in OpenAI function-calling format (Groq, GLM)
     static func openAIFormat() -> [[String: Any]] {
         [
             [
@@ -315,7 +315,7 @@ enum ForgeTools {
 
 // MARK: - Response Parsers
 
-/// Parses non-streaming OpenAI-format responses (Cerebras, Groq)
+/// Parses non-streaming OpenAI-format responses (Groq, GLM)
 enum OpenAIToolResponseParser {
     static func parse(_ data: Data) throws -> ToolResponse {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

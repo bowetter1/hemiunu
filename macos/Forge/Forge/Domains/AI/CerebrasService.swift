@@ -5,7 +5,7 @@ final class CerebrasService: AIService, Sendable {
     let provider: AIProvider
     private let baseURL = URL(string: "https://api.cerebras.ai/v1/chat/completions")!
 
-    init(provider: AIProvider = .cerebras) {
+    init(provider: AIProvider = .glm) {
         self.provider = provider
     }
 
@@ -14,7 +14,7 @@ final class CerebrasService: AIService, Sendable {
         systemPrompt: String
     ) -> AsyncThrowingStream<String, Error> {
         guard let apiKey = KeychainHelper.load(key: provider.keychainKey), !apiKey.isEmpty else {
-            return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: .cerebras)) }
+            return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: provider)) }
         }
 
         let body = buildRequestBody(messages: messages, systemPrompt: systemPrompt)
@@ -50,7 +50,7 @@ final class CerebrasService: AIService, Sendable {
         tools: [[String: Any]]
     ) async throws -> ToolResponse {
         guard let apiKey = KeychainHelper.load(key: provider.keychainKey), !apiKey.isEmpty else {
-            throw AIError.noAPIKey(provider: .cerebras)
+            throw AIError.noAPIKey(provider: provider)
         }
 
         var payload: [String: Any] = [
