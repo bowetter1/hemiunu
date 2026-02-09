@@ -24,3 +24,11 @@ __pycache__/
 
 # Build artifacts
 /workspace/
+.xcode-derived/
+.xcode-home/
+.xcode-spm/
+*.build-*.log
+forge-build-*.log
+
+# Legacy experiments
+legacy/
