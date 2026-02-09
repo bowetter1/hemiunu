@@ -117,7 +117,7 @@ class ChatViewModel {
                     guard let appState else { return service }
                     switch builderName {
                     case "opus": return appState.claudeOpusService
-                    case "gemini": return appState.geminiService
+                    case "gemini": return appState.geminiProService
                     case "kimi": return appState.kimiService
                     default: return appState.kimiService
                     }

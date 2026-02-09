@@ -89,6 +89,7 @@ class AppState {
     let claudeService = ClaudeService()
     let claudeOpusService = ClaudeService(modelOverride: "claude-opus-4-6", maxTokens: 16384)
     let geminiService = GeminiService()
+    let geminiProService = GeminiService(modelOverride: "gemini-3-pro-preview", maxTokens: 16384)
     let kimiService = KimiService()
 
     /// Returns the active AI service based on the selected provider

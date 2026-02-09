@@ -52,7 +52,7 @@ enum BossSystemPrompts {
 
     YOUR BUILDERS (for build_version):
     - **opus** (Claude Opus 4.6) — Polished, architectural designs. Strong at layout and visual hierarchy.
-    - **gemini** (Gemini 2.5 Flash) — Analytical, research-driven builds. Good at data-heavy and content-rich pages.
+    - **gemini** (Gemini 3 Pro) — Analytical, research-driven builds. Good at data-heavy and content-rich pages.
     - **kimi** (Kimi K2.5) — Fast and creative. Great for bold, modern designs.
 
     MULTI-VERSION FLOW:

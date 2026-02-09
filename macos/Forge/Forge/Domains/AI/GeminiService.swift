@@ -1,9 +1,17 @@
 import Foundation
 
-/// Gemini API service — OpenAI-compatible endpoint (Gemini 2.5 Flash)
+/// Gemini API service — OpenAI-compatible endpoint
+/// Use modelOverride to select a specific model (e.g. "gemini-3-pro-preview" for builders)
 final class GeminiService: AIService, Sendable {
     let provider: AIProvider = .gemini
+    private let modelName: String
+    private let maxTokens: Int
     private let baseURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")!
+
+    init(modelOverride: String? = nil, maxTokens: Int = 8192) {
+        self.modelName = modelOverride ?? AIProvider.gemini.modelName
+        self.maxTokens = maxTokens
+    }
 
     func generate(
         messages: [AIMessage],
@@ -50,10 +58,10 @@ final class GeminiService: AIService, Sendable {
         }
 
         var payload: [String: Any] = [
-            "model": provider.modelName,
+            "model": modelName,
             "messages": messages,
             "temperature": 0.7,
-            "max_tokens": 8192,
+            "max_tokens": maxTokens,
             "stream": false,
         ]
         if !tools.isEmpty {
@@ -88,11 +96,11 @@ final class GeminiService: AIService, Sendable {
         }
 
         let payload: [String: Any] = [
-            "model": provider.modelName,
+            "model": modelName,
             "messages": apiMessages,
             "stream": true,
             "temperature": 0.7,
-            "max_tokens": 8192,
+            "max_tokens": maxTokens,
         ]
 
         return (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
