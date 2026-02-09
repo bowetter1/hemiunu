@@ -2,14 +2,12 @@ import Foundation
 
 /// Available AI providers for direct API access
 enum AIProvider: String, CaseIterable, Codable {
-    case glm
     case groq
     case claude
     case together
 
     var displayName: String {
         switch self {
-        case .glm: return "ZAI GLM 4.7"
         case .groq: return "Llama 3.3 70B"
         case .claude: return "Opus 4.6"
         case .together: return "Together AI"
@@ -18,7 +16,6 @@ enum AIProvider: String, CaseIterable, Codable {
 
     var icon: String {
         switch self {
-        case .glm: return "brain.head.profile.fill"
         case .groq: return "bolt.fill"
         case .claude: return "sparkles"
         case .together: return "cpu"
@@ -27,7 +24,6 @@ enum AIProvider: String, CaseIterable, Codable {
 
     var shortLabel: String {
         switch self {
-        case .glm: return "GLM"
         case .groq: return "Llama"
         case .claude: return "Opus"
         case .together: return "Together"
@@ -36,7 +32,6 @@ enum AIProvider: String, CaseIterable, Codable {
 
     var modelName: String {
         switch self {
-        case .glm: return "zai-glm-4.7"
         case .groq: return "llama-3.3-70b-versatile"
         case .claude: return "claude-opus-4-6"
         case .together: return "meta-llama/Llama-3.3-70B-Instruct-Turbo"
@@ -46,7 +41,6 @@ enum AIProvider: String, CaseIterable, Codable {
     /// Keychain key for storing the API key
     var keychainKey: String {
         switch self {
-        case .glm: return "forge.api.cerebras"
         case .groq: return "forge.api.groq"
         case .claude: return "forge.api.claude"
         case .together: return "forge.api.together"
@@ -56,7 +50,6 @@ enum AIProvider: String, CaseIterable, Codable {
     /// Cost per million input tokens (USD)
     var inputCostPerMillion: Double {
         switch self {
-        case .glm: return 2.25
         case .groq: return 0.59
         case .claude: return 5.00
         case .together: return 0.88
@@ -66,7 +59,6 @@ enum AIProvider: String, CaseIterable, Codable {
     /// Cost per million output tokens (USD)
     var outputCostPerMillion: Double {
         switch self {
-        case .glm: return 2.75
         case .groq: return 0.79
         case .claude: return 25.00
         case .together: return 0.88
