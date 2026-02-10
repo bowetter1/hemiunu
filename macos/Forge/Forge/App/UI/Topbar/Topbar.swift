@@ -198,6 +198,18 @@ struct Topbar: View {
                 }
             }
 
+            topbarDivider
+
+            // Services
+            IconButton(icon: "arrow.triangle.branch", size: iconSize) { }
+                .help("GitHub")
+            IconButton(icon: "paperplane", size: iconSize) { }
+                .help("Deploy")
+            IconButton(icon: "terminal", size: iconSize) { }
+                .help("Sandbox")
+
+            topbarDivider
+
             // Logs button
             TopbarLogsButton(chatViewModel: chatViewModel, iconSize: iconSize)
 
@@ -218,6 +230,12 @@ struct Topbar: View {
             }
         }
         .frame(height: itemHeight)
+    }
+
+    private var topbarDivider: some View {
+        RoundedRectangle(cornerRadius: 0.5)
+            .fill(Color.secondary.opacity(0.2))
+            .frame(width: 1, height: 14)
     }
 
     // MARK: - Preview Controls
