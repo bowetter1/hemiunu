@@ -10,7 +10,7 @@ enum SubAgentRole: String, Sendable, CaseIterable {
     /// Which AI provider this role prefers
     var preferredProvider: AIProvider {
         switch self {
-        case .coder: return .kimi
+        case .coder: return .codex
         case .researcher: return .claude
         case .reviewer: return .gemini
         case .tester: return .gemini

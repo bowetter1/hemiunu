@@ -49,7 +49,7 @@ struct AgentResult: Sendable {
 /// Tool schemas for Forge's file-management tools
 enum ForgeTools {
 
-    /// All tool definitions in OpenAI function-calling format (Groq, Kimi, Gemini)
+    /// All tool definitions in OpenAI function-calling format (Groq, Codex, Gemini)
     static func openAIFormat() -> [[String: Any]] {
         [
             [
@@ -358,13 +358,13 @@ enum ForgeTools {
         ])
         tools.append([
             "name": "build_version",
-            "description": "Build a version of the website using a specific AI builder. Call this multiple times in parallel to create different versions. Each version gets its own project workspace. Available builders: opus (Claude — polished, architectural), gemini (Gemini — analytical, research-driven), kimi (Kimi — fast, creative).",
+            "description": "Build a version of the website using a specific AI builder. Call this multiple times in parallel to create different versions. Each version gets its own project workspace. Available builders: opus (Claude — polished, architectural), gemini (Gemini — analytical, research-driven), codex (GPT-5.2 Codex — fast, creative).",
             "input_schema": [
                 "type": "object",
                 "properties": [
                     "builder": [
                         "type": "string",
-                        "enum": ["opus", "gemini", "kimi"],
+                        "enum": ["opus", "gemini", "codex"],
                         "description": "Which AI builder to use for this version",
                     ] as [String: Any],
                     "version": [
@@ -469,13 +469,13 @@ enum ForgeTools {
             "type": "function",
             "function": [
                 "name": "build_version",
-                "description": "Build a version of the website using a specific AI builder. Call this multiple times in parallel to create different versions. Each version gets its own project workspace. Available builders: opus (Claude — polished, architectural), gemini (Gemini — analytical, research-driven), kimi (Kimi — fast, creative).",
+                "description": "Build a version of the website using a specific AI builder. Call this multiple times in parallel to create different versions. Each version gets its own project workspace. Available builders: opus (Claude — polished, architectural), gemini (Gemini — analytical, research-driven), codex (GPT-5.2 Codex — fast, creative).",
                 "parameters": [
                     "type": "object",
                     "properties": [
                         "builder": [
                             "type": "string",
-                            "enum": ["opus", "gemini", "kimi"],
+                            "enum": ["opus", "gemini", "codex"],
                             "description": "Which AI builder to use for this version",
                         ] as [String: Any],
                         "version": [
@@ -710,7 +710,7 @@ enum ForgeTools {
 
 // MARK: - Response Parsers
 
-/// Parses non-streaming OpenAI-format responses (Groq, Kimi, Gemini)
+/// Parses non-streaming OpenAI-format responses (Groq, Codex, Gemini)
 enum OpenAIToolResponseParser {
     static func parse(_ data: Data) throws -> ToolResponse {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

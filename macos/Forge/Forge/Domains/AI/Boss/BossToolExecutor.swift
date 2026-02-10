@@ -267,8 +267,8 @@ class BossToolExecutor: ToolExecuting {
         switch builderName {
         case "opus": builderProvider = .claude
         case "gemini": builderProvider = .gemini
-        case "kimi": builderProvider = .kimi
-        default: return "Error: unknown builder '\(builderName)'. Use opus, gemini, or kimi."
+        case "codex": builderProvider = .codex
+        default: return "Error: unknown builder '\(builderName)'. Use opus, gemini, or codex."
         }
 
         // Create version-specific project inside base: e.g. "coffee-shop/v1"
@@ -297,7 +297,7 @@ class BossToolExecutor: ToolExecuting {
         // Log builder start
         buildLogger?.logBuilderStart(builder: builderName, version: version, direction: designDirection, model: modelName)
 
-        // Build tools for coder role + web_search (OpenAI format for Kimi/Gemini, Anthropic for Claude)
+        // Build tools for coder role + web_search (OpenAI format for Codex/Gemini, Anthropic for Claude)
         let isAnthropic = service.provider == .claude
         let allTools: [[String: Any]] = isAnthropic
             ? ForgeTools.anthropicFormat()
@@ -340,26 +340,15 @@ class BossToolExecutor: ToolExecuting {
 
         // Run nested agent loop targeting the version project
         let subExecutor = ToolExecutor(workspace: workspace, projectName: versionProjectName, onFileWrite: onFileWrite)
-        let agentLoop = AgentLoop()
         let builderStartTime = CFAbsoluteTimeGetCurrent()
 
-        let result: AgentResult
-        do {
-            result = try await agentLoop.run(
-                userMessage: fullInstructions,
-                history: [],
-                systemPrompt: systemPrompt,
-                service: service,
-                executor: subExecutor,
-                tools: filteredTools,
-                maxIterations: SubAgentRole.coder.maxIterations
-            ) { [onSubAgentEvent, weak buildLogger] event in
+        // Event handler factory for build logging
+        let makeEventHandler: (String) -> (AgentEvent) -> Void = { [onSubAgentEvent, weak buildLogger] tag in
+            return { event in
                 onSubAgentEvent(.coder, event)
-                let tag = "[v\(version)/\(builderName)]"
                 switch event {
                 case .toolStart(let name, let args):
-                    let preview = String(args.prefix(80))
-                    buildLogger?.logEvent("🔧", "\(tag) `\(name)` — \(preview)")
+                    buildLogger?.logEvent("🔧", "\(tag) `\(name)` — \(String(args.prefix(80)))")
                 case .toolDone(let name, let summary):
                     buildLogger?.logEvent("✓", "\(tag) `\(name)` → \(String(summary.prefix(80)))")
                 case .apiResponse(let input, let output):
@@ -370,6 +359,20 @@ class BossToolExecutor: ToolExecuting {
                     break
                 }
             }
+        }
+
+        var result: AgentResult
+        do {
+            result = try await AgentLoop().run(
+                userMessage: fullInstructions,
+                history: [],
+                systemPrompt: systemPrompt,
+                service: service,
+                executor: subExecutor,
+                tools: filteredTools,
+                maxIterations: SubAgentRole.coder.maxIterations,
+                onEvent: makeEventHandler("[v\(version)/\(builderName)]")
+            )
 
             let builderTime = CFAbsoluteTimeGetCurrent() - builderStartTime
             buildLogger?.logBuilderDone(builder: builderName, version: version, success: true, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens, duration: builderTime)
@@ -380,7 +383,29 @@ class BossToolExecutor: ToolExecuting {
             let builderTime = CFAbsoluteTimeGetCurrent() - builderStartTime
             buildLogger?.logEvent("❌", "[v\(version)/\(builderName)] Builder error: \(error.localizedDescription)")
             buildLogger?.logBuilderDone(builder: builderName, version: version, success: false, inputTokens: 0, outputTokens: 0, duration: builderTime)
-            throw error
+
+            // Auto-retry with gemini fallback (don't retry if already gemini)
+            guard builderName != "gemini" else { throw error }
+            buildLogger?.logEvent("🔄", "[v\(version)] Retrying with gemini fallback...")
+
+            let fallbackService = builderServiceResolver?("gemini") ?? serviceResolver(.gemini)
+            let fallbackTools = filterTools(ForgeTools.openAIFormat(), allowed: builderTools, isAnthropic: false)
+            let retryStart = CFAbsoluteTimeGetCurrent()
+
+            result = try await AgentLoop().run(
+                userMessage: fullInstructions,
+                history: [],
+                systemPrompt: systemPrompt,
+                service: fallbackService,
+                executor: subExecutor,
+                tools: fallbackTools,
+                maxIterations: SubAgentRole.coder.maxIterations,
+                onEvent: makeEventHandler("[v\(version)/gemini-retry]")
+            )
+
+            let retryTime = CFAbsoluteTimeGetCurrent() - retryStart
+            buildLogger?.logBuilderDone(builder: "gemini", version: version, success: true, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens, duration: retryTime)
+            memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName, role: .builder)
         }
 
         // Commit the version project

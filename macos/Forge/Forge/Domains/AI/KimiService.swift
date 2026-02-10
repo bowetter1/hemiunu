@@ -1,13 +1,13 @@
 import Foundation
 
-/// Kimi API service — OpenAI-compatible endpoint (Kimi K2.5 via Moonshot)
-final class KimiService: AIService, Sendable {
-    let provider: AIProvider = .kimi
+/// OpenAI Codex service — gpt-5.2-codex via OpenAI API (OpenAI-compatible endpoint)
+final class CodexService: AIService, Sendable {
+    let provider: AIProvider = .codex
     private let modelName: String
-    private let baseURL = URL(string: "https://api.moonshot.ai/v1/chat/completions")!
+    private let baseURL = URL(string: "https://api.openai.com/v1/chat/completions")!
 
     init(modelOverride: String? = nil) {
-        self.modelName = modelOverride ?? AIProvider.kimi.modelName
+        self.modelName = modelOverride ?? AIProvider.codex.modelName
     }
 
     func generate(
@@ -15,7 +15,7 @@ final class KimiService: AIService, Sendable {
         systemPrompt: String
     ) -> AsyncThrowingStream<String, Error> {
         guard let apiKey = KeychainHelper.load(key: provider.keychainKey), !apiKey.isEmpty else {
-            return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: .kimi)) }
+            return AsyncThrowingStream { $0.finish(throwing: AIError.noAPIKey(provider: .codex)) }
         }
 
         let body = buildRequestBody(messages: messages, systemPrompt: systemPrompt)
@@ -51,7 +51,7 @@ final class KimiService: AIService, Sendable {
         tools: [[String: Any]]
     ) async throws -> ToolResponse {
         guard let apiKey = KeychainHelper.load(key: provider.keychainKey), !apiKey.isEmpty else {
-            throw AIError.noAPIKey(provider: .kimi)
+            throw AIError.noAPIKey(provider: .codex)
         }
 
         var payload: [String: Any] = [

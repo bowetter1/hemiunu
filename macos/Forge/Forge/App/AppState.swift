@@ -92,7 +92,7 @@ class AppState {
     let geminiFlashService = GeminiService(modelOverride: "gemini-3-flash-preview")
     let geminiProService = GeminiService(modelOverride: "gemini-3-pro-preview")
     let geminiBossService = GeminiBossService()
-    let kimiService = KimiService()
+    let codexService = CodexService()
 
     /// Returns the active AI service based on the selected provider
     var activeAIService: any AIService {
@@ -105,7 +105,7 @@ class AppState {
         case .groq: return groqService
         case .claude: return claudeService
         case .gemini: return geminiService
-        case .kimi: return kimiService
+        case .codex: return codexService
         }
     }
 
@@ -114,8 +114,8 @@ class AppState {
         switch name {
         case "opus": return claudeOpusService
         case "gemini": return geminiProService
-        case "kimi": return kimiService
-        default: return kimiService
+        case "codex": return codexService
+        default: return codexService
         }
     }
 
