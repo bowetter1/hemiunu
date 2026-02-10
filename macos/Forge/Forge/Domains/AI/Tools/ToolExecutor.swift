@@ -147,78 +147,52 @@ struct ToolExecutor: ToolExecuting {
         return "Deleted \(path)"
     }
 
-    /// Search the web via Gemini 2.5 Flash + Google Search grounding
+    /// Search the web via SerpAPI (Google Search)
     private func executeWebSearch(query: String) async throws -> String {
-        guard let apiKey = KeychainHelper.load(key: "forge.api.gemini"), !apiKey.isEmpty else {
-            throw ToolError.missingAPIKey("Gemini (forge.api.gemini in ~/Forge/.env)")
+        guard let apiKey = KeychainHelper.load(key: "forge.api.serpapi"), !apiKey.isEmpty else {
+            throw ToolError.missingAPIKey("SerpAPI (forge.api.serpapi in ~/Forge/.env)")
         }
 
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent")!
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        let url = URL(string: "https://serpapi.com/search.json?q=\(encoded)&api_key=\(apiKey)&num=5")!
 
-        let payload: [String: Any] = [
-            "contents": [
-                ["parts": [["text": query]]]
-            ],
-            "tools": [
-                ["google_search": [String: Any]()]
-            ],
-        ]
-
-        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
-            throw AIError.invalidResponse
-        }
-
-        let headers = [
-            "x-goog-api-key": apiKey,
-            "Content-Type": "application/json",
-        ]
-
-        let (data, response) = try await HTTPClient.post(url: url, headers: headers, body: body)
+        let (data, response) = try await HTTPClient.get(url: url, headers: [:])
         guard (200...299).contains(response.statusCode) else {
             let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw AIError.apiError(status: response.statusCode, message: msg)
         }
 
-        return parseGeminiSearchResponse(data)
+        return parseSerpAPIResponse(data)
     }
 
-    /// Parse Gemini response: extract text + grounding source URLs
-    private func parseGeminiSearchResponse(_ data: Data) -> String {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let candidates = json["candidates"] as? [[String: Any]],
-              let candidate = candidates.first else {
+    /// Parse SerpAPI response: extract organic results with titles, snippets, and URLs
+    private func parseSerpAPIResponse(_ data: Data) -> String {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return "No results found."
         }
 
-        // Extract text
-        var text = ""
-        if let content = candidate["content"] as? [String: Any],
-           let parts = content["parts"] as? [[String: Any]] {
-            for part in parts {
-                if let t = part["text"] as? String {
-                    text += t
-                }
+        var parts: [String] = []
+
+        // Answer box / knowledge graph
+        if let answerBox = json["answer_box"] as? [String: Any] {
+            if let answer = answerBox["answer"] as? String {
+                parts.append("Answer: \(answer)")
+            } else if let snippet = answerBox["snippet"] as? String {
+                parts.append("Answer: \(snippet)")
             }
         }
 
-        // Extract source URLs from grounding metadata
-        var sources: [String] = []
-        if let metadata = candidate["groundingMetadata"] as? [String: Any],
-           let chunks = metadata["groundingChunks"] as? [[String: Any]] {
-            for chunk in chunks {
-                if let web = chunk["web"] as? [String: Any],
-                   let uri = web["uri"] as? String {
-                    let title = web["title"] as? String ?? ""
-                    sources.append(title.isEmpty ? uri : "\(title): \(uri)")
-                }
+        // Organic results
+        if let organic = json["organic_results"] as? [[String: Any]] {
+            for (i, result) in organic.prefix(5).enumerated() {
+                let title = result["title"] as? String ?? ""
+                let snippet = result["snippet"] as? String ?? ""
+                let link = result["link"] as? String ?? ""
+                parts.append("\(i + 1). \(title)\n   \(snippet)\n   URL: \(link)")
             }
         }
 
-        if !sources.isEmpty {
-            text += "\n\nSources:\n" + sources.joined(separator: "\n")
-        }
-
-        return text.isEmpty ? "No results found." : text
+        return parts.isEmpty ? "No results found." : parts.joined(separator: "\n\n")
     }
 
     // MARK: - Image Search (Pexels API)
