@@ -35,7 +35,8 @@ class ChatViewModel {
         isLoading = true
 
         let provider = appState.selectedProvider
-        let assistantMessage = ChatMessage(role: .assistant, content: "", aiProvider: provider)
+        let displayProvider = appState.hasClaudeKey ? AIProvider.claude : provider
+        let assistantMessage = ChatMessage(role: .assistant, content: "", aiProvider: displayProvider)
         messages.append(assistantMessage)
         let assistantIndex = messages.count - 1
 
