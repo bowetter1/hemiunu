@@ -21,6 +21,8 @@ struct Topbar: View {
     var onRestoreVersion: ((Int) -> Void)? = nil
     var onOpenInBrowser: (() -> Void)? = nil
 
+    @State private var keyMonitor: Any?
+
     private let height: CGFloat = 38
     private let itemHeight: CGFloat = 26
     private let topInset: CGFloat = 2
@@ -81,6 +83,67 @@ struct Topbar: View {
         .padding(.top, topInset)
         .padding(.horizontal, 12)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear { installKeyMonitor() }
+        .onDisappear { removeKeyMonitor() }
+    }
+
+    // MARK: - Arrow Key Navigation (global via NSEvent monitor)
+
+    private func installKeyMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Don't intercept when typing in text fields
+            if let responder = NSApp.keyWindow?.firstResponder, responder is NSTextView {
+                return event
+            }
+            switch event.keyCode {
+            case 123: return navigateVersion(-1) ? nil : event  // left
+            case 124: return navigateVersion(1) ? nil : event   // right
+            case 125: return navigateGroup(1) ? nil : event     // down
+            case 126: return navigateGroup(-1) ? nil : event    // up
+            default: return event
+            }
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+    }
+
+    private func navigateVersion(_ delta: Int) -> Bool {
+        let siblings = versionSiblings
+        guard siblings.count > 1,
+              let selectedId = appState.selectedProjectId,
+              let index = siblings.firstIndex(where: { "local:\($0.name)" == selectedId })
+        else { return false }
+        let newIndex = index + delta
+        guard siblings.indices.contains(newIndex) else { return false }
+        let project = siblings[newIndex]
+        let projectId = "local:\(project.name)"
+        withAnimation(.easeInOut(duration: 0.15)) {
+            appState.setSelectedProjectId(projectId)
+        }
+        Task { await appState.loadProject(id: projectId) }
+        return true
+    }
+
+    private func navigateGroup(_ delta: Int) -> Bool {
+        let groups = projectGroups
+        guard let session = currentSessionName,
+              let idx = groups.firstIndex(where: { $0.sessionName == session })
+        else { return false }
+        let newIdx = idx + delta
+        guard groups.indices.contains(newIdx),
+              let target = groups[newIdx].projects.first
+        else { return false }
+        let projectId = "local:\(target.name)"
+        withAnimation(.easeInOut(duration: 0.15)) {
+            appState.setSelectedProjectId(projectId)
+        }
+        Task { await appState.loadProject(id: projectId) }
+        return true
     }
 
     private var leftGroup: some View {
@@ -98,19 +161,6 @@ struct Topbar: View {
                         selectedProjectId: appState.selectedProjectId,
                         onSelect: { project in
                             let projectId = "local:\(project.name)"
-                            appState.setSelectedProjectId(projectId)
-                            Task { await appState.loadProject(id: projectId) }
-                        },
-                        onNavigateGroup: { delta in
-                            let groups = projectGroups
-                            guard let session = currentSessionName,
-                                  let idx = groups.firstIndex(where: { $0.sessionName == session })
-                            else { return }
-                            let newIdx = idx + delta
-                            guard groups.indices.contains(newIdx) else { return }
-                            let target = groups[newIdx].projects.first
-                            guard let target else { return }
-                            let projectId = "local:\(target.name)"
                             appState.setSelectedProjectId(projectId)
                             Task { await appState.loadProject(id: projectId) }
                         }
@@ -243,12 +293,6 @@ private struct ProjectDots: View {
     let projects: [LocalProject]
     let selectedProjectId: String?
     let onSelect: (LocalProject) -> Void
-    var onNavigateGroup: ((Int) -> Void)? = nil
-
-    private var currentIndex: Int? {
-        guard let selectedId = selectedProjectId else { return nil }
-        return projects.firstIndex { "local:\($0.name)" == selectedId }
-    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -270,28 +314,5 @@ private struct ProjectDots: View {
         .padding(.vertical, 4)
         .background(Color.secondary.opacity(0.08))
         .clipShape(Capsule())
-        .focusable()
-        .onKeyPress(.leftArrow) { navigateVersion(-1) }
-        .onKeyPress(.rightArrow) { navigateVersion(1) }
-        .onKeyPress(.upArrow) { navigateGroup(-1) }
-        .onKeyPress(.downArrow) { navigateGroup(1) }
-    }
-
-    private func navigateVersion(_ delta: Int) -> KeyPress.Result {
-        guard let index = currentIndex else { return .ignored }
-        let newIndex = index + delta
-        guard projects.indices.contains(newIndex) else { return .ignored }
-        withAnimation(.easeInOut(duration: 0.15)) {
-            onSelect(projects[newIndex])
-        }
-        return .handled
-    }
-
-    private func navigateGroup(_ delta: Int) -> KeyPress.Result {
-        guard let onNavigateGroup else { return .ignored }
-        withAnimation(.easeInOut(duration: 0.15)) {
-            onNavigateGroup(delta)
-        }
-        return .handled
     }
 }

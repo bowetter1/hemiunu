@@ -17,6 +17,7 @@ struct WebPreview: View {
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedDevice: PreviewDevice = .desktop
+    var onElementClicked: ((ClickedElement) -> Void)? = nil
     private let cornerRadius: CGFloat = 16
     private let sidebarTotalWidth: CGFloat = 212
     private let toolsPanelTotalWidth: CGFloat = 312
@@ -43,7 +44,8 @@ struct WebPreview: View {
                 projectId: projectId,
                 localFileURL: localFileURL,
                 refreshToken: refreshToken,
-                cornerRadius: cornerRadius
+                cornerRadius: cornerRadius,
+                onElementClicked: onElementClicked
             )
                 .frame(width: viewportWidth, height: geo.size.height)
                 .clipShape(
@@ -85,18 +87,43 @@ struct VersionDots: View {
     }
 }
 
-/// Reusable WebKit view for rendering HTML content
+/// Reusable WebKit view for rendering HTML content with element click detection
 struct HTMLWebView: NSViewRepresentable {
     let html: String
     var projectId: String? = nil
     var localFileURL: URL? = nil
     var refreshToken: UUID = UUID()
     var cornerRadius: CGFloat = 16
+    var onElementClicked: ((ClickedElement) -> Void)? = nil
 
-    final class Coordinator {
+    @MainActor
+    final class Coordinator: NSObject, WKScriptMessageHandler {
         var lastHTML: String?
         var lastLocalUrl: String?
         var lastRefreshToken: UUID?
+        var onElementClicked: ((ClickedElement) -> Void)?
+
+        nonisolated func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == "elementClicked",
+                  let body = message.body as? [String: Any],
+                  let tag = body["tag"] as? String,
+                  let text = body["text"] as? String,
+                  let selector = body["selector"] as? String,
+                  let x = body["x"] as? CGFloat,
+                  let y = body["y"] as? CGFloat
+            else { return }
+
+            let element = ClickedElement(
+                tag: tag, text: text, selector: selector,
+                screenX: x, screenY: y
+            )
+            Task { @MainActor in
+                onElementClicked?(element)
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -106,15 +133,24 @@ struct HTMLWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
+
+        // JS bridge for element click detection
+        let controller = config.userContentController
+        controller.add(context.coordinator, name: "elementClicked")
+        let script = WKUserScript(source: Self.elementDetectionJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        controller.addUserScript(script)
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.underPageBackgroundColor = .clear
         webView.wantsLayer = true
         webView.layer?.cornerRadius = cornerRadius
         webView.layer?.masksToBounds = true
+        context.coordinator.onElementClicked = onElementClicked
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        context.coordinator.onElementClicked = onElementClicked
         webView.layer?.cornerRadius = cornerRadius
         webView.layer?.masksToBounds = true
 
@@ -137,4 +173,81 @@ struct HTMLWebView: NSViewRepresentable {
         let baseURL = URL(string: "about:blank?t=\(Date().timeIntervalSince1970)")
         webView.loadHTMLString(html, baseURL: baseURL)
     }
+
+    // MARK: - Injected JavaScript
+
+    static let elementDetectionJS = """
+    (function() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .__forge-hover {
+                outline: 2px solid rgba(99, 102, 241, 0.5) !important;
+                outline-offset: 2px;
+                cursor: pointer !important;
+            }
+            .__forge-clicked {
+                outline: 2px solid rgba(99, 102, 241, 0.9) !important;
+                outline-offset: 2px;
+                background-color: rgba(99, 102, 241, 0.05) !important;
+            }
+        `;
+        document.head.appendChild(style);
+
+        let lastHovered = null;
+        let lastClicked = null;
+
+        function buildSelector(el) {
+            const parts = [];
+            let current = el;
+            while (current && current !== document.body && parts.length < 4) {
+                let sel = current.tagName.toLowerCase();
+                if (current.className && typeof current.className === 'string') {
+                    const cls = current.className.trim().split(/\\s+/).filter(c => !c.startsWith('__forge'))[0];
+                    if (cls) sel += '.' + cls;
+                }
+                parts.unshift(sel);
+                current = current.parentElement;
+            }
+            return parts.join(' > ');
+        }
+
+        document.addEventListener('mouseover', (e) => {
+            const el = e.target;
+            if (el === lastHovered || el === document.body || el === document.documentElement) return;
+            if (lastHovered) lastHovered.classList.remove('__forge-hover');
+            el.classList.add('__forge-hover');
+            lastHovered = el;
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            if (lastHovered) {
+                lastHovered.classList.remove('__forge-hover');
+                lastHovered = null;
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const el = e.target;
+            if (el === document.body || el === document.documentElement) return;
+
+            if (lastClicked) lastClicked.classList.remove('__forge-clicked');
+            el.classList.add('__forge-clicked');
+            lastClicked = el;
+
+            const rect = el.getBoundingClientRect();
+            const text = (el.textContent || '').trim().substring(0, 60);
+
+            window.webkit.messageHandlers.elementClicked.postMessage({
+                tag: el.tagName,
+                text: text,
+                selector: buildSelector(el),
+                x: rect.left + rect.width / 2,
+                y: rect.top
+            });
+        }, true);
+    })();
+    """
 }

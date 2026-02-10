@@ -148,7 +148,10 @@ struct AppRouter: View {
                 viewModel: designViewModel,
                 sidebarVisible: appState.showSidebar,
                 toolsPanelVisible: showToolsPanel,
-                selectedPageId: appState.selectedPageId
+                selectedPageId: appState.selectedPageId,
+                onElementInstruction: { instruction in
+                    appState.chatViewModel.sendMessage(instruction)
+                }
             )
         case .code:
             CodeModeView(appState: appState, selectedPageId: $appState.selectedPageId)

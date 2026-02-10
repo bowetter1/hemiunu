@@ -8,6 +8,9 @@ struct DesignView: View {
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
     var selectedPageId: String?
+    var onElementInstruction: ((String) -> Void)? = nil
+
+    @State private var clickedElement: ClickedElement?
 
     var selectedPage: Page? {
         guard let pageId = selectedPageId else { return nil }
@@ -16,18 +19,32 @@ struct DesignView: View {
 
     var body: some View {
         if let project = appState.currentProject {
-            projectContent(project)
-                .onChange(of: selectedPageId) { _, newPageId in
-                    viewModel.handlePageChange(projectId: project.id, pageId: newPageId)
+            ZStack {
+                projectContent(project)
+
+                if let element = clickedElement {
+                    ElementPopover(
+                        element: element,
+                        onSubmit: { instruction in
+                            onElementInstruction?(instruction)
+                            clickedElement = nil
+                        },
+                        onDismiss: { clickedElement = nil }
+                    )
                 }
-                .onChange(of: appState.pages) { _, newPages in
-                    viewModel.handlePagesUpdate(projectId: project.id, selectedPageId: selectedPageId, newPages: newPages)
+            }
+            .onChange(of: selectedPageId) { _, newPageId in
+                clickedElement = nil
+                viewModel.handlePageChange(projectId: project.id, pageId: newPageId)
+            }
+            .onChange(of: appState.pages) { _, newPages in
+                viewModel.handlePagesUpdate(projectId: project.id, selectedPageId: selectedPageId, newPages: newPages)
+            }
+            .onAppear {
+                if let pageId = selectedPageId {
+                    viewModel.handlePageChange(projectId: project.id, pageId: pageId)
                 }
-                .onAppear {
-                    if let pageId = selectedPageId {
-                        viewModel.handlePageChange(projectId: project.id, pageId: pageId)
-                    }
-                }
+            }
         } else {
             welcomeView
         }
@@ -77,7 +94,8 @@ struct DesignView: View {
                 projectId: project.id,
                 sidebarVisible: sidebarVisible,
                 toolsPanelVisible: toolsPanelVisible,
-                selectedDevice: appState.selectedDevice
+                selectedDevice: appState.selectedDevice,
+                onElementClicked: { clickedElement = $0 }
             )
         } else {
             if let firstPage = appState.pages.first {
@@ -86,7 +104,8 @@ struct DesignView: View {
                     projectId: project.id,
                     sidebarVisible: sidebarVisible,
                     toolsPanelVisible: toolsPanelVisible,
-                    selectedDevice: appState.selectedDevice
+                    selectedDevice: appState.selectedDevice,
+                    onElementClicked: { clickedElement = $0 }
                 )
             } else {
                 GeneratingView(message: "Loading...")
@@ -114,7 +133,8 @@ struct DesignView: View {
                 refreshToken: appState.previewRefreshToken,
                 sidebarVisible: sidebarVisible,
                 toolsPanelVisible: toolsPanelVisible,
-                selectedDevice: appState.selectedDevice
+                selectedDevice: appState.selectedDevice,
+                onElementClicked: { clickedElement = $0 }
             )
         } else {
             VStack(spacing: 16) {

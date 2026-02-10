@@ -127,6 +127,7 @@ class AppState {
 
     let workspace = LocalWorkspaceService.shared
     let authService = AuthService()
+    private let fileWatcher = FileWatcher()
 
     // MARK: - View Models
 
@@ -211,6 +212,7 @@ class AppState {
         }
 
         localPreviewURL = workspace.projectPath(name)
+        startFileWatcher(directory: projectPath)
         await syncLocalVersionState(projectName: name)
     }
 
@@ -229,6 +231,7 @@ class AppState {
     }
 
     func clearCurrentProject() {
+        fileWatcher.stop()
         currentProject = nil
         pages = []
         localFiles = []
@@ -237,6 +240,12 @@ class AppState {
         localPreviewURL = nil
         pageVersions = []
         currentVersionNumber = 1
+    }
+
+    private func startFileWatcher(directory: URL) {
+        fileWatcher.watch(directory: directory) { [weak self] in
+            self?.refreshPreview()
+        }
     }
 
     // MARK: - Delegate-like methods for ChatViewModel
