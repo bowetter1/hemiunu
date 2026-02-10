@@ -368,6 +368,13 @@ class ChatViewModel {
         isLoading = false
     }
 
+    func startNewChat() {
+        stopStreaming()
+        messages = []
+        agentRawHistory = []
+        Task { await appState.bossService.clearCache() }
+    }
+
     func resetForProject() {
         stopStreaming()
         messages = []

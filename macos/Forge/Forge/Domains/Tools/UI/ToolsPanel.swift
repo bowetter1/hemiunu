@@ -83,6 +83,14 @@ struct ToolsPanel: View {
                     Text("Chat")
                         .font(.system(size: 13, weight: .semibold))
                     Spacer()
+                    Button(action: { startNewChat() }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("New chat")
+                    .disabled(chatViewModel.isStreaming)
                     Button(action: { onOpenFloatingChat?() }) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 11))
@@ -103,6 +111,12 @@ struct ToolsPanel: View {
                 )
             }
         }
+    }
+
+    private func startNewChat() {
+        chatViewModel.startNewChat()
+        appState.clearCurrentProject()
+        appState.currentMode = .design
     }
 }
 

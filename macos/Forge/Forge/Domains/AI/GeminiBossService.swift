@@ -40,24 +40,23 @@ final class GeminiBossService: AIService, @unchecked Sendable {
         }
 
         let url = URL(string: "\(baseURL)/models/\(modelName):generateContent?key=\(apiKey)")!
-        let nativeTools = convertToolsToNative(tools)
 
-        var payload: [String: Any] = [
-            "tools": [["functionDeclarations": nativeTools]],
-        ]
+        var payload: [String: Any] = [:]
 
         if let cacheName = cachedContentName, cacheMessageCount > 0 {
-            // Cached: skip system prompt and cached messages, send only new ones
+            // Cached: tools/system/history are in the cache — only send new messages
             let newMessages = Array(messages.dropFirst(cacheMessageCount))
             payload["cachedContent"] = cacheName
             payload["contents"] = convertMessagesToNative(newMessages)
         } else {
-            // No cache: send system instruction + all messages
+            // No cache: send system instruction, tools, and all messages
             // Skip the OpenAI system message at index 0 (use systemInstruction instead)
             let conversationMessages = messages.first.flatMap({ $0["role"] as? String }) == "system"
                 ? Array(messages.dropFirst())
                 : messages
+            let nativeTools = convertToolsToNative(tools)
             payload["systemInstruction"] = ["parts": [["text": systemPrompt]]]
+            payload["tools"] = [["functionDeclarations": nativeTools]]
             payload["contents"] = convertMessagesToNative(conversationMessages)
         }
 
@@ -110,10 +109,12 @@ final class GeminiBossService: AIService, @unchecked Sendable {
         // Need at least some messages to cache
         guard !conversationMessages.isEmpty else { return }
 
+        let nativeTools = convertToolsToNative(ForgeTools.bossOpenAIFormat())
         let payload: [String: Any] = [
             "model": "models/\(modelName)",
             "displayName": "forge-boss",
             "systemInstruction": ["parts": [["text": systemPrompt]]],
+            "tools": [["functionDeclarations": nativeTools]],
             "contents": convertMessagesToNative(conversationMessages),
             "ttl": cacheTTL,
         ]
