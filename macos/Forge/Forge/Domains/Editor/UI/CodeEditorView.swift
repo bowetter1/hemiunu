@@ -48,7 +48,7 @@ struct CodeEditorView: View {
             .overlay(
                 Rectangle()
                     .frame(height: 2)
-                    .foregroundStyle(Color.accentColor),
+                    .foregroundStyle(.tint),
                 alignment: .bottom
             )
 

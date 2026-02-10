@@ -275,6 +275,10 @@ class BossToolExecutor: ToolExecuting {
         let versionProjectName = "\(projectName)/v\(version)"
         _ = try? workspace.createProject(name: versionProjectName)
 
+        // Write agent name for sidebar display
+        let displayName = builderName.prefix(1).uppercased() + builderName.dropFirst()
+        try? workspace.writeFile(project: versionProjectName, path: "agent-name.txt", content: displayName)
+
         // Copy research files from base project to version project
         copyResearchFiles(to: versionProjectName)
 
@@ -408,6 +412,18 @@ class BossToolExecutor: ToolExecuting {
             memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName, role: .builder)
         }
 
+        // Write per-version build log
+        let buildTime = CFAbsoluteTimeGetCurrent() - builderStartTime
+        let logContent = """
+        # Build Log — v\(version)
+        **Builder:** \(builderName)
+        **Model:** \(modelName)
+        **Direction:** \(designDirection)
+        **Tokens:** \(result.totalInputTokens)→\(result.totalOutputTokens)
+        **Time:** \(String(format: "%d:%02d", Int(buildTime) / 60, Int(buildTime) % 60))
+        """
+        try? workspace.writeFile(project: versionProjectName, path: "build-log.md", content: logContent)
+
         // Commit the version project
         _ = try? await workspace.ensureGitRepository(project: versionProjectName)
         _ = try? await workspace.gitCommit(project: versionProjectName, message: "v\(version) built by \(builderName)")
@@ -455,7 +471,7 @@ class BossToolExecutor: ToolExecuting {
 
     /// Copy brief.md and research.md from base project to a version project
     private func copyResearchFiles(to versionProject: String) {
-        let researchFiles = ["brief.md", "research.md", "checklist.md"]
+        let researchFiles = ["brief.md", "research.md", "checklist.md", "project-name.txt"]
         for file in researchFiles {
             if let content = try? workspace.readFile(project: projectName, path: file) {
                 try? workspace.writeFile(project: versionProject, path: file, content: content)

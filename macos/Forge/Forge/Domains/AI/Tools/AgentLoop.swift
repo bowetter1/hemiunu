@@ -13,7 +13,7 @@ enum AgentEvent: Sendable {
 /// Runs an agentic tool-use loop: call LLM → execute tools → repeat until text response
 @MainActor
 class AgentLoop {
-    private let defaultMaxIterations = 10
+    private let defaultMaxIterations = 100
 
     func run(
         userMessage: String,

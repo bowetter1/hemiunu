@@ -32,7 +32,6 @@ final class CodexService: AIService, Sendable {
             "instructions": systemPrompt,
             "input": input,
             "stream": true,
-            "temperature": 0.7,
         ]
 
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
@@ -83,7 +82,6 @@ final class CodexService: AIService, Sendable {
             "model": modelName,
             "instructions": instructions,
             "input": input,
-            "temperature": 0.7,
             "stream": false,
         ]
         if !responsesTools.isEmpty {

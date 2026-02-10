@@ -117,6 +117,8 @@ extension LocalWorkspaceService {
         let briefURL = url.appendingPathComponent("brief.md")
         guard let content = try? String(contentsOf: briefURL, encoding: .utf8) else { return nil }
         let lines = content.components(separatedBy: .newlines)
+
+        // Strategy 1: Find "## Project" heading → take first non-empty line after it
         var foundProject = false
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -125,17 +127,40 @@ extension LocalWorkspaceService {
                 continue
             }
             if foundProject && !trimmed.isEmpty && !trimmed.hasPrefix("#") {
-                let clean = trimmed
-                    .components(separatedBy: "—").first?
-                    .components(separatedBy: ".").first?
-                    .trimmingCharacters(in: .whitespaces) ?? trimmed
-                if clean.count > 35 {
-                    return String(clean.prefix(32)) + "..."
-                }
-                return clean.isEmpty ? nil : clean
+                return cleanTitle(trimmed)
             }
         }
+
+        // Strategy 2: Use the first "# Heading" as the title
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("# ") && !trimmed.hasPrefix("## ") {
+                let title = String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+                if !title.isEmpty && title.lowercased() != "brief" {
+                    return cleanTitle(title)
+                }
+            }
+        }
+
+        // Strategy 3: First non-empty, non-heading line (last resort)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if !trimmed.isEmpty && !trimmed.hasPrefix("#") && !trimmed.hasPrefix("---") {
+                return cleanTitle(trimmed)
+            }
+        }
+
         return nil
+    }
+
+    /// Truncate and clean a title string for sidebar display
+    private func cleanTitle(_ raw: String) -> String? {
+        let clean = raw
+            .components(separatedBy: "—").first?
+            .components(separatedBy: ".").first?
+            .trimmingCharacters(in: .whitespaces) ?? raw
+        guard !clean.isEmpty else { return nil }
+        return clean.count > 35 ? String(clean.prefix(32)) + "..." : clean
     }
 
     /// Find the main HTML file in a project

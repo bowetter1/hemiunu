@@ -42,10 +42,10 @@ enum SubAgentRole: String, Sendable, CaseIterable {
     /// Maximum iterations for this role's agent loop
     var maxIterations: Int {
         switch self {
-        case .coder: return 15
-        case .researcher: return 8
-        case .reviewer: return 5
-        case .tester: return 6
+        case .coder: return 50
+        case .researcher: return 20
+        case .reviewer: return 10
+        case .tester: return 10
         }
     }
 }
