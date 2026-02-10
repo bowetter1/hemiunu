@@ -123,7 +123,23 @@ struct ToolExecutor: ToolExecuting {
         let updated = content.replacingOccurrences(of: search, with: replace)
         try workspace.writeFile(project: projectName, path: path, content: updated)
         onFileWrite?()
-        return "Edited \(path) — replaced \(search.count) chars with \(replace.count) chars"
+        let snippet = contextSnippet(content: updated, around: replace)
+        return "Edited \(path) — replaced \(search.count) chars with \(replace.count) chars\n\n\(snippet)"
+    }
+
+    /// Extract a few lines around the replaced text so the LLM can verify without a full read_file
+    private func contextSnippet(content: String, around target: String, contextLines: Int = 2) -> String {
+        guard let range = content.range(of: target) else { return "" }
+        let lines = content.components(separatedBy: "\n")
+        let prefix = content[content.startIndex..<range.lowerBound]
+        let targetLine = prefix.components(separatedBy: "\n").count - 1
+        let start = max(0, targetLine - contextLines)
+        let end = min(lines.count - 1, targetLine + target.components(separatedBy: "\n").count - 1 + contextLines)
+        let slice = lines[start...end].enumerated().map { (i, line) in
+            let lineNum = start + i + 1
+            return String(format: "%4d│ %@", lineNum, String(line.prefix(120)))
+        }
+        return slice.joined(separator: "\n")
     }
 
     private func executeDeleteFile(path: String) throws -> String {
