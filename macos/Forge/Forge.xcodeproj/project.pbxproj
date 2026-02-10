@@ -87,6 +87,7 @@
 		A10001000000000000000067 /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000067 /* FileWatcher.swift */; };
 		A10001000000000000000068 /* ClickedElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000068 /* ClickedElement.swift */; };
 		A10001000000000000000069 /* ElementPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000069 /* ElementPopover.swift */; };
+		A10001000000000000000070 /* GeminiBossService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000070 /* GeminiBossService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -118,6 +119,7 @@
 		B10001000000000000000067 /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
 		B10001000000000000000068 /* ClickedElement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickedElement.swift; sourceTree = "<group>"; };
 		B10001000000000000000069 /* ElementPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementPopover.swift; sourceTree = "<group>"; };
+		B10001000000000000000070 /* GeminiBossService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiBossService.swift; sourceTree = "<group>"; };
 		B10001000000000000000046 /* ToolDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDefinition.swift; sourceTree = "<group>"; };
 		B10001000000000000000047 /* ToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolExecutor.swift; sourceTree = "<group>"; };
 		B10001000000000000000048 /* AgentLoop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLoop.swift; sourceTree = "<group>"; };
@@ -351,6 +353,7 @@
 				B10001000000000000000010 /* GroqService.swift */,
 				B10001000000000000000011 /* ClaudeService.swift */,
 				B10001000000000000000060 /* GeminiService.swift */,
+				B10001000000000000000070 /* GeminiBossService.swift */,
 				B10001000000000000000061 /* KimiService.swift */,
 				D10001000000000000000093 /* Boss */,
 				D10001000000000000000091 /* Tools */,
@@ -740,6 +743,7 @@
 				A10001000000000000000047 /* ToolExecutor.swift in Sources */,
 				A10001000000000000000048 /* AgentLoop.swift in Sources */,
 				A10001000000000000000060 /* GeminiService.swift in Sources */,
+				A10001000000000000000070 /* GeminiBossService.swift in Sources */,
 				A10001000000000000000061 /* KimiService.swift in Sources */,
 				A10001000000000000000009 /* Project.swift in Sources */,
 				A1000100000000000000000A /* Page.swift in Sources */,

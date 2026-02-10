@@ -18,6 +18,8 @@ class ChatViewModel {
     private let projectUpdater: any ChatProjectUpdating
     private let requestLogger: RequestLogger
     private let memoryService = MemoryService()
+    /// Full agent conversation history (including tool calls) for context caching
+    private var agentRawHistory: [[String: Any]] = []
 
     init(appState: AppState, projectUpdater: (any ChatProjectUpdating)? = nil) {
         self.appState = appState
@@ -35,7 +37,7 @@ class ChatViewModel {
         isLoading = true
 
         let provider = appState.selectedProvider
-        let displayProvider = appState.hasClaudeKey ? AIProvider.claude : provider
+        let displayProvider = appState.hasBossKey ? AIProvider.gemini : provider
         let assistantMessage = ChatMessage(role: .assistant, content: "", aiProvider: displayProvider)
         messages.append(assistantMessage)
         let assistantIndex = messages.count - 1
@@ -55,8 +57,8 @@ class ChatViewModel {
             return nil
         }()
 
-        // Boss mode: always use tools when Claude key is available
-        if appState.hasClaudeKey {
+        // Boss mode: always use tools when Gemini key is available
+        if appState.hasBossKey {
             sendWithTools(
                 text: text,
                 aiMessages: Array(aiMessages),
@@ -99,10 +101,10 @@ class ChatViewModel {
         projectName: String,
         promptText: String
     ) {
-        // Boss mode: use Claude as orchestrator when API key is available
-        let useBossMode = appState.hasClaudeKey
-        let bossService: any AIService = useBossMode ? appState.claudeService : service
-        let bossProvider: AIProvider = useBossMode ? .claude : provider
+        // Boss mode: use Gemini Flash as orchestrator when API key is available
+        let useBossMode = appState.hasBossKey
+        let bossService: any AIService = useBossMode ? appState.bossService : service
+        let bossProvider: AIProvider = useBossMode ? .gemini : provider
 
         let executor: any ToolExecuting
         let bossExecutor: BossToolExecutor?
@@ -173,7 +175,7 @@ class ChatViewModel {
             systemPrompt = BossSystemPrompts.boss + (hasProject
                 ? "\n\nCONTEXT: Project '\(projectName)' already exists. Do NOT call create_project. Skip discovery if the user is giving follow-up instructions."
                 : "\n\nCONTEXT: No project exists yet. Start with Discovery to understand what the user wants.")
-            tools = ForgeTools.bossAnthropicFormat()
+            tools = ForgeTools.bossOpenAIFormat()
         } else {
             executor = ToolExecutor(
                 workspace: appState.workspace,
@@ -206,7 +208,8 @@ class ChatViewModel {
                     systemPrompt: systemPrompt,
                     service: bossService,
                     executor: executor,
-                    tools: tools
+                    tools: tools,
+                    rawHistory: useBossMode ? (agentRawHistory.isEmpty ? nil : agentRawHistory) : nil
                 ) { [weak self] event in
                     guard let self else { return }
                     switch event {
@@ -246,6 +249,16 @@ class ChatViewModel {
                 let finalProjectName = bossExecutor?.projectName ?? projectName
                 if !finalProjectName.isEmpty {
                     await projectUpdater.commitAndRefresh(projectName: finalProjectName, commitMessage: text)
+                }
+
+                // Update Gemini context cache with full conversation (Boss only)
+                if useBossMode {
+                    agentRawHistory = result.messages
+                    saveAgentHistory()
+                    await appState.bossService.updateCache(
+                        systemPrompt: systemPrompt,
+                        messages: result.messages
+                    )
                 }
 
                 saveChatHistory()
@@ -358,7 +371,15 @@ class ChatViewModel {
     func resetForProject() {
         stopStreaming()
         messages = []
+        agentRawHistory = []
+        // Clear Gemini context cache for previous project
+        Task { await appState.bossService.clearCache() }
         loadChatHistory()
+        loadAgentHistory()
+        // Restore cache state from loaded history
+        if !agentRawHistory.isEmpty {
+            appState.bossService.cacheMessageCount = 0 // will be set on next updateCache
+        }
     }
 
     // MARK: - Content Extraction
@@ -407,5 +428,28 @@ class ChatViewModel {
     private func loadChatHistory() {
         guard let url = chatHistoryURL else { return }
         messages = chatHistory.load(from: url)
+    }
+
+    // MARK: - Agent History Persistence (full tool call context)
+
+    private var agentHistoryURL: URL? {
+        guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
+              let projectName = appState.localProjectName(from: projectId) else { return nil }
+        return appState.workspace.projectPath(projectName).appendingPathComponent("agent-history.json")
+    }
+
+    private func saveAgentHistory() {
+        guard let url = agentHistoryURL else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: agentRawHistory, options: []) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    private func loadAgentHistory() {
+        guard let url = agentHistoryURL,
+              FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return }
+        agentRawHistory = array
     }
 }

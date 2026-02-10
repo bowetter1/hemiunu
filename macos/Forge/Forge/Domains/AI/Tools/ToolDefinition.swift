@@ -42,6 +42,8 @@ struct AgentResult: Sendable {
     let text: String
     let totalInputTokens: Int
     let totalOutputTokens: Int
+    /// Full conversation messages including tool calls/results (for context caching)
+    nonisolated(unsafe) let messages: [[String: Any]]
 }
 
 /// Tool schemas for Forge's file-management tools
@@ -383,6 +385,118 @@ enum ForgeTools {
                     ] as [String: Any],
                 ] as [String: Any],
                 "required": ["builder", "version", "instructions", "design_direction"],
+            ] as [String: Any],
+        ])
+        return tools
+    }
+
+    /// Boss-mode tool definitions in OpenAI format (Gemini) — wraps boss tools for OpenAI-compatible APIs
+    static func bossOpenAIFormat() -> [[String: Any]] {
+        var tools = openAIFormat()
+        tools.append([
+            "type": "function",
+            "function": [
+                "name": "delegate_task",
+                "description": "Delegate a task to a sub-agent. The sub-agent will execute the task using its own tools and return a result. Available roles: coder (builds HTML/CSS/JS), researcher (web search + files), reviewer (read-only inspection), tester (screenshot + visual QA).",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "role": [
+                            "type": "string",
+                            "enum": ["coder", "researcher", "reviewer", "tester"],
+                            "description": "The sub-agent role to delegate to",
+                        ] as [String: Any],
+                        "instructions": [
+                            "type": "string",
+                            "description": "Detailed instructions for the sub-agent",
+                        ],
+                        "context": [
+                            "type": "string",
+                            "description": "Optional context from previous steps (e.g. file contents, search results)",
+                        ],
+                    ] as [String: Any],
+                    "required": ["role", "instructions"],
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+        tools.append([
+            "type": "function",
+            "function": [
+                "name": "create_project",
+                "description": "Create a new project workspace. Call this first if no project exists yet. The name should be a short kebab-case slug derived from the user's request (e.g. 'coffee-shop-site', 'portfolio-site').",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "name": [
+                            "type": "string",
+                            "description": "Short kebab-case project name (e.g. 'coffee-shop-site', 'restaurant-menu')",
+                        ] as [String: Any],
+                    ] as [String: Any],
+                    "required": ["name"],
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+        tools.append([
+            "type": "function",
+            "function": [
+                "name": "update_checklist",
+                "description": "Create or update the task checklist. Use this to break down the user's request into steps and track progress. Always call this before starting work.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "items": [
+                            "type": "array",
+                            "items": [
+                                "type": "object",
+                                "properties": [
+                                    "step": ["type": "string", "description": "Description of this step"] as [String: Any],
+                                    "status": [
+                                        "type": "string",
+                                        "enum": ["pending", "in_progress", "done", "error"],
+                                        "description": "Current status of this step",
+                                    ] as [String: Any],
+                                ] as [String: Any],
+                                "required": ["step", "status"],
+                            ] as [String: Any],
+                            "description": "List of checklist items with their status",
+                        ] as [String: Any],
+                    ] as [String: Any],
+                    "required": ["items"],
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+        tools.append([
+            "type": "function",
+            "function": [
+                "name": "build_version",
+                "description": "Build a version of the website using a specific AI builder. Call this multiple times in parallel to create different versions. Each version gets its own project workspace. Available builders: opus (Claude — polished, architectural), gemini (Gemini — analytical, research-driven), kimi (Kimi — fast, creative).",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "builder": [
+                            "type": "string",
+                            "enum": ["opus", "gemini", "kimi"],
+                            "description": "Which AI builder to use for this version",
+                        ] as [String: Any],
+                        "version": [
+                            "type": "integer",
+                            "description": "Version number (1, 2, or 3)",
+                        ] as [String: Any],
+                        "instructions": [
+                            "type": "string",
+                            "description": "Build instructions including what to create",
+                        ] as [String: Any],
+                        "design_direction": [
+                            "type": "string",
+                            "description": "Unique creative direction for this version (e.g. 'Luxury minimalist aesthetic', 'Tech-forward and futuristic', 'Warm and community-focused')",
+                        ] as [String: Any],
+                        "research_context": [
+                            "type": "string",
+                            "description": "Research results to pass to the builder (brief, findings, image URLs, etc.)",
+                        ] as [String: Any],
+                    ] as [String: Any],
+                    "required": ["builder", "version", "instructions", "design_direction"],
+                ] as [String: Any],
             ] as [String: Any],
         ])
         return tools

@@ -23,6 +23,7 @@ class AgentLoop {
         executor: any ToolExecuting,
         tools overrideTools: [[String: Any]]? = nil,
         maxIterations overrideMax: Int? = nil,
+        rawHistory: [[String: Any]]? = nil,
         onEvent: @escaping (AgentEvent) -> Void
     ) async throws -> AgentResult {
         let isAnthropic = service.provider == .claude
@@ -30,13 +31,21 @@ class AgentLoop {
         var totalInput = 0
         var totalOutput = 0
 
-        // Build initial message list in provider-specific format
-        nonisolated(unsafe) var messages: [[String: Any]] = buildInitialMessages(
-            history: history,
-            userMessage: userMessage,
-            systemPrompt: systemPrompt,
-            isAnthropic: isAnthropic
-        )
+        // Build initial message list — use raw history (with tool calls) if available
+        nonisolated(unsafe) var messages: [[String: Any]]
+        if let rawHistory, !rawHistory.isEmpty {
+            // Raw history includes system prompt + full conversation with tool calls
+            var msgs = rawHistory
+            msgs.append(["role": "user", "content": userMessage])
+            messages = msgs
+        } else {
+            messages = buildInitialMessages(
+                history: history,
+                userMessage: userMessage,
+                systemPrompt: systemPrompt,
+                isAnthropic: isAnthropic
+            )
+        }
 
         nonisolated(unsafe) let tools: [[String: Any]] = overrideTools ?? (isAnthropic
             ? ForgeTools.anthropicFormat()
@@ -61,7 +70,9 @@ class AgentLoop {
             if response.toolCalls.isEmpty {
                 let text = response.text ?? ""
                 onEvent(.text(text))
-                return AgentResult(text: text, totalInputTokens: totalInput, totalOutputTokens: totalOutput)
+                // Append final assistant message to history
+                messages.append(["role": "assistant", "content": text])
+                return AgentResult(text: text, totalInputTokens: totalInput, totalOutputTokens: totalOutput, messages: messages)
             }
 
             // Emit tool start events
@@ -140,7 +151,7 @@ class AgentLoop {
         }
 
         onEvent(.error("Reached maximum iterations (\(maxIterations))"))
-        return AgentResult(text: "I ran out of steps. Please try a more specific request.", totalInputTokens: totalInput, totalOutputTokens: totalOutput)
+        return AgentResult(text: "I ran out of steps. Please try a more specific request.", totalInputTokens: totalInput, totalOutputTokens: totalOutput, messages: messages)
     }
 
     // MARK: - Message Building

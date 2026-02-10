@@ -89,7 +89,9 @@ class AppState {
     let claudeService = ClaudeService()
     let claudeOpusService = ClaudeService(modelOverride: "claude-opus-4-6", maxTokens: 128000)
     let geminiService = GeminiService()
+    let geminiFlashService = GeminiService(modelOverride: "gemini-3-flash-preview")
     let geminiProService = GeminiService(modelOverride: "gemini-3-pro-preview")
+    let geminiBossService = GeminiBossService()
     let kimiService = KimiService()
 
     /// Returns the active AI service based on the selected provider
@@ -117,11 +119,14 @@ class AppState {
         }
     }
 
-    /// Whether the Claude API key is configured (needed for Boss mode)
-    var hasClaudeKey: Bool {
-        guard let key = KeychainHelper.load(key: AIProvider.claude.keychainKey) else { return false }
+    /// Whether the Gemini API key is configured (needed for Boss mode)
+    var hasBossKey: Bool {
+        guard let key = KeychainHelper.load(key: AIProvider.gemini.keychainKey) else { return false }
         return !key.isEmpty
     }
+
+    /// Boss orchestrator service (Gemini 3 Flash with context caching)
+    var bossService: GeminiBossService { geminiBossService }
 
     // MARK: - Services
 
