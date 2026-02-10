@@ -12,6 +12,7 @@ class ChatViewModel {
     let checklist = ChecklistModel()
     let activityLog = ActivityLog()
     private var streamTask: Task<Void, Never>?
+    private var hasFirstBuilderLoaded = false
     private let agentLoop = AgentLoop()
     private let contentExtractor = ContentExtractor()
     private let chatHistory = ChatHistoryService()
@@ -155,9 +156,6 @@ class ChatViewModel {
                         appState.setSelectedProjectId(projectId)
                         appState.setLocalPreviewURL(appState.workspace.projectPath(name))
                         appState.setLocalFiles(appState.workspace.listFiles(project: name))
-                    } else if name.hasSuffix("/v1") {
-                        // First version project: point preview to it for live progress
-                        appState.setLocalPreviewURL(appState.workspace.projectPath(name))
                     }
                     // Always refresh sidebar so version projects show up
                     appState.refreshLocalProjects()
@@ -165,6 +163,18 @@ class ChatViewModel {
                 },
                 onFileWrite: { [weak self] in
                     self?.appState.refreshPreview()
+                },
+                onBuilderDone: { [weak self] versionProjectName in
+                    guard let self, !self.hasFirstBuilderLoaded else { return }
+                    self.hasFirstBuilderLoaded = true
+                    let appState = self.appState
+                    // Load the first completed builder's project into the preview
+                    let projectId = "local:\(versionProjectName)"
+                    appState.setSelectedProjectId(projectId)
+                    appState.setLocalPreviewURL(appState.workspace.projectPath(versionProjectName))
+                    appState.setLocalFiles(appState.workspace.listFiles(project: versionProjectName))
+                    appState.refreshPreview()
+                    appState.refreshLocalProjects()
                 }
             )
             boss.buildLogger = logger
@@ -200,6 +210,7 @@ class ChatViewModel {
                     checklist.reset()
                     activityLog.reset()
                     activityLog.append("🚀", "Build started")
+                    self.hasFirstBuilderLoaded = false
                 }
 
                 let result = try await agentLoop.run(

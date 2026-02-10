@@ -11,6 +11,7 @@ class BossToolExecutor: ToolExecuting {
     let onSubAgentEvent: (SubAgentRole, AgentEvent) -> Void
     let onProjectCreate: ((String) -> Void)?
     let onFileWrite: (() -> Void)?
+    let onBuilderDone: ((String) -> Void)?
     var buildLogger: BuildLogger?
     var memoryService: MemoryService?
 
@@ -22,7 +23,8 @@ class BossToolExecutor: ToolExecuting {
         onChecklistUpdate: @escaping ([ChecklistItem]) -> Void,
         onSubAgentEvent: @escaping (SubAgentRole, AgentEvent) -> Void,
         onProjectCreate: ((String) -> Void)? = nil,
-        onFileWrite: (() -> Void)? = nil
+        onFileWrite: (() -> Void)? = nil,
+        onBuilderDone: ((String) -> Void)? = nil
     ) {
         self.workspace = workspace
         self.projectName = projectName
@@ -32,6 +34,7 @@ class BossToolExecutor: ToolExecuting {
         self.onSubAgentEvent = onSubAgentEvent
         self.onProjectCreate = onProjectCreate
         self.onFileWrite = onFileWrite
+        self.onBuilderDone = onBuilderDone
     }
 
     var priorityToolNames: Set<String> { ["create_project"] }
@@ -411,6 +414,9 @@ class BossToolExecutor: ToolExecuting {
             buildLogger?.logBuilderDone(builder: "gemini", version: version, success: true, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens, duration: retryTime)
             memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName, role: .builder)
         }
+
+        // Notify host that this builder finished (first one triggers preview load)
+        onBuilderDone?(versionProjectName)
 
         // Write per-version build log
         let buildTime = CFAbsoluteTimeGetCurrent() - builderStartTime

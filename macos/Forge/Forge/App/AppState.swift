@@ -48,8 +48,9 @@ class AppState {
 
     // MARK: - Appearance
 
-    @ObservationIgnored
-    @AppStorage("appearanceMode") var appearanceMode: AppearanceMode = .dark
+    var appearanceMode: AppearanceMode = AppearanceMode(rawValue: UserDefaults.standard.string(forKey: "appearanceMode") ?? "dark") ?? .dark {
+        didSet { UserDefaults.standard.set(appearanceMode.rawValue, forKey: "appearanceMode") }
+    }
 
     // MARK: - Navigation
 
