@@ -135,12 +135,12 @@ class ChatViewModel {
                     switch event {
                     case .toolStart(let name, _):
                         let icon = self.toolIcon(name)
-                        messages[assistantIndex].content = "[\(role.rawValue)] \(icon) \(self.toolLabel(name))..."
-                        self.activityLog.append(icon, self.toolLabel(name) + "...", role: role.rawValue)
+                        messages[assistantIndex].content = "[\(role)] \(icon) \(self.toolLabel(name))..."
+                        self.activityLog.append(icon, self.toolLabel(name) + "...", role: role)
                     case .toolDone(let name, let summary):
                         let icon = self.toolIcon(name)
-                        messages[assistantIndex].content = "[\(role.rawValue)] \(icon) \(self.toolLabel(name)) — done\n\(summary)"
-                        self.activityLog.append(icon, self.toolLabel(name) + " — done", role: role.rawValue)
+                        messages[assistantIndex].content = "[\(role)] \(icon) \(self.toolLabel(name)) — done\n\(summary)"
+                        self.activityLog.append(icon, self.toolLabel(name) + " — done", role: role)
                     case .apiResponse:
                         break // logged by BossToolExecutor's BuildLogger
                     default:

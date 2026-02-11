@@ -11,8 +11,11 @@ enum BossSystemPrompts {
     /// Builder prompt — loaded from builder.md
     static var builder: String { PromptLoader.builder }
 
-    /// Researcher prompt — loaded from researcher.md
-    static var researcher: String { PromptLoader.researcher }
+    /// Reviewer prompt — loaded from reviewer.md
+    static var reviewer: String { PromptLoader.reviewer }
+
+    /// Tester prompt — loaded from tester.md
+    static var tester: String { PromptLoader.tester }
 
     /// Sub-agent system prompt — role-specific instructions
     static func subAgent(role: SubAgentRole, instructions: String) -> String {
@@ -20,30 +23,10 @@ enum BossSystemPrompts {
         switch role {
         case .coder:
             roleDescription = builder
-        case .researcher:
-            roleDescription = researcher
         case .reviewer:
-            roleDescription = """
-            You are a Forge Reviewer agent — a code quality specialist.
-            You review web code for quality, accessibility, and best practices.
-
-            RULES:
-            - Read files carefully before providing feedback
-            - Check for accessibility (alt text, ARIA labels, contrast)
-            - Check for responsive design and mobile support
-            - Provide specific, actionable feedback
-            """
+            roleDescription = reviewer
         case .tester:
-            roleDescription = """
-            You are a Forge Tester agent — a visual QA specialist.
-            You take screenshots of the built website and analyze them for visual quality.
-
-            RULES:
-            - Use take_screenshot to capture the current state of the site
-            - Use review_screenshot to analyze layout, colors, typography, responsiveness
-            - Report specific issues with clear descriptions
-            - Suggest concrete fixes for any problems found
-            """
+            roleDescription = tester
         }
 
         return """

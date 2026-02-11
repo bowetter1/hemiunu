@@ -8,7 +8,7 @@ class BossToolExecutor: ToolExecuting {
     let serviceResolver: (AIProvider) -> any AIService
     let builderServiceResolver: ((String) -> any AIService)?
     let onChecklistUpdate: ([ChecklistItem]) -> Void
-    let onSubAgentEvent: (SubAgentRole, AgentEvent) -> Void
+    let onSubAgentEvent: (String, AgentEvent) -> Void
     let onProjectCreate: ((String) -> Void)?
     let onFileWrite: (() -> Void)?
     let onBuilderDone: ((String) -> Void)?
@@ -21,7 +21,7 @@ class BossToolExecutor: ToolExecuting {
         serviceResolver: @escaping (AIProvider) -> any AIService,
         builderServiceResolver: ((String) -> any AIService)? = nil,
         onChecklistUpdate: @escaping ([ChecklistItem]) -> Void,
-        onSubAgentEvent: @escaping (SubAgentRole, AgentEvent) -> Void,
+        onSubAgentEvent: @escaping (String, AgentEvent) -> Void,
         onProjectCreate: ((String) -> Void)? = nil,
         onFileWrite: (() -> Void)? = nil,
         onBuilderDone: ((String) -> Void)? = nil
@@ -131,8 +131,8 @@ class BossToolExecutor: ToolExecuting {
             executor: subExecutor,
             tools: filteredTools,
             maxIterations: role.maxIterations
-        ) { [role, onSubAgentEvent] event in
-            onSubAgentEvent(role, event)
+        ) { [onSubAgentEvent] event in
+            onSubAgentEvent(role.rawValue, event)
         }
 
         return "[\(role.rawValue)] \(result.text)"
@@ -171,7 +171,7 @@ class BossToolExecutor: ToolExecuting {
         copyResearchFiles(to: versionProjectName)
 
         // Copy persistent memory to version project so builder can read/update it
-        memoryService?.copyToProject(workspace: workspace, projectName: versionProjectName, role: .builder)
+        memoryService?.copyToProject(workspace: workspace, projectName: versionProjectName)
 
         // Verify research.md was copied — warn builder if missing
         let hasResearch = (try? workspace.readFile(project: versionProjectName, path: "research.md")) != nil
@@ -233,9 +233,12 @@ class BossToolExecutor: ToolExecuting {
         let builderStartTime = CFAbsoluteTimeGetCurrent()
 
         // Event handler factory for build logging
+        let builderLabel = "v\(version)/\(displayName)"
+
         let makeEventHandler: (String) -> (AgentEvent) -> Void = { [onSubAgentEvent, weak buildLogger] tag in
+            let label = builderLabel
             return { event in
-                onSubAgentEvent(.coder, event)
+                onSubAgentEvent(label, event)
                 switch event {
                 case .toolStart(let name, let args):
                     buildLogger?.logEvent("🔧", "\(tag) `\(name)` — \(String(args.prefix(80)))")
@@ -268,7 +271,7 @@ class BossToolExecutor: ToolExecuting {
             buildLogger?.logBuilderDone(builder: builderName, version: version, success: true, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens, duration: builderTime)
 
             // Persist builder memory (accumulated learnings) back to ~/Forge/memories/
-            memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName, role: .builder)
+            memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName)
         } catch {
             let builderTime = CFAbsoluteTimeGetCurrent() - builderStartTime
             buildLogger?.logEvent("❌", "[v\(version)/\(builderName)] Builder error: \(error.localizedDescription)")
@@ -295,7 +298,7 @@ class BossToolExecutor: ToolExecuting {
 
             let retryTime = CFAbsoluteTimeGetCurrent() - retryStart
             buildLogger?.logBuilderDone(builder: "gemini", version: version, success: true, inputTokens: result.totalInputTokens, outputTokens: result.totalOutputTokens, duration: retryTime)
-            memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName, role: .builder)
+            memoryService?.saveFromProject(workspace: workspace, projectName: versionProjectName)
         }
 
         // Notify host that this builder finished (first one triggers preview load)

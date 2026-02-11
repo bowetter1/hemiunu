@@ -14,8 +14,11 @@ enum PromptLoader {
     /// Load builder.md — builder agent prompt
     static var builder: String { load("builder.md") }
 
-    /// Load researcher.md — research agent prompt
-    static var researcher: String { load("researcher.md") }
+    /// Load reviewer.md — code review agent prompt
+    static var reviewer: String { load("reviewer.md") }
+
+    /// Load tester.md — visual QA agent prompt
+    static var tester: String { load("tester.md") }
 
     // MARK: - Private
 

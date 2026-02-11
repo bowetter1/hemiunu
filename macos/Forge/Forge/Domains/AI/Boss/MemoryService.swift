@@ -1,10 +1,9 @@
 import Foundation
 
-/// Persistent memory across projects — builders and researchers accumulate learnings
+/// Persistent memory across projects — builders accumulate learnings
 ///
 /// Storage: ~/Forge/memories/
 ///   - memory-build.md     (builder agent learnings)
-///   - memory-research.md  (research agent learnings)
 ///
 /// Flow: load persistent → inject into agent prompt → agent updates memory.md in project → save back to persistent
 @MainActor
@@ -24,11 +23,6 @@ class MemoryService {
         readFile("memory-build.md")
     }
 
-    /// Load researcher memory (accumulated research learnings)
-    func loadResearcherMemory() -> String? {
-        readFile("memory-research.md")
-    }
-
     // MARK: - Save
 
     /// Save builder memory back to persistent storage
@@ -36,47 +30,29 @@ class MemoryService {
         writeFile("memory-build.md", content: content)
     }
 
-    /// Save researcher memory back to persistent storage
-    func saveResearcherMemory(_ content: String) {
-        writeFile("memory-research.md", content: content)
-    }
-
     // MARK: - Project Integration
 
     /// Copy persistent memory into a project workspace so builders can read/update it
-    func copyToProject(workspace: LocalWorkspaceService, projectName: String, role: Role) {
-        let content = role == .builder ? loadBuilderMemory() : loadResearcherMemory()
+    func copyToProject(workspace: LocalWorkspaceService, projectName: String) {
+        let content = loadBuilderMemory()
         guard let content, !content.isEmpty else {
-            // Write empty template if no memory exists yet
-            let template = role == .builder ? Self.builderTemplate : Self.researcherTemplate
-            try? workspace.writeFile(project: projectName, path: "memory.md", content: template)
+            try? workspace.writeFile(project: projectName, path: "memory.md", content: Self.builderTemplate)
             return
         }
         try? workspace.writeFile(project: projectName, path: "memory.md", content: content)
     }
 
     /// Save memory from a project workspace back to persistent storage
-    func saveFromProject(workspace: LocalWorkspaceService, projectName: String, role: Role) {
+    func saveFromProject(workspace: LocalWorkspaceService, projectName: String) {
         guard let content = try? workspace.readFile(project: projectName, path: "memory.md"),
               !content.isEmpty,
-              content.count > 50 else { return } // Skip if empty/trivial
+              content.count > 50 else { return }
 
-        if role == .builder {
-            saveBuilderMemory(content)
-        } else {
-            saveResearcherMemory(content)
-        }
+        saveBuilderMemory(content)
 
         #if DEBUG
-        print("[MemoryService] Saved \(role) memory from \(projectName) — \(content.count) chars")
+        print("[MemoryService] Saved builder memory from \(projectName) — \(content.count) chars")
         #endif
-    }
-
-    // MARK: - Types
-
-    enum Role {
-        case builder
-        case researcher
     }
 
     // MARK: - Private
@@ -109,21 +85,6 @@ class MemoryService {
     - (no learnings yet)
 
     ## Technical
-    - (no learnings yet)
-    """
-
-    static let researcherTemplate = """
-    # Memory — Researcher
-
-    Read before every project. Update with learnings after each project. Max ~20 items.
-
-    ## Research
-    - (no learnings yet)
-
-    ## Tools
-    - (no learnings yet)
-
-    ## Brands
     - (no learnings yet)
     """
 }
