@@ -226,7 +226,7 @@ class BossToolExecutor: ToolExecuting {
         if let memoryContent, !memoryContent.isEmpty {
             fullInstructions += "\n\n--- YOUR MEMORY (learnings from previous projects) ---\n\(memoryContent)"
         }
-        fullInstructions += "\n\nIMPORTANT: The brief, research, and memory content is provided above. Do NOT waste iterations calling read_file on brief.md, research.md, or memory.md — the content is already here. Start building immediately with create_file(\"index.html\", ...)."
+        fullInstructions += "\n\nIMPORTANT: The brief, research, and memory content is provided above. Do NOT waste iterations calling read_file on brief.md, research.md, or memory.md — the content is already here. Start building immediately."
 
         // Run nested agent loop targeting the version project
         let subExecutor = ToolExecutor(workspace: workspace, projectName: versionProjectName, onFileWrite: onFileWrite)
