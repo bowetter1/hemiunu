@@ -147,6 +147,23 @@ enum ForgeTools {
             [
                 "type": "function",
                 "function": [
+                    "name": "run_command",
+                    "description": "Run a shell command in the project directory. Use for installing dependencies (npm install), building projects (npm run build), or other CLI tasks. The command runs in the project root with a 120-second timeout. Returns stdout+stderr and exit code.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "command": [
+                                "type": "string",
+                                "description": "The shell command to run (e.g. 'npm install', 'npm run build')",
+                            ],
+                        ],
+                        "required": ["command"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
                     "name": "web_search",
                     "description": "Search the web using Google. Use this to find images, information, URLs, or anything you need from the internet. Returns text with source URLs.",
                     "parameters": [
@@ -572,6 +589,20 @@ enum ForgeTools {
                         ],
                     ],
                     "required": ["path"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "run_command",
+                "description": "Run a shell command in the project directory. Use for installing dependencies (npm install), building projects (npm run build), or other CLI tasks. The command runs in the project root with a 120-second timeout. Returns stdout+stderr and exit code.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "command": [
+                            "type": "string",
+                            "description": "The shell command to run (e.g. 'npm install', 'npm run build')",
+                        ],
+                    ],
+                    "required": ["command"],
                 ] as [String: Any],
             ],
             [

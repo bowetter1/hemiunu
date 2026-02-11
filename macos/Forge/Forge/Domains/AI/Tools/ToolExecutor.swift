@@ -42,6 +42,12 @@ struct ToolExecutor: ToolExecuting {
             }
             return try executeDeleteFile(path: path)
 
+        case "run_command":
+            guard let command = args["command"] as? String, !command.isEmpty else {
+                throw ToolError.missingParameter("command")
+            }
+            return try await executeRunCommand(command: command)
+
         case "web_search":
             guard let query = args["query"] as? String else {
                 throw ToolError.missingParameter("query")
@@ -140,6 +146,21 @@ struct ToolExecutor: ToolExecuting {
             return String(format: "%4d│ %@", lineNum, String(line.prefix(120)))
         }
         return slice.joined(separator: "\n")
+    }
+
+    private func executeRunCommand(command: String) async throws -> String {
+        let result = try await workspace.exec(
+            command,
+            cwd: workspace.projectPath(projectName),
+            timeout: 120
+        )
+        let output = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let truncated = output.count > 5000 ? String(output.suffix(5000)) : output
+        if result.succeeded {
+            return truncated.isEmpty ? "Command completed successfully (no output)" : truncated
+        } else {
+            return "Exit code \(result.exitCode)\n\(truncated)"
+        }
     }
 
     private func executeDeleteFile(path: String) throws -> String {

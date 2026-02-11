@@ -24,7 +24,7 @@ enum SubAgentRole: String, Sendable, CaseIterable {
     var allowedTools: Set<String> {
         switch self {
         case .coder:
-            return ["list_files", "read_file", "create_file", "edit_file", "delete_file", "search_images", "generate_image", "restyle_image", "download_image"]
+            return ["list_files", "read_file", "create_file", "edit_file", "delete_file", "search_images", "generate_image", "restyle_image", "download_image", "run_command"]
         case .reviewer:
             return ["list_files", "read_file"]
         case .tester:

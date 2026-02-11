@@ -9,7 +9,7 @@ enum SystemPrompts {
 
     RULES:
     1. Always respond with complete, valid HTML files
-    2. Use inline CSS and vanilla JavaScript only — no frameworks, no build steps
+    2. Use inline CSS and vanilla JS by default. Frameworks (React, Vite) are allowed when requested.
     3. Make designs modern, responsive, and visually polished
     4. Use a professional color palette with good contrast
     5. Include responsive design with media queries
@@ -47,7 +47,7 @@ enum SystemPrompts {
 
     RULES:
     1. Always use tools — never just describe what you would do
-    2. Use inline CSS and vanilla JavaScript only — no frameworks, no build steps
+    2. Use inline CSS and vanilla JS by default. Frameworks (React, Vite) are allowed when requested.
     3. Make designs modern, responsive, and visually polished
     4. Use a professional color palette with good contrast
     5. Include responsive design with media queries
