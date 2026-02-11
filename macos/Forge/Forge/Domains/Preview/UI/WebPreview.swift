@@ -13,6 +13,7 @@ struct WebPreview: View {
     let html: String
     var projectId: String? = nil
     var localFileURL: URL? = nil
+    var remoteURL: URL? = nil
     var refreshToken: UUID = UUID()
     var sidebarVisible: Bool = true
     var toolsPanelVisible: Bool = true
@@ -43,6 +44,7 @@ struct WebPreview: View {
                 html: html,
                 projectId: projectId,
                 localFileURL: localFileURL,
+                remoteURL: remoteURL,
                 refreshToken: refreshToken,
                 cornerRadius: cornerRadius,
                 onElementClicked: onElementClicked
@@ -92,6 +94,7 @@ struct HTMLWebView: NSViewRepresentable {
     let html: String
     var projectId: String? = nil
     var localFileURL: URL? = nil
+    var remoteURL: URL? = nil
     var refreshToken: UUID = UUID()
     var cornerRadius: CGFloat = 16
     var onElementClicked: ((ClickedElement) -> Void)? = nil
@@ -100,6 +103,7 @@ struct HTMLWebView: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler {
         var lastHTML: String?
         var lastLocalUrl: String?
+        var lastRemoteUrl: String?
         var lastRefreshToken: UUID?
         var onElementClicked: ((ClickedElement) -> Void)?
 
@@ -132,7 +136,11 @@ struct HTMLWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .nonPersistent()
+        // Use default (persistent) data store for remote URLs (Vite dev server needs WebSocket)
+        // and non-persistent for inline HTML to avoid caching stale content
+        if remoteURL == nil {
+            config.websiteDataStore = .nonPersistent()
+        }
 
         // JS bridge for element click detection
         let controller = config.userContentController
@@ -159,9 +167,23 @@ struct HTMLWebView: NSViewRepresentable {
             let urlString = localURL.absoluteString
             if context.coordinator.lastLocalUrl != urlString || context.coordinator.lastRefreshToken != refreshToken {
                 context.coordinator.lastLocalUrl = urlString
+                context.coordinator.lastRemoteUrl = nil
                 context.coordinator.lastRefreshToken = refreshToken
                 context.coordinator.lastHTML = nil
                 webView.loadFileURL(localURL, allowingReadAccessTo: localURL.deletingLastPathComponent())
+            }
+            return
+        }
+
+        // Remote URL: load directly (for React/Vite/Next dev servers)
+        if let remoteURL = remoteURL {
+            let urlString = remoteURL.absoluteString
+            if context.coordinator.lastRemoteUrl != urlString || context.coordinator.lastRefreshToken != refreshToken {
+                context.coordinator.lastRemoteUrl = urlString
+                context.coordinator.lastLocalUrl = nil
+                context.coordinator.lastRefreshToken = refreshToken
+                context.coordinator.lastHTML = nil
+                webView.load(URLRequest(url: remoteURL))
             }
             return
         }
@@ -170,6 +192,7 @@ struct HTMLWebView: NSViewRepresentable {
         guard context.coordinator.lastHTML != html else { return }
         context.coordinator.lastHTML = html
         context.coordinator.lastLocalUrl = nil
+        context.coordinator.lastRemoteUrl = nil
         let baseURL = URL(string: "about:blank?t=\(Date().timeIntervalSince1970)")
         webView.loadHTMLString(html, baseURL: baseURL)
     }
@@ -193,8 +216,10 @@ struct HTMLWebView: NSViewRepresentable {
         `;
         document.head.appendChild(style);
 
-        let lastHovered = null;
-        let lastClicked = null;
+        let state = {
+            lastHovered: null,
+            lastClicked: null
+        };
 
         function buildSelector(el) {
             const parts = [];
@@ -213,29 +238,26 @@ struct HTMLWebView: NSViewRepresentable {
 
         document.addEventListener('mouseover', (e) => {
             const el = e.target;
-            if (el === lastHovered || el === document.body || el === document.documentElement) return;
-            if (lastHovered) lastHovered.classList.remove('__forge-hover');
+            if (el === state.lastHovered || el === document.body || el === document.documentElement) return;
+            if (state.lastHovered) state.lastHovered.classList.remove('__forge-hover');
             el.classList.add('__forge-hover');
-            lastHovered = el;
+            state.lastHovered = el;
         });
 
         document.addEventListener('mouseout', (e) => {
-            if (lastHovered) {
-                lastHovered.classList.remove('__forge-hover');
-                lastHovered = null;
+            if (state.lastHovered) {
+                state.lastHovered.classList.remove('__forge-hover');
+                state.lastHovered = null;
             }
         });
 
         document.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
             const el = e.target;
             if (el === document.body || el === document.documentElement) return;
 
-            if (lastClicked) lastClicked.classList.remove('__forge-clicked');
+            if (state.lastClicked) state.lastClicked.classList.remove('__forge-clicked');
             el.classList.add('__forge-clicked');
-            lastClicked = el;
+            state.lastClicked = el;
 
             const rect = el.getBoundingClientRect();
             const text = (el.textContent || '').trim().substring(0, 60);

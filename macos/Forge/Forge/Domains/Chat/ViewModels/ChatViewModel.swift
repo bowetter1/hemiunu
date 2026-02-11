@@ -171,9 +171,13 @@ class ChatViewModel {
                     // Load the first completed builder's project into the preview
                     let projectId = "local:\(versionProjectName)"
                     appState.setSelectedProjectId(projectId)
-                    appState.setLocalPreviewURL(appState.workspace.projectPath(versionProjectName))
                     appState.setLocalFiles(appState.workspace.listFiles(project: versionProjectName))
-                    appState.refreshPreview()
+                    // Use resolvePreviewURL to start dev server for framework projects
+                    Task {
+                        let url = await appState.workspace.resolvePreviewURL(project: versionProjectName)
+                        appState.setLocalPreviewURL(url)
+                        appState.refreshPreview()
+                    }
                     appState.refreshLocalProjects()
                 }
             )

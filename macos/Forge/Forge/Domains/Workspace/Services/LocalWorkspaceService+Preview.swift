@@ -3,6 +3,16 @@ import Foundation
 extension LocalWorkspaceService {
     // MARK: - Local Preview Server
 
+    /// Resolve the best preview URL for a project.
+    /// For JS app projects, prefer a local dev server. Otherwise fall back to file-based preview.
+    func resolvePreviewURL(project: String) async -> URL {
+        if let devURL = await startFrontendPreviewIfPossible(project: project) {
+            return devURL
+        }
+        stopLocalServer()
+        return projectPath(project)
+    }
+
     /// Start a local HTTP server for previewing project files
     func startLocalServer(project: String, port: Int = 8421) async throws -> Int {
         stopLocalServer()
@@ -32,6 +42,8 @@ extension LocalWorkspaceService {
         serverProcess?.terminate()
         serverProcess = nil
         serverPort = nil
+        activeProcess = nil
+        isRunning = false
     }
 
     /// List workspace directories that contain HTML files
@@ -168,6 +180,7 @@ extension LocalWorkspaceService {
         let dir = projectPath(project)
         let candidates = [
             "index.html",
+            "frontend/index.html",
             "proposal/index.html",
             "dist/index.html",
             "build/index.html",
@@ -205,5 +218,196 @@ extension LocalWorkspaceService {
                 html: html
             )
         }
+    }
+
+    // MARK: - Frontend Dev Server
+
+    private func startFrontendPreviewIfPossible(project: String) async -> URL? {
+        if activeProcess == "preview:\(project)",
+           serverProcess?.isRunning == true,
+           let port = serverPort,
+           let url = URL(string: "http://127.0.0.1:\(port)") {
+            return url
+        }
+
+        let root = projectPath(project)
+        let candidateDirs = [
+            root,
+            root.appendingPathComponent("frontend"),
+            root.appendingPathComponent("apps/web"),
+            root.appendingPathComponent("web"),
+        ]
+
+        var selected: (dir: URL, script: (name: String, body: String))?
+        for dir in candidateDirs {
+            let packageJSON = dir.appendingPathComponent("package.json")
+            guard FileManager.default.fileExists(atPath: packageJSON.path) else { continue }
+            if let script = selectPreviewScript(at: packageJSON) {
+                selected = (dir, script)
+                break
+            }
+        }
+
+        guard let selected else { return nil }
+
+        stopLocalServer()
+
+        // Kill stale dev servers from previous app sessions (async — won't block UI)
+        let candidatePorts = [5173, 3000, 4173, 8080]
+        for port in candidatePorts {
+            _ = try? await exec("lsof -ti :\(port) | xargs kill 2>/dev/null", timeout: 3)
+        }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        for port in candidatePorts {
+            guard let command = buildPreviewCommand(projectDir: selected.dir, script: selected.script, port: port) else { continue }
+            do {
+                try launchDevServer(command: command.command, env: command.env, cwd: selected.dir, project: project, port: port)
+                guard let url = URL(string: "http://127.0.0.1:\(port)") else {
+                    stopLocalServer()
+                    continue
+                }
+                // Only accept if OUR process is still running (not a stale server)
+                if await waitForServer(url: url, process: serverProcess),
+                   serverProcess?.isRunning == true {
+                    return url
+                }
+                stopLocalServer()
+            } catch {
+                stopLocalServer()
+            }
+        }
+
+        return nil
+    }
+
+
+    private func launchDevServer(
+        command: String,
+        env: [String: String],
+        cwd: URL,
+        project: String,
+        port: Int
+    ) throws {
+        stopLocalServer()
+
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-l", "-c", command]
+        process.currentDirectoryURL = cwd
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        var environment = ProcessInfo.processInfo.environment
+        let extraPaths = [
+            "/usr/local/bin",
+            "/opt/homebrew/bin",
+            "/usr/local/share/npm/bin",
+            "\(FileManager.default.homeDirectoryForCurrentUser.path)/.nvm/versions/node/v20/bin",
+        ]
+        let existingPath = environment["PATH"] ?? "/usr/bin:/bin"
+        environment["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
+        for (key, value) in env {
+            environment[key] = value
+        }
+        process.environment = environment
+
+        process.terminationHandler = { [weak self] terminatedProcess in
+            guard let self else { return }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            Task { @MainActor in
+                self.lastOutput = output
+                if self.serverProcess === terminatedProcess {
+                    self.serverProcess = nil
+                    self.serverPort = nil
+                    self.activeProcess = nil
+                    self.isRunning = false
+                }
+            }
+        }
+
+        try process.run()
+        serverProcess = process
+        serverPort = port
+        activeProcess = "preview:\(project)"
+        isRunning = true
+    }
+
+    private func waitForServer(url: URL, process: Process?, timeout: TimeInterval = 12) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if process?.isRunning != true { return false }
+            if await isReachable(url: url) { return true }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+        }
+        return false
+    }
+
+    private func isReachable(url: URL) async -> Bool {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 1.2
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse {
+                return (200..<500).contains(http.statusCode)
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func selectPreviewScript(at packageJSON: URL) -> (name: String, body: String)? {
+        guard let data = try? Data(contentsOf: packageJSON),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let scripts = object["scripts"] as? [String: Any] else { return nil }
+
+        if let dev = scripts["dev"] as? String {
+            return ("dev", dev)
+        }
+        if let start = scripts["start"] as? String {
+            return ("start", start)
+        }
+        return nil
+    }
+
+    private func buildPreviewCommand(
+        projectDir: URL,
+        script: (name: String, body: String),
+        port: Int
+    ) -> (command: String, env: [String: String])? {
+        let fm = FileManager.default
+        let body = script.body.lowercased()
+        let hasBun = fm.fileExists(atPath: projectDir.appendingPathComponent("bun.lock").path)
+            || fm.fileExists(atPath: projectDir.appendingPathComponent("bun.lockb").path)
+        let hasPnpm = fm.fileExists(atPath: projectDir.appendingPathComponent("pnpm-lock.yaml").path)
+        let hasYarn = fm.fileExists(atPath: projectDir.appendingPathComponent("yarn.lock").path)
+
+        var base: String
+        if hasBun {
+            base = "bun run \(script.name)"
+        } else if hasPnpm {
+            base = "pnpm \(script.name)"
+        } else if hasYarn {
+            base = "yarn \(script.name)"
+        } else {
+            base = "npm run \(script.name)"
+        }
+
+        var args = ""
+        if body.contains("vite") {
+            args = " -- --host 127.0.0.1 --port \(port)"
+        } else if body.contains("next") {
+            args = " -- --hostname 127.0.0.1 --port \(port)"
+        }
+
+        let env = [
+            "PORT": "\(port)",
+            "HOST": "127.0.0.1",
+            "BROWSER": "none",
+        ]
+        return (base + args, env)
     }
 }
