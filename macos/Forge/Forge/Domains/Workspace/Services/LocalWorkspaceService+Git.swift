@@ -27,6 +27,11 @@ extension LocalWorkspaceService {
         try await exec("git status", cwd: projectPath(project))
     }
 
+    /// Git status in porcelain format for machine parsing
+    func gitPorcelainStatus(project: String) async throws -> ShellResult {
+        try await exec("git status --porcelain", cwd: projectPath(project))
+    }
+
     /// Git commit all changes
     func gitCommit(project: String, message: String) async throws -> ShellResult {
         _ = try await ensureGitRepository(project: project)
