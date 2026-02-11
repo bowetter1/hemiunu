@@ -94,14 +94,6 @@ class BossToolExecutor: ToolExecuting {
             throw ToolError.missingParameter("role and instructions")
         }
 
-        // Researcher: use fast programmatic pipeline (web search + Groq summary)
-        if role == .researcher {
-            buildLogger?.logPhase("Phase 2 — Research")
-            let result = try await executeProgrammaticResearch(instructions)
-            buildLogger?.logEvent("✅", "Research complete")
-            return result
-        }
-
         let context = args["context"] as? String
 
         // Resolve AI service — use builderServiceResolver for roles with a preferred builder
@@ -146,111 +138,6 @@ class BossToolExecutor: ToolExecuting {
         return "[\(role.rawValue)] \(result.text)"
     }
 
-    // MARK: - Programmatic Research (fast: web search + Groq summary)
-
-    /// Fast research pipeline: 3 parallel Gemini web searches → 1 Groq summary → research.md
-    private func executeProgrammaticResearch(_ instructions: String) async throws -> String {
-        // 1. Read brief.md
-        let brief: String
-        do {
-            brief = try workspace.readFile(project: projectName, path: "brief.md")
-        } catch {
-            return "[researcher] Error: brief.md not found. Boss must write brief.md first."
-        }
-
-        onSubAgentEvent(.researcher, .toolStart(name: "web_search", args: "Researching brand..."))
-
-        // 2. Run 3 parallel web searches via Gemini grounding
-        let queries = [
-            "Tell me about this project and find the existing website: \(String(brief.prefix(500))). Find the brand's website URL, colors, typography, and visual identity.",
-            "Find a competitor website for: \(String(brief.prefix(300))). Describe what makes the competitor's website effective, their design techniques and visual approach.",
-            "Find modern web design inspiration outside this industry: \(String(brief.prefix(300))). Look for innovative design techniques, typography, color usage, and layout patterns."
-        ]
-
-        let executor = standardExecutor
-        var searchResults: [String] = Array(repeating: "", count: 3)
-
-        let tasks: [Task<(Int, String), Never>] = queries.enumerated().map { (i, query) in
-            let exec = executor
-            return Task { @MainActor in
-                let argsDict = ["query": query]
-                guard let argsData = try? JSONSerialization.data(withJSONObject: argsDict),
-                      let argsString = String(data: argsData, encoding: .utf8) else {
-                    return (i, "Error: failed to encode query")
-                }
-                let call = ToolCall(id: "research-\(i)", name: "web_search", arguments: argsString)
-                let result = (try? await exec.execute(call)) ?? "No results found."
-                return (i, result)
-            }
-        }
-        for task in tasks {
-            let (i, result) = await task.value
-            searchResults[i] = result
-        }
-
-        onSubAgentEvent(.researcher, .toolDone(name: "web_search", summary: "3 searches complete"))
-        onSubAgentEvent(.researcher, .toolStart(name: "create_file", args: "Writing research.md..."))
-
-        // 3. Summarize via Groq (fast, ~2-3 seconds)
-        let groqService = serviceResolver(.groq)
-        let summaryMessages: [[String: Any]] = [
-            ["role": "system", "content": "You are a web design researcher. Write concise, factual research notes. Never guess or invent information — only use data from the provided search results. Write in the same language as the brief."],
-            ["role": "user", "content": """
-            Based on the project brief and search results below, write a concise research.md file.
-
-            PROJECT BRIEF:
-            \(brief)
-
-            --- BRAND RESEARCH ---
-            \(searchResults[0])
-
-            --- COMPETITOR RESEARCH ---
-            \(searchResults[1])
-
-            --- DESIGN INSPIRATION ---
-            \(searchResults[2])
-
-            Write research.md in this exact format (max 60 lines, concise facts only):
-
-            # Research
-
-            ## Brand
-            - Colors: [primary hex, secondary hex, background — from their actual website]
-            - Typography: [font names and weights found]
-            - Tone: [2-3 words describing the brand voice]
-            - Key images: [describe 2-3 important images with URLs if found]
-
-            ## Competitor: [Name] ([URL])
-            - What's strong: [1-2 sentences]
-            - Notable techniques: [2-3 design techniques]
-
-            ## Inspiration: [Name] ([URL])
-            - What's strong: [1-2 sentences]
-            - Notable techniques: [2-3 techniques from outside the industry]
-
-            Use ONLY information from the search results. Never invent colors, fonts, or URLs.
-            """]
-        ]
-
-        let response = try await groqService.generateWithTools(
-            messages: summaryMessages,
-            systemPrompt: "",
-            tools: []
-        )
-
-        let researchContent = response.text ?? "# Research\n\nNo research data available."
-
-        // 4. Write research.md
-        try workspace.writeFile(project: projectName, path: "research.md", content: researchContent)
-
-        onSubAgentEvent(.researcher, .toolDone(name: "create_file", summary: "research.md written (\(researchContent.count) chars)"))
-
-        #if DEBUG
-        print("[BossToolExecutor] Programmatic research complete — \(researchContent.count) chars")
-        #endif
-
-        return "[researcher] Research complete — research.md written (\(researchContent.count) chars)"
-    }
 
     // MARK: - Build Version
 
@@ -262,8 +149,6 @@ class BossToolExecutor: ToolExecuting {
               let designDirection = args["design_direction"] as? String else {
             throw ToolError.missingParameter("builder, version, instructions, and design_direction")
         }
-
-        let researchContext = args["research_context"] as? String
 
         // Map builder name to AI provider
         let builderProvider: AIProvider
@@ -320,8 +205,9 @@ class BossToolExecutor: ToolExecuting {
 
         ## ASSIGNED DESIGN DIRECTION
         Your creative direction: [\(designDirection)]
-        Push the design toward [\(designDirection)]. This is your angle — own it.
-        Build a complete, polished website following this direction.
+        This is YOUR vision. It defines your layout, visual hierarchy, mood, and structure.
+        Research gives you brand facts — but [\(designDirection)] is how you interpret them.
+        Be bold. Be different. Commit fully to this angle.
         """
 
         // Inject brief+research content directly — eliminates 2-3 file-reading iterations per builder
@@ -334,9 +220,6 @@ class BossToolExecutor: ToolExecuting {
         }
         if let researchFileContent {
             fullInstructions += "\n\n--- RESEARCH (research.md) ---\n\(researchFileContent)"
-        }
-        if let researchContext {
-            fullInstructions += "\n\n--- ADDITIONAL CONTEXT ---\n\(researchContext)"
         }
         // Inject persistent memory (accumulated learnings from previous projects)
         let memoryContent = try? workspace.readFile(project: versionProjectName, path: "memory.md")

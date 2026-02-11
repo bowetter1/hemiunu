@@ -128,6 +128,27 @@ struct FilesTabContent: View {
         LocalProjectGroup.group(appState.localProjects)
     }
 
+    private func deleteVersion(_ project: LocalProject) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: project.path)
+        // Clean up parent if empty
+        let parentDir = project.path.deletingLastPathComponent()
+        let remaining = (try? fm.contentsOfDirectory(atPath: parentDir.path))?.filter { $0 != ".DS_Store" && $0 != "project-name.txt" } ?? []
+        if remaining.isEmpty {
+            try? fm.removeItem(at: parentDir)
+        }
+        if selectedProjectId == "local:\(project.name)" {
+            appState.clearCurrentProject()
+        }
+        appState.refreshLocalProjects()
+    }
+
+    private func forkVersion(_ project: LocalProject) {
+        guard let newName = try? appState.workspace.forkVersion(sourceProject: project.name) else { return }
+        appState.refreshLocalProjects()
+        selectedProjectId = "local:\(newName)"
+    }
+
     private func deleteLocalGroup(_ group: LocalProjectGroup) {
         let fm = FileManager.default
         for project in group.projects {
@@ -159,13 +180,18 @@ struct FilesTabContent: View {
                             SidebarSessionRow(
                                 group: group,
                                 selectedProjectId: selectedProjectId,
-                                onSelect: { name in selectedProjectId = "local:\(name)" },
+                                onSelect: { name in
+                                    let id = "local:\(name)"
+                                    selectedProjectId = selectedProjectId == id ? nil : id
+                                },
                                 onDelete: { deleteLocalGroup(group) },
                                 pages: appState.pages,
                                 selectedPageId: selectedPageId,
                                 onSelectPage: { pageId in
                                     selectedPageId = pageId
-                                }
+                                },
+                                onFork: { project in forkVersion(project) },
+                                onDeleteVersion: { project in deleteVersion(project) }
                             )
                         }
                     }

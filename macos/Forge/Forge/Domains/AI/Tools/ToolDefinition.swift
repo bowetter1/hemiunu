@@ -379,10 +379,6 @@ enum ForgeTools {
                         "type": "string",
                         "description": "Unique creative direction for this version (e.g. 'Luxury minimalist aesthetic', 'Tech-forward and futuristic', 'Warm and community-focused')",
                     ] as [String: Any],
-                    "research_context": [
-                        "type": "string",
-                        "description": "Research results to pass to the builder (brief, findings, image URLs, etc.)",
-                    ] as [String: Any],
                 ] as [String: Any],
                 "required": ["builder", "version", "instructions", "design_direction"],
             ] as [String: Any],
@@ -489,10 +485,6 @@ enum ForgeTools {
                         "design_direction": [
                             "type": "string",
                             "description": "Unique creative direction for this version (e.g. 'Luxury minimalist aesthetic', 'Tech-forward and futuristic', 'Warm and community-focused')",
-                        ] as [String: Any],
-                        "research_context": [
-                            "type": "string",
-                            "description": "Research results to pass to the builder (brief, findings, image URLs, etc.)",
                         ] as [String: Any],
                     ] as [String: Any],
                     "required": ["builder", "version", "instructions", "design_direction"],

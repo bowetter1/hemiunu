@@ -63,4 +63,43 @@ extension LocalWorkspaceService {
         }
         return files
     }
+
+    // MARK: - Fork
+
+    /// Duplicate a version directory to the next available version number
+    func forkVersion(sourceProject: String) throws -> String {
+        let components = sourceProject.components(separatedBy: "/")
+        guard components.count == 2 else { throw NSError(domain: "Forge", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid project format"]) }
+        let parentName = components[0]
+        let parentDir = rootDirectory.appendingPathComponent(parentName)
+        let fm = FileManager.default
+
+        // Find max existing version number
+        let siblings = (try? fm.contentsOfDirectory(atPath: parentDir.path)) ?? []
+        let maxVersion = siblings.compactMap { dir -> Int? in
+            guard dir.hasPrefix("v"), let num = Int(dir.dropFirst()) else { return nil }
+            return num
+        }.max() ?? 0
+
+        let newVersion = "v\(maxVersion + 1)"
+        let newProject = "\(parentName)/\(newVersion)"
+        let sourceURL = projectPath(sourceProject)
+        let destURL = parentDir.appendingPathComponent(newVersion)
+
+        try fm.copyItem(at: sourceURL, to: destURL)
+
+        // Read original agent name and write fork label
+        let agentFile = destURL.appendingPathComponent("agent-name.txt")
+        let originalName = (try? String(contentsOf: sourceURL.appendingPathComponent("agent-name.txt"), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let forkName = originalName.map { "Fork av \($0)" } ?? "Fork"
+        try forkName.write(to: agentFile, atomically: true, encoding: .utf8)
+
+        // Remove .git from the copy
+        let gitDir = destURL.appendingPathComponent(".git")
+        if fm.fileExists(atPath: gitDir.path) {
+            try? fm.removeItem(at: gitDir)
+        }
+
+        return newProject
+    }
 }
