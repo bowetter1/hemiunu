@@ -5,7 +5,7 @@ import Foundation
 /// generateContent endpoint and manages a CachedContent for session continuity.
 final class GeminiBossService: AIService, @unchecked Sendable {
     let provider: AIProvider = .gemini
-    private let modelName: String
+    let modelName: String
     private let baseURL = "https://generativelanguage.googleapis.com/v1beta"
     private let cacheTTL = "1800s" // 30 minutes
 

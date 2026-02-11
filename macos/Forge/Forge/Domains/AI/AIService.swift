@@ -3,6 +3,7 @@ import Foundation
 /// Protocol for AI services that support streaming text generation
 protocol AIService: Sendable {
     var provider: AIProvider { get }
+    var modelName: String { get }
 
     /// Generate a streaming response from chat messages
     func generate(

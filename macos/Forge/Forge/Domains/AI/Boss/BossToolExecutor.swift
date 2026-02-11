@@ -184,7 +184,7 @@ class BossToolExecutor: ToolExecuting {
 
         // Resolve AI service for this builder (use builderServiceResolver for model-specific services like Opus)
         let service = builderServiceResolver?(builderName) ?? serviceResolver(builderProvider)
-        let modelName = builderProvider.modelName
+        let modelName = service.modelName
 
         // Log builder start
         buildLogger?.logBuilderStart(builder: builderName, version: version, direction: designDirection, model: modelName)

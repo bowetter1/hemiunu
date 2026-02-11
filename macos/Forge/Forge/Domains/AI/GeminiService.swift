@@ -4,7 +4,7 @@ import Foundation
 /// Use modelOverride to select a specific model (e.g. "gemini-3-pro-preview" for builders)
 final class GeminiService: AIService, Sendable {
     let provider: AIProvider = .gemini
-    private let modelName: String
+    let modelName: String
     private let baseURL = URL(string: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")!
 
     init(modelOverride: String? = nil) {

@@ -4,7 +4,7 @@ import Foundation
 /// Converts OpenAI chat format ↔ Responses API format internally so AgentLoop stays unchanged.
 final class CodexService: AIService, Sendable {
     let provider: AIProvider = .codex
-    private let modelName: String
+    let modelName: String
     private let baseURL = URL(string: "https://api.openai.com/v1/responses")!
 
     init(modelOverride: String? = nil) {

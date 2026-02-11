@@ -4,7 +4,7 @@ import Foundation
 /// Use modelOverride to select a specific model (e.g. "claude-opus-4-6" for builders)
 final class ClaudeService: AIService, Sendable {
     let provider: AIProvider = .claude
-    private let modelName: String
+    let modelName: String
     private let maxTokens: Int
     private let baseURL = URL(string: "https://api.anthropic.com/v1/messages")!
 
