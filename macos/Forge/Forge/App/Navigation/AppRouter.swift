@@ -163,6 +163,10 @@ struct AppRouter: View {
     private func openPreviewInBrowser() {
         // Local file: open directly
         if let localURL = appState.localPreviewURL {
+            if !localURL.isFileURL {
+                NSWorkspace.shared.open(localURL)
+                return
+            }
             if let projectName = appState.currentProject.flatMap({ appState.localProjectName(from: $0.id) }),
                let mainHTML = appState.workspace.findMainHTML(project: projectName) {
                 let fileURL = localURL.appendingPathComponent(mainHTML)

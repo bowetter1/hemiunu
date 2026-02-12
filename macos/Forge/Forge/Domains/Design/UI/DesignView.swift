@@ -115,21 +115,10 @@ struct DesignView: View {
 
     @ViewBuilder
     private func localPreviewContent(project: Project, baseURL: URL) -> some View {
-        let projectName = appState.localProjectName(from: project.id) ?? ""
-        let prefix = "local-page-\(projectName)/"
-
-        let relativePath: String? = {
-            if let pageId = selectedPageId, pageId.hasPrefix(prefix) {
-                return String(pageId.dropFirst(prefix.count))
-            }
-            return appState.workspace.findMainHTML(project: projectName)
-        }()
-
-        if let relativePath {
-            let fileURL = baseURL.appendingPathComponent(relativePath)
+        if !baseURL.isFileURL {
             WebPreview(
                 html: "",
-                localFileURL: fileURL,
+                remoteURL: baseURL,
                 refreshToken: appState.previewRefreshToken,
                 sidebarVisible: sidebarVisible,
                 toolsPanelVisible: toolsPanelVisible,
@@ -137,23 +126,46 @@ struct DesignView: View {
                 onElementClicked: { clickedElement = $0 }
             )
         } else {
-            VStack(spacing: 16) {
-                Image(systemName: "folder")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
-                Text("No HTML file found")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                Text("The local project at \(baseURL.path) has no index.html")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Open in Finder") {
-                    NSWorkspace.shared.open(baseURL)
+            let projectName = appState.localProjectName(from: project.id) ?? ""
+            let prefix = "local-page-\(projectName)/"
+
+            let relativePath: String? = {
+                if let pageId = selectedPageId, pageId.hasPrefix(prefix) {
+                    return String(pageId.dropFirst(prefix.count))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                return appState.workspace.findMainHTML(project: projectName)
+            }()
+
+            if let relativePath {
+                let fileURL = baseURL.appendingPathComponent(relativePath)
+                WebPreview(
+                    html: "",
+                    localFileURL: fileURL,
+                    refreshToken: appState.previewRefreshToken,
+                    sidebarVisible: sidebarVisible,
+                    toolsPanelVisible: toolsPanelVisible,
+                    selectedDevice: appState.selectedDevice,
+                    onElementClicked: { clickedElement = $0 }
+                )
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    Text("No HTML file found")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                    Text("The local project at \(baseURL.path) has no index.html")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Open in Finder") {
+                        NSWorkspace.shared.open(baseURL)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.blue)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

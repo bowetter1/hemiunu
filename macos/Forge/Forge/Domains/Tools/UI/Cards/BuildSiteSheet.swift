@@ -245,6 +245,12 @@ struct BuildSiteSheet: View {
         }
 
         if let previewURL = appState.localPreviewURL {
+            if !previewURL.isFileURL {
+                if let html = try? String(contentsOf: previewURL, encoding: .utf8) {
+                    return html
+                }
+                return nil
+            }
             let candidates = ["index.html", "proposal/index.html", "dist/index.html", "public/index.html"]
             for candidate in candidates {
                 let url = previewURL.appendingPathComponent(candidate)

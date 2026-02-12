@@ -217,7 +217,7 @@ class AppState {
             selectedPageId = pages.first?.id
         }
 
-        localPreviewURL = workspace.projectPath(name)
+        localPreviewURL = await workspace.resolvePreviewURL(project: name)
         startFileWatcher(directory: projectPath)
         await syncLocalVersionState(projectName: name)
     }
@@ -237,6 +237,7 @@ class AppState {
     }
 
     func clearCurrentProject() {
+        workspace.stopLocalServer()
         fileWatcher.stop()
         currentProject = nil
         pages = []
