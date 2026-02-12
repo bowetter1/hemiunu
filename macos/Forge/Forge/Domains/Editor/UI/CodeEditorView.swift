@@ -47,8 +47,8 @@ struct CodeEditorView: View {
             .background(Color(nsColor: .textBackgroundColor))
             .overlay(
                 Rectangle()
-                    .frame(height: 2)
-                    .foregroundStyle(.tint),
+                    .fill(Color.accentColor)
+                    .frame(height: 2),
                 alignment: .bottom
             )
 
