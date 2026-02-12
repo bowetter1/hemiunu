@@ -23,6 +23,7 @@ struct Topbar: View {
 
     @State private var keyMonitor: Any?
     @State private var showDeployPopover = false
+    @State private var showRailwayPopover = false
 
     private let height: CGFloat = 38
     private let itemHeight: CGFloat = 26
@@ -212,7 +213,7 @@ struct Topbar: View {
             }
             .buttonStyle(.plain)
             .help("GitHub")
-            Button { } label: {
+            Button { showRailwayPopover.toggle() } label: {
                 Image("railway")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -222,6 +223,9 @@ struct Topbar: View {
             }
             .buttonStyle(.plain)
             .help("Deploy (Railway)")
+            .popover(isPresented: $showRailwayPopover) {
+                RailwayDeployPopover(appState: appState, chatViewModel: chatViewModel)
+            }
             Button { showDeployPopover.toggle() } label: {
                 Image("daytona")
                     .resizable()

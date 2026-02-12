@@ -20,6 +20,9 @@ enum BossSystemPrompts {
     /// Deployer prompt — loaded from deployer.md
     static var deployer: String { PromptLoader.deployer }
 
+    /// Railway deployer prompt — loaded from railway-deployer.md
+    static var railwayDeployer: String { PromptLoader.railwayDeployer }
+
     /// Sub-agent system prompt — role-specific instructions
     static func subAgent(role: SubAgentRole, instructions: String) -> String {
         let roleDescription: String

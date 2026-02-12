@@ -54,6 +54,8 @@ class BossToolExecutor: ToolExecuting {
             return try await executeBuildVersion(call)
         case "deploy_to_sandbox":
             return try await executeDeployToSandbox(call)
+        case "deploy_to_railway":
+            return try await executeDeployToRailway(call)
         case "update_checklist":
             return executeUpdateChecklist(call)
         default:

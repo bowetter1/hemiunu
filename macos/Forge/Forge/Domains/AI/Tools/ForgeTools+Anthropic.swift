@@ -108,6 +108,20 @@ extension ForgeTools {
                 "required": ["version"],
             ] as [String: Any],
         ])
+        tools.append([
+            "name": "deploy_to_railway",
+            "description": "Deploy a version to Railway cloud hosting. Nixpacks auto-detects project type. Returns public URL.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "version": [
+                        "type": "string",
+                        "description": "Which version to deploy (e.g. 'v1', 'v2')",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["version"],
+            ] as [String: Any],
+        ])
         return tools
     }
 

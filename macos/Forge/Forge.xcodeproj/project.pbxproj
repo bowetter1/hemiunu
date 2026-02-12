@@ -116,6 +116,9 @@
 		A100010000000000000000A1 /* DaytonaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A1 /* DaytonaService.swift */; };
 		A100010000000000000000A2 /* DeployPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A2 /* DeployPopover.swift */; };
 		A100010000000000000000A3 /* BossToolExecutor+Deploy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A3 /* BossToolExecutor+Deploy.swift */; };
+		A100010000000000000000A4 /* RailwayService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A4 /* RailwayService.swift */; };
+		A100010000000000000000A5 /* BossToolExecutor+Railway.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A5 /* BossToolExecutor+Railway.swift */; };
+		A100010000000000000000A6 /* RailwayDeployPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A6 /* RailwayDeployPopover.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -229,6 +232,9 @@
 		B100010000000000000000A1 /* DaytonaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaytonaService.swift; sourceTree = "<group>"; };
 		B100010000000000000000A2 /* DeployPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeployPopover.swift; sourceTree = "<group>"; };
 		B100010000000000000000A3 /* BossToolExecutor+Deploy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Deploy.swift"; sourceTree = "<group>"; };
+		B100010000000000000000A4 /* RailwayService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailwayService.swift; sourceTree = "<group>"; };
+		B100010000000000000000A5 /* BossToolExecutor+Railway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Railway.swift"; sourceTree = "<group>"; };
+		B100010000000000000000A6 /* RailwayDeployPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailwayDeployPopover.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -358,6 +364,7 @@
 			isa = PBXGroup;
 			children = (
 				B100010000000000000000A1 /* DaytonaService.swift */,
+				B100010000000000000000A4 /* RailwayService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -366,6 +373,7 @@
 			isa = PBXGroup;
 			children = (
 				B100010000000000000000A2 /* DeployPopover.swift */,
+				B100010000000000000000A6 /* RailwayDeployPopover.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -511,6 +519,7 @@
 					B10001000000000000000083 /* BossToolExecutor+Checklist.swift */,
 					B10001000000000000000084 /* BossToolExecutor+Helpers.swift */,
 					B100010000000000000000A3 /* BossToolExecutor+Deploy.swift */,
+					B100010000000000000000A5 /* BossToolExecutor+Railway.swift */,
 					B10001000000000000000062 /* ActivityLog.swift */,
 					B10001000000000000000064 /* BuildLogger.swift */,
 					B10001000000000000000065 /* MemoryService.swift */,
@@ -967,6 +976,9 @@
 				A100010000000000000000A1 /* DaytonaService.swift in Sources */,
 				A100010000000000000000A2 /* DeployPopover.swift in Sources */,
 				A100010000000000000000A3 /* BossToolExecutor+Deploy.swift in Sources */,
+				A100010000000000000000A4 /* RailwayService.swift in Sources */,
+				A100010000000000000000A5 /* BossToolExecutor+Railway.swift in Sources */,
+				A100010000000000000000A6 /* RailwayDeployPopover.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

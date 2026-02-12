@@ -23,6 +23,9 @@ enum PromptLoader {
     /// Load deployer.md — sandbox deploy agent prompt
     static var deployer: String { load("deployer.md") }
 
+    /// Load railway-deployer.md — Railway deploy agent prompt
+    static var railwayDeployer: String { load("railway-deployer.md") }
+
     // MARK: - Private
 
     private static func load(_ filename: String) -> String {
