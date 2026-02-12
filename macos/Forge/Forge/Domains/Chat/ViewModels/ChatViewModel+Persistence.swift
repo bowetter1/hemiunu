@@ -1,0 +1,74 @@
+import Foundation
+
+extension ChatViewModel {
+    func stopStreaming() {
+        streamTask?.cancel()
+        streamTask = nil
+        isStreaming = false
+        isLoading = false
+    }
+
+    func startNewChat() {
+        stopStreaming()
+        messages = []
+        agentRawHistory = []
+        Task { await appState.bossService.clearCache() }
+    }
+
+    func resetForProject() {
+        stopStreaming()
+        messages = []
+        agentRawHistory = []
+        // Clear Gemini context cache for previous project
+        Task { await appState.bossService.clearCache() }
+        loadChatHistory()
+        loadAgentHistory()
+        // Restore cache state from loaded history
+        if !agentRawHistory.isEmpty {
+            appState.bossService.cacheMessageCount = 0 // will be set on next updateCache
+        }
+    }
+
+    // MARK: - Chat History Persistence
+
+    var chatHistoryURL: URL? {
+        chatHistory.historyURL(
+            workspace: appState.workspace,
+            projectId: appState.selectedProjectId ?? appState.currentProject?.id,
+            projectNameResolver: { appState.localProjectName(from: $0) }
+        )
+    }
+
+    func saveChatHistory() {
+        guard let url = chatHistoryURL else { return }
+        chatHistory.save(messages, to: url)
+    }
+
+    func loadChatHistory() {
+        guard let url = chatHistoryURL else { return }
+        messages = chatHistory.load(from: url)
+    }
+
+    // MARK: - Agent History Persistence (full tool call context)
+
+    var agentHistoryURL: URL? {
+        guard let projectId = appState.selectedProjectId ?? appState.currentProject?.id,
+              let projectName = appState.localProjectName(from: projectId) else { return nil }
+        return appState.workspace.projectPath(projectName).appendingPathComponent("agent-history.json")
+    }
+
+    func saveAgentHistory() {
+        guard let url = agentHistoryURL else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: agentRawHistory, options: []) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    func loadAgentHistory() {
+        guard let url = agentHistoryURL,
+              FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return }
+        agentRawHistory = array
+    }
+}

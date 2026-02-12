@@ -27,21 +27,38 @@
 		A10001000000000000000060 /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000060 /* GeminiService.swift */; };
 		A10001000000000000000061 /* CodexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000061 /* CodexService.swift */; };
 		A10001000000000000000046 /* ToolDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000046 /* ToolDefinition.swift */; };
+		A10001000000000000000074 /* ForgeTools+Schemas.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000074 /* ForgeTools+Schemas.swift */; };
+		A1000100000000000000007A /* ForgeTools+Anthropic.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000007A /* ForgeTools+Anthropic.swift */; };
+		A10001000000000000000075 /* ToolResponseParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000075 /* ToolResponseParsers.swift */; };
 		A10001000000000000000047 /* ToolExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000047 /* ToolExecutor.swift */; };
+		A1000100000000000000007B /* ToolExecutor+FileTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000007B /* ToolExecutor+FileTools.swift */; };
+		A1000100000000000000007C /* ToolExecutor+WebImageTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000007C /* ToolExecutor+WebImageTools.swift */; };
+		A1000100000000000000007D /* ToolExecutor+ScreenshotTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000007D /* ToolExecutor+ScreenshotTools.swift */; };
+		A1000100000000000000007E /* ToolExecutor+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000007E /* ToolExecutor+Helpers.swift */; };
+		A1000100000000000000007F /* ToolError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000007F /* ToolError.swift */; };
 		A10001000000000000000048 /* AgentLoop.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000048 /* AgentLoop.swift */; };
 		A10001000000000000000012 /* StreamingParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000012 /* StreamingParser.swift */; };
 		A10001000000000000000013 /* SystemPrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000013 /* SystemPrompts.swift */; };
 		A10001000000000000000014 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000014 /* KeychainHelper.swift */; };
 		A10001000000000000000015 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000015 /* ChatMessage.swift */; };
 		A10001000000000000000016 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000016 /* ChatViewModel.swift */; };
+		A10001000000000000000077 /* ChatViewModel+Tools.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000077 /* ChatViewModel+Tools.swift */; };
+		A10001000000000000000078 /* ChatViewModel+Streaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000078 /* ChatViewModel+Streaming.swift */; };
+		A10001000000000000000079 /* ChatViewModel+Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000079 /* ChatViewModel+Persistence.swift */; };
 		A10001000000000000000017 /* ChatTabContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000017 /* ChatTabContent.swift */; };
 		A10001000000000000000018 /* ChatBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000018 /* ChatBubble.swift */; };
 		A10001000000000000000019 /* FloatingChatWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000019 /* FloatingChatWindow.swift */; };
 		A1000100000000000000001A /* WebPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001A /* WebPreview.swift */; };
 		A1000100000000000000001C /* ProjectFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001C /* ProjectFile.swift */; };
+		A10001000000000000000076 /* CodeAnalysisTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000076 /* CodeAnalysisTypes.swift */; };
 		A1000100000000000000001D /* CodeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001D /* CodeViewModel.swift */; };
+		A10001000000000000000073 /* CodeViewModel+Analysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000073 /* CodeViewModel+Analysis.swift */; };
+		A10001000000000000000089 /* CodeViewModel+DatabaseSignals.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000089 /* CodeViewModel+DatabaseSignals.swift */; };
 		A1000100000000000000001E /* CodeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001E /* CodeEditorView.swift */; };
 		A1000100000000000000001F /* CodeModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000001F /* CodeModeView.swift */; };
+		A10001000000000000000071 /* CodeModeView+Panels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000071 /* CodeModeView+Panels.swift */; };
+		A10001000000000000000072 /* CodeModeView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000072 /* CodeModeView+Actions.swift */; };
+		A10001000000000000000088 /* CodeModeView+DomainReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000088 /* CodeModeView+DomainReport.swift */; };
 		A10001000000000000000020 /* FileTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000020 /* FileTreeView.swift */; };
 		A10001000000000000000021 /* LocalProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000021 /* LocalProject.swift */; };
 		A10001000000000000000022 /* LocalWorkspaceTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000022 /* LocalWorkspaceTypes.swift */; };
@@ -78,6 +95,11 @@
 		A1000100000000000000004E /* ChecklistModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004E /* ChecklistModel.swift */; };
 		A1000100000000000000004F /* BossSystemPrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000100000000000000004F /* BossSystemPrompts.swift */; };
 		A10001000000000000000050 /* BossToolExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000050 /* BossToolExecutor.swift */; };
+		A10001000000000000000080 /* BossToolExecutor+CreateProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000080 /* BossToolExecutor+CreateProject.swift */; };
+		A10001000000000000000081 /* BossToolExecutor+Delegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000081 /* BossToolExecutor+Delegate.swift */; };
+		A10001000000000000000082 /* BossToolExecutor+Build.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000082 /* BossToolExecutor+Build.swift */; };
+		A10001000000000000000083 /* BossToolExecutor+Checklist.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000083 /* BossToolExecutor+Checklist.swift */; };
+		A10001000000000000000084 /* BossToolExecutor+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000084 /* BossToolExecutor+Helpers.swift */; };
 		A10001000000000000000051 /* ChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000051 /* ChecklistView.swift */; };
 		A10001000000000000000062 /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000062 /* ActivityLog.swift */; };
 		A10001000000000000000063 /* ActivityLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000063 /* ActivityLogView.swift */; };
@@ -88,6 +110,9 @@
 		A10001000000000000000068 /* ClickedElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000068 /* ClickedElement.swift */; };
 		A10001000000000000000069 /* ElementPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000069 /* ElementPopover.swift */; };
 		A10001000000000000000070 /* GeminiBossService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000070 /* GeminiBossService.swift */; };
+		A10001000000000000000085 /* GeminiBossService+Cache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000085 /* GeminiBossService+Cache.swift */; };
+		A10001000000000000000086 /* GeminiBossService+Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000086 /* GeminiBossService+Conversion.swift */; };
+		A10001000000000000000087 /* GeminiBossService+Parsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000087 /* GeminiBossService+Parsing.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,22 +145,42 @@
 		B10001000000000000000068 /* ClickedElement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickedElement.swift; sourceTree = "<group>"; };
 		B10001000000000000000069 /* ElementPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementPopover.swift; sourceTree = "<group>"; };
 		B10001000000000000000070 /* GeminiBossService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiBossService.swift; sourceTree = "<group>"; };
+		B10001000000000000000085 /* GeminiBossService+Cache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeminiBossService+Cache.swift"; sourceTree = "<group>"; };
+		B10001000000000000000086 /* GeminiBossService+Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeminiBossService+Conversion.swift"; sourceTree = "<group>"; };
+		B10001000000000000000087 /* GeminiBossService+Parsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GeminiBossService+Parsing.swift"; sourceTree = "<group>"; };
 		B10001000000000000000046 /* ToolDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDefinition.swift; sourceTree = "<group>"; };
+		B10001000000000000000074 /* ForgeTools+Schemas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ForgeTools+Schemas.swift"; sourceTree = "<group>"; };
+		B1000100000000000000007A /* ForgeTools+Anthropic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ForgeTools+Anthropic.swift"; sourceTree = "<group>"; };
+		B10001000000000000000075 /* ToolResponseParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolResponseParsers.swift; sourceTree = "<group>"; };
 		B10001000000000000000047 /* ToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolExecutor.swift; sourceTree = "<group>"; };
+		B1000100000000000000007B /* ToolExecutor+FileTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolExecutor+FileTools.swift"; sourceTree = "<group>"; };
+		B1000100000000000000007C /* ToolExecutor+WebImageTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolExecutor+WebImageTools.swift"; sourceTree = "<group>"; };
+		B1000100000000000000007D /* ToolExecutor+ScreenshotTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolExecutor+ScreenshotTools.swift"; sourceTree = "<group>"; };
+		B1000100000000000000007E /* ToolExecutor+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolExecutor+Helpers.swift"; sourceTree = "<group>"; };
+		B1000100000000000000007F /* ToolError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolError.swift; sourceTree = "<group>"; };
 		B10001000000000000000048 /* AgentLoop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLoop.swift; sourceTree = "<group>"; };
 		B10001000000000000000012 /* StreamingParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingParser.swift; sourceTree = "<group>"; };
 		B10001000000000000000013 /* SystemPrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPrompts.swift; sourceTree = "<group>"; };
 		B10001000000000000000014 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		B10001000000000000000015 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		B10001000000000000000016 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
+		B10001000000000000000077 /* ChatViewModel+Tools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatViewModel+Tools.swift"; sourceTree = "<group>"; };
+		B10001000000000000000078 /* ChatViewModel+Streaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatViewModel+Streaming.swift"; sourceTree = "<group>"; };
+		B10001000000000000000079 /* ChatViewModel+Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatViewModel+Persistence.swift"; sourceTree = "<group>"; };
 		B10001000000000000000017 /* ChatTabContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTabContent.swift; sourceTree = "<group>"; };
 		B10001000000000000000018 /* ChatBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubble.swift; sourceTree = "<group>"; };
 		B10001000000000000000019 /* FloatingChatWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingChatWindow.swift; sourceTree = "<group>"; };
 		B1000100000000000000001A /* WebPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebPreview.swift; sourceTree = "<group>"; };
 		B1000100000000000000001C /* ProjectFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectFile.swift; sourceTree = "<group>"; };
+		B10001000000000000000076 /* CodeAnalysisTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeAnalysisTypes.swift; sourceTree = "<group>"; };
 		B1000100000000000000001D /* CodeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeViewModel.swift; sourceTree = "<group>"; };
+		B10001000000000000000073 /* CodeViewModel+Analysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CodeViewModel+Analysis.swift"; sourceTree = "<group>"; };
+		B10001000000000000000089 /* CodeViewModel+DatabaseSignals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CodeViewModel+DatabaseSignals.swift"; sourceTree = "<group>"; };
 		B1000100000000000000001E /* CodeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorView.swift; sourceTree = "<group>"; };
 		B1000100000000000000001F /* CodeModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeModeView.swift; sourceTree = "<group>"; };
+		B10001000000000000000071 /* CodeModeView+Panels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CodeModeView+Panels.swift"; sourceTree = "<group>"; };
+		B10001000000000000000072 /* CodeModeView+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CodeModeView+Actions.swift"; sourceTree = "<group>"; };
+		B10001000000000000000088 /* CodeModeView+DomainReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CodeModeView+DomainReport.swift"; sourceTree = "<group>"; };
 		B10001000000000000000020 /* FileTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTreeView.swift; sourceTree = "<group>"; };
 		B10001000000000000000021 /* LocalProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalProject.swift; sourceTree = "<group>"; };
 		B10001000000000000000022 /* LocalWorkspaceTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWorkspaceTypes.swift; sourceTree = "<group>"; };
@@ -172,6 +217,11 @@
 		B1000100000000000000004E /* ChecklistModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistModel.swift; sourceTree = "<group>"; };
 		B1000100000000000000004F /* BossSystemPrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossSystemPrompts.swift; sourceTree = "<group>"; };
 		B10001000000000000000050 /* BossToolExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BossToolExecutor.swift; sourceTree = "<group>"; };
+		B10001000000000000000080 /* BossToolExecutor+CreateProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+CreateProject.swift"; sourceTree = "<group>"; };
+		B10001000000000000000081 /* BossToolExecutor+Delegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Delegate.swift"; sourceTree = "<group>"; };
+		B10001000000000000000082 /* BossToolExecutor+Build.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Build.swift"; sourceTree = "<group>"; };
+		B10001000000000000000083 /* BossToolExecutor+Checklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Checklist.swift"; sourceTree = "<group>"; };
+		B10001000000000000000084 /* BossToolExecutor+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Helpers.swift"; sourceTree = "<group>"; };
 		B10001000000000000000051 /* ChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -340,51 +390,99 @@
 			path = Utilities;
 			sourceTree = "<group>";
 		};
-		D10001000000000000000058 /* AI */ = {
-			isa = PBXGroup;
-			children = (
-				B1000100000000000000000D /* AIProvider.swift */,
-				B1000100000000000000000F /* AIError.swift */,
-				B1000100000000000000000E /* AIService.swift */,
-				B10001000000000000000012 /* StreamingParser.swift */,
-				B10001000000000000000014 /* KeychainHelper.swift */,
-				B10001000000000000000013 /* SystemPrompts.swift */,
-				B10001000000000000000049 /* RequestLogger.swift */,
-				B10001000000000000000010 /* GroqService.swift */,
-				B10001000000000000000011 /* ClaudeService.swift */,
-				B10001000000000000000060 /* GeminiService.swift */,
-				B10001000000000000000070 /* GeminiBossService.swift */,
-				B10001000000000000000061 /* CodexService.swift */,
-				D10001000000000000000093 /* Boss */,
-				D10001000000000000000091 /* Tools */,
-			);
-			path = AI;
+			D10001000000000000000058 /* AI */ = {
+				isa = PBXGroup;
+				children = (
+					D10001000000000000000094 /* Domain */,
+					D10001000000000000000095 /* Services */,
+					D10001000000000000000097 /* Support */,
+					D10001000000000000000096 /* UI */,
+					D10001000000000000000093 /* Boss */,
+					D10001000000000000000091 /* Tools */,
+				);
+				path = AI;
+				sourceTree = "<group>";
+			};
+			D10001000000000000000094 /* Domain */ = {
+				isa = PBXGroup;
+				children = (
+					B1000100000000000000000D /* AIProvider.swift */,
+					B1000100000000000000000F /* AIError.swift */,
+					B1000100000000000000000E /* AIService.swift */,
+				);
+				path = Domain;
+				sourceTree = "<group>";
+			};
+			D10001000000000000000095 /* Services */ = {
+				isa = PBXGroup;
+				children = (
+					B10001000000000000000010 /* GroqService.swift */,
+					B10001000000000000000011 /* ClaudeService.swift */,
+					B10001000000000000000060 /* GeminiService.swift */,
+					B10001000000000000000070 /* GeminiBossService.swift */,
+					B10001000000000000000085 /* GeminiBossService+Cache.swift */,
+					B10001000000000000000086 /* GeminiBossService+Conversion.swift */,
+					B10001000000000000000087 /* GeminiBossService+Parsing.swift */,
+					B10001000000000000000061 /* CodexService.swift */,
+				);
+				path = Services;
+				sourceTree = "<group>";
+			};
+			D10001000000000000000097 /* Support */ = {
+				isa = PBXGroup;
+				children = (
+					B10001000000000000000012 /* StreamingParser.swift */,
+					B10001000000000000000014 /* KeychainHelper.swift */,
+					B10001000000000000000013 /* SystemPrompts.swift */,
+					B10001000000000000000049 /* RequestLogger.swift */,
+				);
+				path = Support;
+				sourceTree = "<group>";
+			};
+			D10001000000000000000096 /* UI */ = {
+				isa = PBXGroup;
+				children = (
+					B10001000000000000000051 /* ChecklistView.swift */,
+					B10001000000000000000063 /* ActivityLogView.swift */,
+				);
+				path = UI;
+				sourceTree = "<group>";
+			};
+			D10001000000000000000091 /* Tools */ = {
+				isa = PBXGroup;
+				children = (
+					B10001000000000000000046 /* ToolDefinition.swift */,
+					B10001000000000000000074 /* ForgeTools+Schemas.swift */,
+					B1000100000000000000007A /* ForgeTools+Anthropic.swift */,
+					B10001000000000000000075 /* ToolResponseParsers.swift */,
+					B10001000000000000000047 /* ToolExecutor.swift */,
+					B1000100000000000000007B /* ToolExecutor+FileTools.swift */,
+					B1000100000000000000007C /* ToolExecutor+WebImageTools.swift */,
+					B1000100000000000000007D /* ToolExecutor+ScreenshotTools.swift */,
+					B1000100000000000000007E /* ToolExecutor+Helpers.swift */,
+					B1000100000000000000007F /* ToolError.swift */,
+					B10001000000000000000048 /* AgentLoop.swift */,
+				);
+				path = Tools;
 			sourceTree = "<group>";
 		};
-		D10001000000000000000091 /* Tools */ = {
-			isa = PBXGroup;
-			children = (
-				B10001000000000000000046 /* ToolDefinition.swift */,
-				B10001000000000000000047 /* ToolExecutor.swift */,
-				B10001000000000000000048 /* AgentLoop.swift */,
-			);
-			path = Tools;
-			sourceTree = "<group>";
-		};
-		D10001000000000000000093 /* Boss */ = {
-			isa = PBXGroup;
-			children = (
-				B1000100000000000000004D /* SubAgentRole.swift */,
-				B1000100000000000000004E /* ChecklistModel.swift */,
-				B1000100000000000000004F /* BossSystemPrompts.swift */,
-				B10001000000000000000050 /* BossToolExecutor.swift */,
-				B10001000000000000000051 /* ChecklistView.swift */,
-				B10001000000000000000062 /* ActivityLog.swift */,
-				B10001000000000000000063 /* ActivityLogView.swift */,
-				B10001000000000000000064 /* BuildLogger.swift */,
-				B10001000000000000000065 /* MemoryService.swift */,
-				B10001000000000000000066 /* PromptLoader.swift */,
-			);
+			D10001000000000000000093 /* Boss */ = {
+				isa = PBXGroup;
+				children = (
+					B1000100000000000000004D /* SubAgentRole.swift */,
+					B1000100000000000000004E /* ChecklistModel.swift */,
+					B1000100000000000000004F /* BossSystemPrompts.swift */,
+					B10001000000000000000050 /* BossToolExecutor.swift */,
+					B10001000000000000000080 /* BossToolExecutor+CreateProject.swift */,
+					B10001000000000000000081 /* BossToolExecutor+Delegate.swift */,
+					B10001000000000000000082 /* BossToolExecutor+Build.swift */,
+					B10001000000000000000083 /* BossToolExecutor+Checklist.swift */,
+					B10001000000000000000084 /* BossToolExecutor+Helpers.swift */,
+					B10001000000000000000062 /* ActivityLog.swift */,
+					B10001000000000000000064 /* BuildLogger.swift */,
+					B10001000000000000000065 /* MemoryService.swift */,
+					B10001000000000000000066 /* PromptLoader.swift */,
+				);
 			path = Boss;
 			sourceTree = "<group>";
 		};
@@ -417,13 +515,16 @@
 			path = Domain;
 			sourceTree = "<group>";
 		};
-		D1000100000000000000005B /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				B10001000000000000000016 /* ChatViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
+			D1000100000000000000005B /* ViewModels */ = {
+				isa = PBXGroup;
+				children = (
+					B10001000000000000000016 /* ChatViewModel.swift */,
+					B10001000000000000000077 /* ChatViewModel+Tools.swift */,
+					B10001000000000000000078 /* ChatViewModel+Streaming.swift */,
+					B10001000000000000000079 /* ChatViewModel+Persistence.swift */,
+				);
+				path = ViewModels;
+				sourceTree = "<group>";
 		};
 		D1000100000000000000005C /* UI */ = {
 			isa = PBXGroup;
@@ -471,31 +572,37 @@
 			path = Editor;
 			sourceTree = "<group>";
 		};
-		D10001000000000000000060 /* Domain */ = {
-			isa = PBXGroup;
-			children = (
-				B1000100000000000000001C /* ProjectFile.swift */,
-			);
-			path = Domain;
-			sourceTree = "<group>";
+			D10001000000000000000060 /* Domain */ = {
+				isa = PBXGroup;
+				children = (
+					B1000100000000000000001C /* ProjectFile.swift */,
+					B10001000000000000000076 /* CodeAnalysisTypes.swift */,
+				);
+				path = Domain;
+				sourceTree = "<group>";
 		};
-		D10001000000000000000061 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				B1000100000000000000001D /* CodeViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
+			D10001000000000000000061 /* ViewModels */ = {
+				isa = PBXGroup;
+				children = (
+					B1000100000000000000001D /* CodeViewModel.swift */,
+					B10001000000000000000073 /* CodeViewModel+Analysis.swift */,
+					B10001000000000000000089 /* CodeViewModel+DatabaseSignals.swift */,
+				);
+				path = ViewModels;
+				sourceTree = "<group>";
 		};
-		D10001000000000000000062 /* UI */ = {
-			isa = PBXGroup;
-			children = (
-				B1000100000000000000001E /* CodeEditorView.swift */,
-				B1000100000000000000001F /* CodeModeView.swift */,
-				B10001000000000000000020 /* FileTreeView.swift */,
-			);
-			path = UI;
-			sourceTree = "<group>";
+			D10001000000000000000062 /* UI */ = {
+				isa = PBXGroup;
+				children = (
+					B1000100000000000000001E /* CodeEditorView.swift */,
+					B1000100000000000000001F /* CodeModeView.swift */,
+					B10001000000000000000071 /* CodeModeView+Panels.swift */,
+					B10001000000000000000072 /* CodeModeView+Actions.swift */,
+					B10001000000000000000088 /* CodeModeView+DomainReport.swift */,
+					B10001000000000000000020 /* FileTreeView.swift */,
+				);
+				path = UI;
+				sourceTree = "<group>";
 		};
 		D10001000000000000000063 /* Workspace */ = {
 			isa = PBXGroup;
@@ -738,27 +845,47 @@
 				A10001000000000000000014 /* KeychainHelper.swift in Sources */,
 				A10001000000000000000013 /* SystemPrompts.swift in Sources */,
 				A10001000000000000000010 /* GroqService.swift in Sources */,
-				A10001000000000000000011 /* ClaudeService.swift in Sources */,
-				A10001000000000000000046 /* ToolDefinition.swift in Sources */,
-				A10001000000000000000047 /* ToolExecutor.swift in Sources */,
-				A10001000000000000000048 /* AgentLoop.swift in Sources */,
+					A10001000000000000000011 /* ClaudeService.swift in Sources */,
+					A10001000000000000000046 /* ToolDefinition.swift in Sources */,
+					A10001000000000000000074 /* ForgeTools+Schemas.swift in Sources */,
+					A1000100000000000000007A /* ForgeTools+Anthropic.swift in Sources */,
+					A10001000000000000000075 /* ToolResponseParsers.swift in Sources */,
+					A10001000000000000000047 /* ToolExecutor.swift in Sources */,
+					A1000100000000000000007B /* ToolExecutor+FileTools.swift in Sources */,
+					A1000100000000000000007C /* ToolExecutor+WebImageTools.swift in Sources */,
+					A1000100000000000000007D /* ToolExecutor+ScreenshotTools.swift in Sources */,
+					A1000100000000000000007E /* ToolExecutor+Helpers.swift in Sources */,
+					A1000100000000000000007F /* ToolError.swift in Sources */,
+					A10001000000000000000048 /* AgentLoop.swift in Sources */,
 				A10001000000000000000060 /* GeminiService.swift in Sources */,
 				A10001000000000000000070 /* GeminiBossService.swift in Sources */,
+				A10001000000000000000085 /* GeminiBossService+Cache.swift in Sources */,
+				A10001000000000000000086 /* GeminiBossService+Conversion.swift in Sources */,
+				A10001000000000000000087 /* GeminiBossService+Parsing.swift in Sources */,
 				A10001000000000000000061 /* CodexService.swift in Sources */,
 				A10001000000000000000009 /* Project.swift in Sources */,
 				A1000100000000000000000A /* Page.swift in Sources */,
 				A1000100000000000000000B /* PageFilters.swift in Sources */,
-				A1000100000000000000000C /* ProjectFormatters.swift in Sources */,
-				A10001000000000000000015 /* ChatMessage.swift in Sources */,
-				A10001000000000000000016 /* ChatViewModel.swift in Sources */,
-				A10001000000000000000018 /* ChatBubble.swift in Sources */,
+					A1000100000000000000000C /* ProjectFormatters.swift in Sources */,
+					A10001000000000000000015 /* ChatMessage.swift in Sources */,
+					A10001000000000000000016 /* ChatViewModel.swift in Sources */,
+					A10001000000000000000077 /* ChatViewModel+Tools.swift in Sources */,
+					A10001000000000000000078 /* ChatViewModel+Streaming.swift in Sources */,
+					A10001000000000000000079 /* ChatViewModel+Persistence.swift in Sources */,
+					A10001000000000000000018 /* ChatBubble.swift in Sources */,
 				A10001000000000000000017 /* ChatTabContent.swift in Sources */,
-				A10001000000000000000019 /* FloatingChatWindow.swift in Sources */,
-				A1000100000000000000001C /* ProjectFile.swift in Sources */,
-				A1000100000000000000001D /* CodeViewModel.swift in Sources */,
-				A1000100000000000000001E /* CodeEditorView.swift in Sources */,
-				A1000100000000000000001F /* CodeModeView.swift in Sources */,
-				A10001000000000000000020 /* FileTreeView.swift in Sources */,
+					A10001000000000000000019 /* FloatingChatWindow.swift in Sources */,
+					A1000100000000000000001C /* ProjectFile.swift in Sources */,
+					A10001000000000000000076 /* CodeAnalysisTypes.swift in Sources */,
+					A1000100000000000000001D /* CodeViewModel.swift in Sources */,
+					A10001000000000000000073 /* CodeViewModel+Analysis.swift in Sources */,
+					A10001000000000000000089 /* CodeViewModel+DatabaseSignals.swift in Sources */,
+					A1000100000000000000001E /* CodeEditorView.swift in Sources */,
+					A1000100000000000000001F /* CodeModeView.swift in Sources */,
+					A10001000000000000000071 /* CodeModeView+Panels.swift in Sources */,
+					A10001000000000000000072 /* CodeModeView+Actions.swift in Sources */,
+					A10001000000000000000088 /* CodeModeView+DomainReport.swift in Sources */,
+					A10001000000000000000020 /* FileTreeView.swift in Sources */,
 				A10001000000000000000021 /* LocalProject.swift in Sources */,
 				A10001000000000000000022 /* LocalWorkspaceTypes.swift in Sources */,
 				A10001000000000000000023 /* LocalWorkspaceService.swift in Sources */,
@@ -793,6 +920,11 @@
 				A1000100000000000000004E /* ChecklistModel.swift in Sources */,
 				A1000100000000000000004F /* BossSystemPrompts.swift in Sources */,
 				A10001000000000000000050 /* BossToolExecutor.swift in Sources */,
+				A10001000000000000000080 /* BossToolExecutor+CreateProject.swift in Sources */,
+				A10001000000000000000081 /* BossToolExecutor+Delegate.swift in Sources */,
+				A10001000000000000000082 /* BossToolExecutor+Build.swift in Sources */,
+				A10001000000000000000083 /* BossToolExecutor+Checklist.swift in Sources */,
+				A10001000000000000000084 /* BossToolExecutor+Helpers.swift in Sources */,
 				A10001000000000000000051 /* ChecklistView.swift in Sources */,
 				A10001000000000000000062 /* ActivityLog.swift in Sources */,
 				A10001000000000000000063 /* ActivityLogView.swift in Sources */,
