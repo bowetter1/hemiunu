@@ -204,13 +204,13 @@ struct Topbar: View {
             // Services
             IconButton(icon: "arrow.triangle.branch", size: iconSize) { }
                 .help("GitHub")
-            IconButton(icon: "paperplane", size: iconSize) { showDeployPopover.toggle() }
-                .help("Deploy")
+            IconButton(icon: "train.side.front.car", size: iconSize) { }
+                .help("Deploy (Railway)")
+            IconButton(icon: "cube", size: iconSize) { showDeployPopover.toggle() }
+                .help("Sandbox (Daytona)")
                 .popover(isPresented: $showDeployPopover) {
                     DeployPopover(appState: appState, chatViewModel: chatViewModel)
                 }
-            IconButton(icon: "terminal", size: iconSize) { }
-                .help("Sandbox")
 
             topbarDivider
 
