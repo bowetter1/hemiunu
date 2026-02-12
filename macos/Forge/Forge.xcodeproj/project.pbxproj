@@ -399,7 +399,7 @@
 			isa = PBXGroup;
 			children = (
 				D10001000000000000000055 /* Domain */,
-				D10001000000000000000056 /* Utilities */,
+				D10001000000000000000056 /* Services */,
 			);
 			path = Projects;
 			sourceTree = "<group>";
@@ -413,13 +413,13 @@
 			path = Domain;
 			sourceTree = "<group>";
 		};
-		D10001000000000000000056 /* Utilities */ = {
+		D10001000000000000000056 /* Services */ = {
 			isa = PBXGroup;
 			children = (
 				B1000100000000000000000B /* PageFilters.swift */,
 				B1000100000000000000000C /* ProjectFormatters.swift */,
 			);
-			path = Utilities;
+			path = Services;
 			sourceTree = "<group>";
 		};
 			D10001000000000000000058 /* AI */ = {
