@@ -1,16 +1,17 @@
 import SwiftUI
 
-/// Railway deploy popover — CLI-based, no API key needed
+/// Railway deploy popover — API key setup + one-click deploy
 struct RailwayDeployPopover: View {
     let appState: AppState
     let chatViewModel: ChatViewModel
 
+    @State private var apiKey = ""
     @State private var selectedVersion = "v1"
     @State private var isDeploying = false
     @State private var deployURL: String?
     @State private var savedRailway: RailwayInfo?
 
-    private var isAvailable: Bool { RailwayService.isAvailable }
+    private var hasKey: Bool { RailwayAPIService.hasAPIKey }
 
     /// Available version directories for current project
     private var versions: [String] {
@@ -64,8 +65,8 @@ struct RailwayDeployPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !isAvailable {
-                cliRequired
+            if !hasKey {
+                apiKeySetup
             } else if let url = deployURL {
                 deployedState(url: url)
             } else {
@@ -80,26 +81,29 @@ struct RailwayDeployPopover: View {
         }
     }
 
-    // MARK: - CLI Required
+    // MARK: - API Key Setup
 
-    private var cliRequired: some View {
+    private var apiKeySetup: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Railway CLI Required")
+            Text("Railway API Key")
                 .font(.system(size: 12, weight: .semibold))
 
-            Text("Install the Railway CLI to deploy:")
+            Text("Get your key from railway.com/account/tokens")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
-            Text("brew install railway")
-                .font(.system(size: 11, design: .monospaced))
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 6))
+            SecureField("API Key", text: $apiKey)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12))
 
-            Text("Then run `railway login` to authenticate.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+            Button("Save") {
+                guard !apiKey.isEmpty else { return }
+                KeychainHelper.save(key: RailwayAPIService.keychainKey, value: apiKey)
+                apiKey = ""
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .disabled(apiKey.isEmpty)
         }
     }
 

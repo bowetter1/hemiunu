@@ -228,7 +228,7 @@ extension BossToolExecutor {
     // MARK: - Helpers
 
     /// Create a tar.gz archive from project files, returns the archive data
-    private func createTarGz(projectPath: URL, files: [LocalFileInfo]) throws -> Data {
+    func createTarGz(projectPath: URL, files: [LocalFileInfo]) throws -> Data {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let tarFile = tempDir.appendingPathComponent("site.tar.gz")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)

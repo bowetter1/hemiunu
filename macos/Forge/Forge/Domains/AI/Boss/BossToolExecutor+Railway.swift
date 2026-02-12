@@ -24,7 +24,7 @@ extension BossToolExecutor {
 
         let deployerLabel = "railway/\(version)"
 
-        // Fast path first — no AI, just direct CLI pipeline
+        // Fast path first — no AI, just direct API pipeline
         do {
             onSubAgentEvent(deployerLabel, .toolStart(name: "deploy_to_railway", args: "Fast deploy \(deployProject)"))
             let url = try await fastDeployRailway(project: deployProject, label: deployerLabel)
@@ -41,46 +41,56 @@ extension BossToolExecutor {
         return try await agentDeployRailway(project: deployProject, version: version, label: deployerLabel)
     }
 
-    // MARK: - Fast Path (no AI)
+    // MARK: - Fast Path (API)
 
     private func fastDeployRailway(project: String, label: String) async throws -> String {
         let projectPath = workspace.projectPath(project)
         let serviceName = project.replacingOccurrences(of: "/", with: "-")
 
-        // 1. Copy project files to temp dir (Railway CLI uploads from cwd)
-        onSubAgentEvent(label, .toolStart(name: "railway_copy", args: "Copying project files"))
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("railway-\(UUID().uuidString)")
-        try copyProjectFiles(from: projectPath, to: tempDir)
-        onSubAgentEvent(label, .toolDone(name: "railway_copy", summary: "Files copied to temp dir"))
-        buildLogger?.logEvent("📦", "[railway] Copied project files to temp dir")
+        // 1. Pack project files into tar.gz
+        onSubAgentEvent(label, .toolStart(name: "railway_pack", args: "Packing project files"))
+        let files = workspace.listFiles(project: project).filter { !$0.isDirectory }
+        let tarData = try createTarGz(projectPath: projectPath, files: files)
+        let tarSizeMB = String(format: "%.1f", Double(tarData.count) / 1_048_576)
+        onSubAgentEvent(label, .toolDone(name: "railway_pack", summary: "Packed (\(tarSizeMB) MB)"))
+        buildLogger?.logEvent("📦", "[railway] Packed project files (\(tarSizeMB) MB)")
 
-        defer { try? FileManager.default.removeItem(at: tempDir) }
+        // 2. Create Railway project → projectId + environmentId
+        onSubAgentEvent(label, .toolStart(name: "railway_create_project", args: serviceName))
+        let (projectId, environmentId) = try await RailwayAPIService.createProject(name: serviceName)
+        onSubAgentEvent(label, .toolDone(name: "railway_create_project", summary: "Project created"))
+        buildLogger?.logEvent("🚂", "[railway] Project created: \(serviceName)")
 
-        // 2. railway init
-        onSubAgentEvent(label, .toolStart(name: "railway_init", args: serviceName))
-        _ = try await RailwayService.createProject(name: serviceName, cwd: tempDir)
-        onSubAgentEvent(label, .toolDone(name: "railway_init", summary: "Project created"))
-        buildLogger?.logEvent("🚂", "[railway] Project initialized: \(serviceName)")
+        // 3. Create service → serviceId
+        onSubAgentEvent(label, .toolStart(name: "railway_create_service", args: serviceName))
+        let serviceId = try await RailwayAPIService.createService(projectId: projectId, name: serviceName)
+        onSubAgentEvent(label, .toolDone(name: "railway_create_service", summary: "Service created"))
+        buildLogger?.logEvent("🔧", "[railway] Service created: \(serviceId.prefix(8))...")
 
-        // 3. railway up --detach (no --service flag — Railway auto-creates service)
-        onSubAgentEvent(label, .toolStart(name: "railway_up", args: "Uploading & deploying"))
-        _ = try await RailwayService.deploy(cwd: tempDir)
-        onSubAgentEvent(label, .toolDone(name: "railway_up", summary: "Upload started"))
-        buildLogger?.logEvent("⬆️", "[railway] Deploy started (detached)")
+        // 4. Upload tarball & deploy → deploymentId
+        onSubAgentEvent(label, .toolStart(name: "railway_upload", args: "Uploading & deploying"))
+        let deploymentId = try await RailwayAPIService.uploadAndDeploy(
+            projectId: projectId,
+            environmentId: environmentId,
+            serviceId: serviceId,
+            tarball: tarData
+        )
+        onSubAgentEvent(label, .toolDone(name: "railway_upload", summary: "Upload started"))
+        buildLogger?.logEvent("⬆️", "[railway] Deploy started: \(deploymentId.prefix(8))...")
 
-        // 4. railway domain (uses linked service from project context)
+        // 5. Create public domain → URL
         onSubAgentEvent(label, .toolStart(name: "railway_domain", args: "Requesting domain"))
-        let url = try await RailwayService.getDomain(cwd: tempDir)
+        let url = try await RailwayAPIService.createDomain(serviceId: serviceId, environmentId: environmentId)
         onSubAgentEvent(label, .toolDone(name: "railway_domain", summary: url))
         buildLogger?.logEvent("🌐", "[railway] Domain: \(url)")
 
-        // 5. Poll status until SUCCESS
+        // 6. Poll status until SUCCESS
         onSubAgentEvent(label, .toolStart(name: "railway_status", args: "Waiting for deploy..."))
-        let status = try await RailwayService.pollStatus(cwd: tempDir, maxAttempts: 30, interval: 2_000_000_000)
+        let status = try await RailwayAPIService.pollDeployment(deploymentId: deploymentId)
         onSubAgentEvent(label, .toolDone(name: "railway_status", summary: status))
         buildLogger?.logEvent("✅", "[railway] Deploy status: \(status)")
 
-        // 6. Save railway.json to project dir
+        // 7. Save railway.json to project dir
         saveRailwayJSON(project: project, serviceName: serviceName, url: url)
 
         return url
@@ -102,11 +112,12 @@ extension BossToolExecutor {
         PROJECT FILES:
         \(fileListing)
 
-        ## Railway CLI Commands
-        - `railway init -n "<name>"` — create a new Railway project
-        - `railway up --detach` — deploy via Nixpacks (auto-creates service)
-        - `railway domain --json` — get the public URL
-        - `railway status` — check deploy status
+        ## Railway API (use RailwayAPIService)
+        1. `RailwayAPIService.createProject(name:)` → (projectId, environmentId)
+        2. `RailwayAPIService.createService(projectId:, name:)` → serviceId
+        3. Pack project files into tar.gz, then `RailwayAPIService.uploadAndDeploy(projectId:, environmentId:, serviceId:, tarball:)` → deploymentId
+        4. `RailwayAPIService.createDomain(serviceId:, environmentId:)` → URL
+        5. `RailwayAPIService.pollDeployment(deploymentId:)` → wait for SUCCESS
 
         ## Notes
         - Nixpacks auto-detects project type (HTML, Node, React, etc.)
@@ -114,7 +125,6 @@ extension BossToolExecutor {
         - For static HTML: Nixpacks will serve it automatically
         - Deploy takes ~30-60 seconds
 
-        Copy project files to a temp directory first, then run Railway CLI from there.
         Return the public URL when done.
         """
 
@@ -145,7 +155,7 @@ extension BossToolExecutor {
             let service = builderServiceResolver?("opus") ?? serviceResolver(.claude)
             let isAnthropic = service.provider == .claude
             let allTools: [[String: Any]] = isAnthropic ? ForgeTools.anthropicFormat() : ForgeTools.openAIFormat()
-            let allowed: Set<String> = ["list_files", "read_file", "create_file", "edit_file", "run_command"]
+            let allowed: Set<String> = ["list_files", "read_file", "create_file", "edit_file"]
             let filteredTools = filterTools(allTools, allowed: allowed, isAnthropic: isAnthropic)
 
             result = try await AgentLoop().run(
@@ -164,7 +174,7 @@ extension BossToolExecutor {
             buildLogger?.logEvent("🔄", "[railway] Retrying with codex...")
 
             let fallbackService = builderServiceResolver?("codex") ?? serviceResolver(.codex)
-            let allowed: Set<String> = ["list_files", "read_file", "create_file", "edit_file", "run_command"]
+            let allowed: Set<String> = ["list_files", "read_file", "create_file", "edit_file"]
             let fallbackTools = filterTools(ForgeTools.openAIFormat(), allowed: allowed, isAnthropic: false)
 
             result = try await AgentLoop().run(
@@ -188,27 +198,6 @@ extension BossToolExecutor {
     }
 
     // MARK: - Helpers
-
-    /// Copy project files to a temp directory, skipping build artifacts and metadata
-    private func copyProjectFiles(from source: URL, to destination: URL) throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: destination, withIntermediateDirectories: true)
-
-        let skipDirs: Set<String> = ["node_modules", ".git", ".next", "dist", "build"]
-        let skipFiles: Set<String> = ["build-log.md", "agent-name.txt", "brief.md", "project-name.txt", "sandbox.json", "railway.json", "memory.md", "research.md", "checklist.md"]
-
-        let items = try fm.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isDirectoryKey])
-        for item in items {
-            let name = item.lastPathComponent
-            let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-
-            if isDir && skipDirs.contains(name) { continue }
-            if !isDir && skipFiles.contains(name) { continue }
-
-            let dest = destination.appendingPathComponent(name)
-            try fm.copyItem(at: item, to: dest)
-        }
-    }
 
     func saveRailwayJSON(project: String, serviceName: String, url: String) {
         let file = workspace.projectPath(project).appendingPathComponent("railway.json")
