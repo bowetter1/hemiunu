@@ -119,6 +119,8 @@
 		A100010000000000000000A4 /* RailwayAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A4 /* RailwayAPIService.swift */; };
 		A100010000000000000000A5 /* BossToolExecutor+Railway.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A5 /* BossToolExecutor+Railway.swift */; };
 		A100010000000000000000A6 /* RailwayDeployPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A6 /* RailwayDeployPopover.swift */; };
+		A100010000000000000000A7 /* GitHubService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A7 /* GitHubService.swift */; };
+		A100010000000000000000A8 /* GitHubPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A8 /* GitHubPopover.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -235,6 +237,8 @@
 		B100010000000000000000A4 /* RailwayAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailwayAPIService.swift; sourceTree = "<group>"; };
 		B100010000000000000000A5 /* BossToolExecutor+Railway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Railway.swift"; sourceTree = "<group>"; };
 		B100010000000000000000A6 /* RailwayDeployPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailwayDeployPopover.swift; sourceTree = "<group>"; };
+		B100010000000000000000A7 /* GitHubService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubService.swift; sourceTree = "<group>"; };
+		B100010000000000000000A8 /* GitHubPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPopover.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -364,6 +368,7 @@
 			isa = PBXGroup;
 			children = (
 				B100010000000000000000A1 /* DaytonaService.swift */,
+				B100010000000000000000A7 /* GitHubService.swift */,
 				B100010000000000000000A4 /* RailwayAPIService.swift */,
 			);
 			path = Services;
@@ -373,6 +378,7 @@
 			isa = PBXGroup;
 			children = (
 				B100010000000000000000A2 /* DeployPopover.swift */,
+				B100010000000000000000A8 /* GitHubPopover.swift */,
 				B100010000000000000000A6 /* RailwayDeployPopover.swift */,
 			);
 			path = UI;
@@ -979,6 +985,8 @@
 				A100010000000000000000A4 /* RailwayAPIService.swift in Sources */,
 				A100010000000000000000A5 /* BossToolExecutor+Railway.swift in Sources */,
 				A100010000000000000000A6 /* RailwayDeployPopover.swift in Sources */,
+				A100010000000000000000A7 /* GitHubService.swift in Sources */,
+				A100010000000000000000A8 /* GitHubPopover.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
