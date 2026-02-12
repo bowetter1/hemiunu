@@ -6,13 +6,13 @@ extension ForgeTools {
         var tools = anthropicFormat()
         tools.append([
             "name": "delegate_task",
-            "description": "Delegate a task to a sub-agent. The sub-agent will execute the task using its own tools and return a result. Available roles: coder (builds HTML/CSS/JS), researcher (web search + files), reviewer (read-only inspection), tester (screenshot + visual QA).",
+            "description": "Delegate a task to a sub-agent. The sub-agent will execute the task using its own tools and return a result. Available roles: coder (builds HTML/CSS/JS), reviewer (read-only inspection), tester (screenshot + visual QA), deployer (deploys versions to sandbox).",
             "input_schema": [
                 "type": "object",
                 "properties": [
                     "role": [
                         "type": "string",
-                        "enum": ["coder", "researcher", "reviewer", "tester"],
+                        "enum": ["coder", "reviewer", "tester", "deployer"],
                         "description": "The sub-agent role to delegate to",
                     ] as [String: Any],
                     "instructions": [
