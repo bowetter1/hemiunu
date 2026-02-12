@@ -18,8 +18,6 @@ extension CodeModeView {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    healthCard
-                    dashboardSection
                     codexDomainReportSection
 
                     insightSectionHeader("Large Files")
@@ -66,29 +64,39 @@ extension CodeModeView {
                             .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 6))
                         }
                     }
-
-                    architectureMapSection
-                    flowMapSection
-
-                    insightSectionHeader("Flow Highlights")
-                    if filteredFlows.isEmpty {
-                        insightInfo("No API flow highlights.")
-                    } else {
-                        ForEach(Array(filteredFlows.prefix(4).enumerated()), id: \.offset) { _, flow in
-                            Text(flow)
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 7)
-                                .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 6))
-                        }
-                    }
                 }
                 .padding(10)
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    var dashboardMainArea: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                healthCard
+                dashboardSection
+                architectureMapSection
+                flowMapSection
+
+                insightSectionHeader("Flow Highlights")
+                if filteredFlows.isEmpty {
+                    insightInfo("No API flow highlights.")
+                } else {
+                    ForEach(Array(filteredFlows.prefix(8).enumerated()), id: \.offset) { _, flow in
+                        Text(flow)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 7)
+                            .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 6))
+                    }
+                }
+            }
+            .padding(12)
+        }
+        .background(Color(nsColor: .textBackgroundColor))
     }
 
     private var healthCard: some View {

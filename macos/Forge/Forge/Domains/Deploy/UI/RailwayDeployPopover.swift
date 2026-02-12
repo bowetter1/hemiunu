@@ -58,9 +58,15 @@ struct RailwayDeployPopover: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Builder name for the currently viewed version
-    private var currentBuilderName: String? {
-        builderName(for: currentVersion)
+    /// Builder name for the selected version
+    private var selectedBuilderName: String? {
+        builderName(for: selectedVersion)
+    }
+
+    /// Project name for selected deploy target (e.g. "coffee-shop/v2")
+    private var selectedProjectName: String {
+        guard !parentProjectName.isEmpty else { return "" }
+        return "\(parentProjectName)/\(selectedVersion)"
     }
 
     var body: some View {
@@ -77,6 +83,9 @@ struct RailwayDeployPopover: View {
         .frame(width: 280)
         .onAppear {
             selectedVersion = currentVersion
+            loadRailwayInfo()
+        }
+        .onChange(of: selectedVersion) { _, _ in
             loadRailwayInfo()
         }
     }
@@ -116,7 +125,7 @@ struct RailwayDeployPopover: View {
                 Text("Railway Deploy")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                if let builder = currentBuilderName {
+                if let builder = selectedBuilderName {
                     Text(builder)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -238,51 +247,86 @@ struct RailwayDeployPopover: View {
     // MARK: - Actions
 
     private func deploy() {
+        let projectName = selectedProjectName
+        guard !projectName.isEmpty else { return }
+
         isDeploying = true
+        let deployStartedAt = Date()
+        let baseline = readRailwayInfo(projectName: projectName)
         chatViewModel.sendMessage("Deploy version \(selectedVersion) to Railway")
 
-        // Poll chat messages for Railway URL
+        // Poll railway.json for an updated deployment result.
         Task {
-            for _ in 0..<120 {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                if let url = findRailwayURL() {
-                    await MainActor.run {
-                        deployURL = url
-                        isDeploying = false
-                    }
-                    return
-                }
-            }
+            let url = await waitForDeploymentURL(projectName: projectName, baseline: baseline, startedAt: deployStartedAt)
             await MainActor.run {
+                deployURL = url
                 isDeploying = false
+                loadRailwayInfo()
             }
         }
     }
 
     private func loadRailwayInfo() {
-        let projectName = currentProjectName
-        guard !projectName.isEmpty else { return }
+        let projectName = selectedProjectName
+        guard !projectName.isEmpty else {
+            savedRailway = nil
+            return
+        }
+        guard let info = readRailwayInfo(projectName: projectName) else {
+            savedRailway = nil
+            return
+        }
+        savedRailway = info
+    }
+
+    private func readRailwayInfo(projectName: String) -> RailwayInfo? {
         let file = appState.workspace.projectPath(projectName).appendingPathComponent("railway.json")
         guard let data = try? Data(contentsOf: file),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let serviceName = json["service_name"] as? String,
-              let url = json["url"] as? String else { return }
+              let url = json["url"] as? String else {
+            return nil
+        }
 
         var createdAt: Date?
         if let dateStr = json["created_at"] as? String {
             createdAt = ISO8601DateFormatter().date(from: dateStr)
         }
 
-        savedRailway = RailwayInfo(serviceName: serviceName, url: url, createdAt: createdAt)
+        return RailwayInfo(serviceName: serviceName, url: url, createdAt: createdAt)
     }
 
-    private func findRailwayURL() -> String? {
-        for message in chatViewModel.messages.reversed() {
-            if let range = message.content.range(of: #"https://[\w-]+-production\.up\.railway\.app"#, options: .regularExpression) {
-                return String(message.content[range])
+    private func waitForDeploymentURL(projectName: String, baseline: RailwayInfo?, startedAt: Date) async -> String? {
+        for _ in 0..<180 {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard let latest = readRailwayInfo(projectName: projectName) else { continue }
+            guard isNewDeployment(latest, baseline: baseline, startedAt: startedAt) else { continue }
+            if !latest.url.isEmpty {
+                return latest.url
             }
         }
         return nil
+    }
+
+    private func isNewDeployment(_ latest: RailwayInfo, baseline: RailwayInfo?, startedAt: Date) -> Bool {
+        guard let baseline else {
+            // No prior deploy info: any written deployment artifact is new.
+            return true
+        }
+
+        if latest.serviceName != baseline.serviceName {
+            return true
+        }
+
+        if latest.url != baseline.url {
+            return true
+        }
+
+        if let latestCreatedAt = latest.createdAt {
+            return latestCreatedAt >= startedAt
+        }
+
+        return latest.createdAt != baseline.createdAt
     }
 }
 

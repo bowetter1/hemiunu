@@ -61,9 +61,15 @@ struct DeployPopover: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Builder name for the currently viewed version
-    private var currentBuilderName: String? {
-        builderName(for: currentVersion)
+    /// Builder name for the selected version
+    private var selectedBuilderName: String? {
+        builderName(for: selectedVersion)
+    }
+
+    /// Project name for selected deploy target (e.g. "coffee-shop/v2")
+    private var selectedProjectName: String {
+        guard !parentProjectName.isEmpty else { return "" }
+        return "\(parentProjectName)/\(selectedVersion)"
     }
 
     var body: some View {
@@ -80,6 +86,9 @@ struct DeployPopover: View {
         .frame(width: 280)
         .onAppear {
             selectedVersion = currentVersion
+            loadSandboxInfo()
+        }
+        .onChange(of: selectedVersion) { _, _ in
             loadSandboxInfo()
         }
     }
@@ -119,7 +128,7 @@ struct DeployPopover: View {
                 Text("Daytona Sandbox")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                if let builder = currentBuilderName {
+                if let builder = selectedBuilderName {
                     Text(builder)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -272,23 +281,21 @@ struct DeployPopover: View {
     // MARK: - Actions
 
     private func deploy() {
+        let projectName = selectedProjectName
+        guard !projectName.isEmpty else { return }
+
         isDeploying = true
+        let deployStartedAt = Date()
+        let baseline = readSandboxInfo(projectName: projectName)
         chatViewModel.sendMessage("Deploy version \(selectedVersion) to Daytona sandbox")
 
-        // Poll chat messages for deploy URL
+        // Poll sandbox.json for an updated deployment result.
         Task {
-            for _ in 0..<120 {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                if let url = findDeployURL() {
-                    await MainActor.run {
-                        deployURL = url
-                        isDeploying = false
-                    }
-                    return
-                }
-            }
+            let url = await waitForDeploymentURL(projectName: projectName, baseline: baseline, startedAt: deployStartedAt)
             await MainActor.run {
+                deployURL = url
                 isDeploying = false
+                loadSandboxInfo()
             }
         }
     }
@@ -311,12 +318,34 @@ struct DeployPopover: View {
     }
 
     private func loadSandboxInfo() {
-        let projectName = currentProjectName
-        guard !projectName.isEmpty else { return }
+        let projectName = selectedProjectName
+        guard !projectName.isEmpty else {
+            savedSandbox = nil
+            sandboxState = nil
+            return
+        }
+        guard let sandbox = readSandboxInfo(projectName: projectName) else {
+            savedSandbox = nil
+            sandboxState = nil
+            return
+        }
+
+        savedSandbox = sandbox
+
+        // Fetch live state
+        Task {
+            let state = await DaytonaService.sandboxState(id: sandbox.sandboxId)
+            await MainActor.run { sandboxState = state }
+        }
+    }
+
+    private func readSandboxInfo(projectName: String) -> SandboxInfo? {
         let file = appState.workspace.projectPath(projectName).appendingPathComponent("sandbox.json")
         guard let data = try? Data(contentsOf: file),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let sandboxId = json["sandbox_id"] as? String else { return }
+              let sandboxId = json["sandbox_id"] as? String else {
+            return nil
+        }
 
         let previewURL = json["preview_url"] as? String
         var createdAt: Date?
@@ -324,22 +353,40 @@ struct DeployPopover: View {
             createdAt = ISO8601DateFormatter().date(from: dateStr)
         }
 
-        savedSandbox = SandboxInfo(sandboxId: sandboxId, previewURL: previewURL, createdAt: createdAt)
-
-        // Fetch live state
-        Task {
-            let state = await DaytonaService.sandboxState(id: sandboxId)
-            await MainActor.run { sandboxState = state }
-        }
+        return SandboxInfo(sandboxId: sandboxId, previewURL: previewURL, createdAt: createdAt)
     }
 
-    private func findDeployURL() -> String? {
-        for message in chatViewModel.messages.reversed() {
-            if let range = message.content.range(of: #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#, options: .regularExpression) {
-                return String(message.content[range])
+    private func waitForDeploymentURL(projectName: String, baseline: SandboxInfo?, startedAt: Date) async -> String? {
+        for _ in 0..<180 {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard let latest = readSandboxInfo(projectName: projectName) else { continue }
+            guard isNewDeployment(latest, baseline: baseline, startedAt: startedAt) else { continue }
+            if let url = latest.previewURL, !url.isEmpty {
+                return url
             }
         }
         return nil
+    }
+
+    private func isNewDeployment(_ latest: SandboxInfo, baseline: SandboxInfo?, startedAt: Date) -> Bool {
+        guard let baseline else {
+            // No prior sandbox info: any written deployment artifact is new.
+            return true
+        }
+
+        if latest.sandboxId != baseline.sandboxId {
+            return true
+        }
+
+        if latest.previewURL != baseline.previewURL, latest.previewURL != nil {
+            return true
+        }
+
+        if let latestCreatedAt = latest.createdAt {
+            return latestCreatedAt >= startedAt
+        }
+
+        return latest.createdAt != baseline.createdAt
     }
 }
 

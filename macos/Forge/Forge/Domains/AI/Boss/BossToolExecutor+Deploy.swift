@@ -29,7 +29,7 @@ extension BossToolExecutor {
             onSubAgentEvent(deployerLabel, .toolStart(name: "deploy_to_sandbox", args: "Fast deploy \(deployProject)"))
             let url = try await fastDeploy(project: deployProject, label: deployerLabel)
             onSubAgentEvent(deployerLabel, .toolDone(name: "deploy_to_sandbox", summary: "Deployed: \(url)"))
-            return "✅ Deployed to \(url) — the URL is already shown to the user as a clickable card. Do NOT repeat the URL in your response."
+            return "✅ Deployed to Daytona: \(url) — IMPORTANT: Include this URL in your response so the user can click it."
         } catch {
             // Fast path failed — call in the agent to debug
             buildLogger?.logEvent("⚡", "[deploy] Fast path failed: \(error.localizedDescription)")
@@ -219,7 +219,7 @@ extension BossToolExecutor {
 
         if let range = result.text.range(of: #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#, options: .regularExpression) {
             let url = String(result.text[range])
-            return "✅ Deployed to \(url) — the URL is already shown to the user as a clickable card. Do NOT repeat the URL in your response."
+            return "✅ Deployed to Daytona: \(url) — IMPORTANT: Include this URL in your response so the user can click it."
         }
 
         return result.text

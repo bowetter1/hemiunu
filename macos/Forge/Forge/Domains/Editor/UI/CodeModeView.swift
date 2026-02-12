@@ -3,10 +3,19 @@ import SwiftUI
 
 /// Code Mode command center with file tree, editor, insights, and context dock
 struct CodeModeView: View {
+    enum MainAreaTab: String, CaseIterable {
+        case code = "Code"
+        case dashboard = "Dashboard"
+    }
+
     var appState: AppState
     @Binding var selectedPageId: String?
     @State var viewModel: CodeViewModel
     @State var commandQuery: String = ""
+    @State private var mainAreaTab: MainAreaTab = .code
+    @State private var gitBranch: String = "no-git"
+    @State private var isGitDirty = false
+    @AppStorage("codeMode.lastSelectedProjectId") private var lastSelectedProjectId: String = ""
 
     private let fileTreeWidth: CGFloat = 250
 
@@ -37,10 +46,42 @@ struct CodeModeView: View {
                 .frame(height: 96)
         }
         .onAppear {
-            viewModel.loadFiles()
+            appState.refreshLocalProjects()
+            let validProjectIds = Set(appState.localProjects.map { "local:\($0.name)" })
+            let preferredProjectId: String? = {
+                if let selected = appState.selectedProjectId, validProjectIds.contains(selected) {
+                    return selected
+                }
+                if !lastSelectedProjectId.isEmpty, validProjectIds.contains(lastSelectedProjectId) {
+                    return lastSelectedProjectId
+                }
+                return appState.localProjects.first.map { "local:\($0.name)" }
+            }()
+
+            if let preferredProjectId {
+                lastSelectedProjectId = preferredProjectId
+                if appState.selectedProjectId != preferredProjectId {
+                    appState.setSelectedProjectId(preferredProjectId)
+                    Task {
+                        await appState.loadProject(id: preferredProjectId)
+                        viewModel.loadFiles()
+                        await refreshGitSummary()
+                    }
+                } else {
+                    viewModel.loadFiles()
+                    Task { await refreshGitSummary() }
+                }
+            } else {
+                viewModel.loadFiles()
+                Task { await refreshGitSummary() }
+            }
         }
         .onChange(of: appState.currentProject?.id) { _, _ in
+            if let selected = appState.selectedProjectId, !selected.isEmpty {
+                lastSelectedProjectId = selected
+            }
             viewModel.loadFiles()
+            Task { await refreshGitSummary() }
         }
     }
 
@@ -53,9 +94,8 @@ struct CodeModeView: View {
                 .foregroundStyle(.secondary)
                 .tracking(1)
 
-            Text(projectDisplayName)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
+            projectPicker
+            gitStatusPill
 
             Spacer(minLength: 6)
 
@@ -129,19 +169,43 @@ struct CodeModeView: View {
 
     private var editorSection: some View {
         VStack(spacing: 0) {
-            if let path = viewModel.selectedFilePath {
-                CodeEditorView(
-                    content: $viewModel.currentFileContent,
-                    fileName: (path as NSString).lastPathComponent,
-                    language: detectLanguage(path),
-                    isLoading: viewModel.isLoadingContent,
-                    onSave: viewModel.saveCurrentFile
-                )
+            mainAreaHeader
+            Divider()
+
+            if mainAreaTab == .dashboard {
+                dashboardMainArea
             } else {
-                emptyEditorState
+                if let path = viewModel.selectedFilePath {
+                    CodeEditorView(
+                        content: $viewModel.currentFileContent,
+                        fileName: (path as NSString).lastPathComponent,
+                        language: detectLanguage(path),
+                        isLoading: viewModel.isLoadingContent,
+                        onSave: viewModel.saveCurrentFile
+                    )
+                } else {
+                    emptyEditorState
+                }
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private var mainAreaHeader: some View {
+        HStack {
+            Picker("", selection: $mainAreaTab) {
+                ForEach(MainAreaTab.allCases, id: \.self) { tab in
+                    Text(tab.rawValue).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private var emptyEditorState: some View {
@@ -161,8 +225,121 @@ struct CodeModeView: View {
 
     // MARK: - Helpers
 
-    private var projectDisplayName: String {
-        appState.currentProject?.brief ?? "No Project"
+    private var projectPicker: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "folder")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            if projectPickerItems.isEmpty {
+                Text("No Project")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("Project", selection: selectedProjectBinding) {
+                    ForEach(projectPickerItems, id: \.id) { item in
+                        Text(item.label).tag(item.id)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 260)
+            }
+        }
+    }
+
+    private var projectPickerItems: [(id: String, label: String)] {
+        appState.localProjects.map { project in
+            ("local:\(project.name)", projectLabel(for: project))
+        }
+    }
+
+    private var selectedProjectBinding: Binding<String> {
+        Binding(
+            get: {
+                appState.selectedProjectId
+                    ?? projectPickerItems.first?.id
+                    ?? ""
+            },
+            set: { newValue in
+                selectProject(id: newValue)
+            }
+        )
+    }
+
+    private func selectProject(id: String) {
+        guard !id.isEmpty, id != appState.selectedProjectId else { return }
+        viewModel.selectedFilePath = nil
+        viewModel.currentFileContent = ""
+        lastSelectedProjectId = id
+        appState.setSelectedProjectId(id)
+        Task {
+            await appState.loadProject(id: id)
+            viewModel.loadFiles()
+            await refreshGitSummary()
+        }
+    }
+
+    private func projectLabel(for project: LocalProject) -> String {
+        let parts = project.name.components(separatedBy: "/")
+        let versionSuffix = parts.count == 2 ? " (\(parts[1]))" : ""
+        if let title = project.briefTitle, !title.isEmpty {
+            return title + versionSuffix
+        }
+        if let agent = project.agentName, !agent.isEmpty, parts.count == 2 {
+            return "\(parts[0])\(versionSuffix) • \(agent)"
+        }
+        return project.name
+    }
+
+    private var gitStatusPill: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+
+            Text(gitBranch)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Circle()
+                .fill(isGitDirty ? .orange : .green)
+                .frame(width: 6, height: 6)
+
+            Text(isGitDirty ? "dirty" : "clean")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.primary.opacity(0.06), in: .capsule)
+        .frame(maxWidth: 220, alignment: .leading)
+    }
+
+    private var activeLocalProjectName: String? {
+        if let selectedId = appState.selectedProjectId,
+           let localName = appState.localProjectName(from: selectedId) {
+            return localName
+        }
+        if let currentId = appState.currentProject?.id,
+           let localName = appState.localProjectName(from: currentId) {
+            return localName
+        }
+        return nil
+    }
+
+    private func refreshGitSummary() async {
+        guard let projectName = activeLocalProjectName else {
+            gitBranch = "no-project"
+            isGitDirty = false
+            return
+        }
+        let branch = (try? await appState.workspace.gitCurrentBranch(project: projectName)) ?? "no-git"
+        let dirty = (try? await appState.workspace.gitIsDirty(project: projectName)) ?? false
+        gitBranch = branch
+        isGitDirty = dirty
     }
 
     private func commandButton(title: String, icon: String, action: @escaping () -> Void) -> some View {

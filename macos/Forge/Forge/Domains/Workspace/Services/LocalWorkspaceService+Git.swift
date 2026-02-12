@@ -32,6 +32,21 @@ extension LocalWorkspaceService {
         try await exec("git status --porcelain", cwd: projectPath(project))
     }
 
+    /// Current branch name (or detached HEAD marker)
+    func gitCurrentBranch(project: String) async throws -> String {
+        let result = try await exec("git rev-parse --abbrev-ref HEAD", cwd: projectPath(project))
+        guard result.succeeded else { return "no-git" }
+        let branch = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        return branch.isEmpty ? "no-git" : branch
+    }
+
+    /// Whether there are uncommitted changes in the working tree
+    func gitIsDirty(project: String) async throws -> Bool {
+        let result = try await gitPorcelainStatus(project: project)
+        guard result.succeeded else { return false }
+        return !result.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// Git commit all changes
     func gitCommit(project: String, message: String) async throws -> ShellResult {
         _ = try await ensureGitRepository(project: project)
