@@ -29,7 +29,7 @@ extension BossToolExecutor {
             onSubAgentEvent(deployerLabel, .toolStart(name: "deploy_to_railway", args: "Fast deploy \(deployProject)"))
             let url = try await fastDeployRailway(project: deployProject, label: deployerLabel)
             onSubAgentEvent(deployerLabel, .toolDone(name: "deploy_to_railway", summary: "Deployed: \(url)"))
-            return "✅ Deployed to \(url) — the URL is already shown to the user as a clickable card. Do NOT repeat the URL in your response."
+            return "✅ Deployed to Railway: \(url)"
         } catch {
             // Fast path failed — call in the agent to debug
             buildLogger?.logEvent("⚡", "[railway] Fast path failed: \(error.localizedDescription)")
@@ -62,15 +62,15 @@ extension BossToolExecutor {
         onSubAgentEvent(label, .toolDone(name: "railway_init", summary: "Project created"))
         buildLogger?.logEvent("🚂", "[railway] Project initialized: \(serviceName)")
 
-        // 3. railway up --detach
+        // 3. railway up --detach (no --service flag — Railway auto-creates service)
         onSubAgentEvent(label, .toolStart(name: "railway_up", args: "Uploading & deploying"))
-        _ = try await RailwayService.deploy(serviceName: serviceName, cwd: tempDir)
+        _ = try await RailwayService.deploy(cwd: tempDir)
         onSubAgentEvent(label, .toolDone(name: "railway_up", summary: "Upload started"))
         buildLogger?.logEvent("⬆️", "[railway] Deploy started (detached)")
 
-        // 4. railway domain
+        // 4. railway domain (uses linked service from project context)
         onSubAgentEvent(label, .toolStart(name: "railway_domain", args: "Requesting domain"))
-        let url = try await RailwayService.getDomain(serviceName: serviceName, cwd: tempDir)
+        let url = try await RailwayService.getDomain(cwd: tempDir)
         onSubAgentEvent(label, .toolDone(name: "railway_domain", summary: url))
         buildLogger?.logEvent("🌐", "[railway] Domain: \(url)")
 
@@ -104,9 +104,9 @@ extension BossToolExecutor {
 
         ## Railway CLI Commands
         - `railway init -n "<name>"` — create a new Railway project
-        - `railway up --detach --service "<name>"` — deploy via Nixpacks
-        - `railway domain --json --service "<name>"` — get the public URL
-        - `railway service status --all` — check deploy status (DEPLOYING → SUCCESS)
+        - `railway up --detach` — deploy via Nixpacks (auto-creates service)
+        - `railway domain --json` — get the public URL
+        - `railway status` — check deploy status
 
         ## Notes
         - Nixpacks auto-detects project type (HTML, Node, React, etc.)
@@ -181,7 +181,7 @@ extension BossToolExecutor {
 
         if let range = result.text.range(of: #"https://[\w-]+-production\.up\.railway\.app"#, options: .regularExpression) {
             let url = String(result.text[range])
-            return "✅ Deployed to \(url) — the URL is already shown to the user as a clickable card. Do NOT repeat the URL in your response."
+            return "✅ Deployed to Railway: \(url)"
         }
 
         return result.text

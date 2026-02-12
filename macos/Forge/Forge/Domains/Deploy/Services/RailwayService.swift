@@ -23,18 +23,18 @@ enum RailwayService {
         return result.output
     }
 
-    /// Deploy to Railway via Nixpacks (detached)
-    static func deploy(serviceName: String, cwd: URL) async throws -> String {
-        let result = try await runCLI("railway up --detach --service \"\(serviceName)\"", cwd: cwd, timeout: 120)
+    /// Deploy to Railway via Nixpacks (detached) — no --service flag, Railway auto-creates it
+    static func deploy(cwd: URL) async throws -> String {
+        let result = try await runCLI("railway up --detach", cwd: cwd, timeout: 120)
         guard result.exitCode == 0 else {
             throw RailwayError.commandFailed("railway up", result.output)
         }
         return result.output
     }
 
-    /// Get the public domain for a service
-    static func getDomain(serviceName: String, cwd: URL) async throws -> String {
-        let result = try await runCLI("railway domain --json --service \"\(serviceName)\"", cwd: cwd, timeout: 30)
+    /// Get the public domain — no --service flag, uses linked service from project
+    static func getDomain(cwd: URL) async throws -> String {
+        let result = try await runCLI("railway domain --json", cwd: cwd, timeout: 30)
         guard result.exitCode == 0 else {
             throw RailwayError.commandFailed("railway domain", result.output)
         }
