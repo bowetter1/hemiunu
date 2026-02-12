@@ -24,6 +24,7 @@ struct Topbar: View {
     @State private var keyMonitor: Any?
     @State private var showDeployPopover = false
     @State private var showRailwayPopover = false
+    @State private var showGitHubPopover = false
 
     private let height: CGFloat = 38
     private let itemHeight: CGFloat = 26
@@ -203,7 +204,7 @@ struct Topbar: View {
             topbarDivider
 
             // Services
-            Button { } label: {
+            Button { showGitHubPopover.toggle() } label: {
                 Image("github")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -213,6 +214,9 @@ struct Topbar: View {
             }
             .buttonStyle(.plain)
             .help("GitHub")
+            .popover(isPresented: $showGitHubPopover) {
+                GitHubPopover(appState: appState, chatViewModel: chatViewModel)
+            }
             Button { showRailwayPopover.toggle() } label: {
                 Image("railway")
                     .resizable()
@@ -226,6 +230,16 @@ struct Topbar: View {
             .popover(isPresented: $showRailwayPopover) {
                 RailwayDeployPopover(appState: appState, chatViewModel: chatViewModel)
             }
+            Button { } label: {
+                Image("supabase")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: iconSize + 1, height: iconSize + 1)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help("Supabase")
             Button { showDeployPopover.toggle() } label: {
                 Image("daytona")
                     .resizable()
@@ -241,9 +255,6 @@ struct Topbar: View {
             }
 
             topbarDivider
-
-            // Logs button
-            TopbarLogsButton(chatViewModel: chatViewModel, iconSize: iconSize)
 
             // Settings
             TopbarSettingsButton(appState: appState, iconSize: iconSize)

@@ -226,7 +226,8 @@ struct FilesTabContent: View {
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
+                .fontDesign(.rounded)
                 .foregroundStyle(.tertiary)
                 .textCase(.uppercase)
                 .tracking(1)

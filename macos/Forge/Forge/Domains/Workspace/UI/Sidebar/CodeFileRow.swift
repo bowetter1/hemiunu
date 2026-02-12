@@ -23,12 +23,12 @@ struct CodeFileRow: View {
         Button(action: onSelect) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: entry.isDirectory ? 11 : 10))
+                    .font(.system(size: 10, weight: entry.isDirectory ? .medium : .regular))
                     .foregroundStyle(iconColor)
                     .frame(width: 14)
 
                 Text(entry.name)
-                    .font(.system(size: entry.isDirectory ? 12 : 11, weight: entry.isDirectory ? .medium : .regular))
+                    .font(.system(size: 12, weight: entry.isDirectory ? .medium : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 

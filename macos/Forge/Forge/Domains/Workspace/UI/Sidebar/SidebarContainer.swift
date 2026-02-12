@@ -23,8 +23,6 @@ struct SidebarContainer: View {
                 Image(systemName: "folder")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                Text("Explorer")
-                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Button(action: { withAnimation(.easeInOut(duration: 0.2)) { onClose() } }) {
                     Image(systemName: "sidebar.left")

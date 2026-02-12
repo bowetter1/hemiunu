@@ -22,7 +22,7 @@ struct SidebarFileRow: View {
                 }
 
                 Text(fileName)
-                    .font(.system(size: isRoot ? 12 : 11, weight: isRoot ? .semibold : .regular))
+                    .font(.system(size: 12, weight: isRoot ? .semibold : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -50,11 +50,11 @@ struct SidebarPageRow: View {
         Button(action: onSelect) {
             HStack(spacing: 5) {
                 Image(systemName: "doc.text")
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
 
                 Text(pageName)
-                    .font(.system(size: 10))
+                    .font(.system(size: 12))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -62,7 +62,7 @@ struct SidebarPageRow: View {
 
                 if page.currentVersion > 1 {
                     Text("v\(page.currentVersion)")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -98,7 +98,7 @@ struct SidebarLayoutPageRow: View {
                     if !childPages.isEmpty {
                         Button(action: { isExpanded.toggle() }) {
                             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 9, weight: .medium))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(.secondary)
                                 .frame(width: 10)
                         }
@@ -150,11 +150,11 @@ struct SidebarLayoutPageRow: View {
                                 .frame(width: 16, height: 20)
 
                                 Image(systemName: "doc.text")
-                                    .font(.system(size: 9))
+                                    .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
 
                                 Text(child.name)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 12))
                                     .foregroundStyle(.primary)
                                     .lineLimit(1)
 

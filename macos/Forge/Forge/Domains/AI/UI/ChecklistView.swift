@@ -14,9 +14,10 @@ struct ChecklistView: View {
                         .foregroundStyle(.secondary)
                     Text("Progress")
                         .font(.system(size: 12, weight: .semibold))
+                        .fontDesign(.rounded)
                     Spacer()
                     Text("\(checklist.completedCount)/\(checklist.items.count)")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
 
@@ -29,10 +30,10 @@ struct ChecklistView: View {
                     ForEach(checklist.items) { item in
                         HStack(spacing: 6) {
                             statusIcon(item.status)
-                                .font(.system(size: 11))
+                                .font(.system(size: 10))
                                 .frame(width: 14)
                             Text(item.step)
-                                .font(.system(size: 11))
+                                .font(.system(size: 12))
                                 .foregroundStyle(item.status == .done ? .secondary : .primary)
                                 .lineLimit(1)
                         }

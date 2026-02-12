@@ -29,28 +29,26 @@ struct ActivityLogView: View {
     }
 
     private func entryRow(_ entry: ActivityEntry) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            // Timestamp
-            Text(log.relativeTime(entry))
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .frame(width: 32, alignment: .trailing)
-
-            // Icon
+        HStack(alignment: .top, spacing: 5) {
             Text(entry.icon)
                 .font(.system(size: 10))
+                .frame(width: 12, alignment: .center)
 
-            // Message
             VStack(alignment: .leading, spacing: 1) {
-                if let role = entry.role {
-                    Text(role)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.orange)
+                HStack(spacing: 4) {
+                    Text(log.relativeTime(entry))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                    if let role = entry.role {
+                        Text(role)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.orange)
+                    }
                 }
                 Text(entry.message)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(.primary.opacity(0.85))
-                    .lineLimit(2)
+                    .lineLimit(3)
             }
         }
     }

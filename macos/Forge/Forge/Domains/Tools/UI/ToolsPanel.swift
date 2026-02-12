@@ -4,6 +4,11 @@ import SwiftUI
 
 /// Right-side tools panel for actions, settings, and chat
 struct ToolsPanel: View {
+    private enum ToolsFeedTab: String, CaseIterable {
+        case activity
+        case checklist
+    }
+
     var appState: AppState
     var chatViewModel: ChatViewModel
     let selectedPageId: String?
@@ -12,6 +17,7 @@ struct ToolsPanel: View {
 
     @State private var toolsHeight: CGFloat = 320
     @State private var isDraggingDivider = false
+    @State private var selectedToolsTab: ToolsFeedTab = .activity
 
     private let panelWidth: CGFloat = 300
     private let minToolsHeight: CGFloat = 180
@@ -30,11 +36,13 @@ struct ToolsPanel: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Image(systemName: "chart.bar.doc.horizontal")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    Text("Activity")
-                        .font(.system(size: 13, weight: .semibold))
+                    HStack(spacing: 2) {
+                        toolsTabButton(.activity, icon: "list.bullet.rectangle", title: "Activity")
+                        toolsTabButton(.checklist, icon: "checklist", title: "Checklist")
+                    }
+                    .padding(2)
+                    .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 7))
+
                     Spacer()
                     Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded = false } }) {
                         Image(systemName: "sidebar.right")
@@ -51,13 +59,23 @@ struct ToolsPanel: View {
                 // Tools content (scrollable, fixed height)
                 ScrollView {
                     VStack(spacing: 8) {
-                        // Boss checklist progress
-                        ChecklistView(checklist: chatViewModel.checklist)
-
-                        // Boss activity log
-                        ActivityLogView(log: chatViewModel.activityLog)
+                        if selectedToolsTab == .activity {
+                            if chatViewModel.activityLog.isActive {
+                                ActivityLogView(log: chatViewModel.activityLog)
+                            } else {
+                                emptyToolsState(icon: "list.bullet.rectangle", title: "No activity yet")
+                            }
+                        } else {
+                            if chatViewModel.checklist.isActive {
+                                ChecklistView(checklist: chatViewModel.checklist)
+                            } else {
+                                emptyToolsState(icon: "checklist", title: "No checklist yet")
+                            }
+                        }
                     }
-                    .padding(12)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(height: toolsHeight)
 
@@ -80,24 +98,25 @@ struct ToolsPanel: View {
                     Image(systemName: "bubble.left.and.bubble.right")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Text("Chat")
-                        .font(.system(size: 13, weight: .semibold))
                     Spacer()
-                    Button(action: { startNewChat() }) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 2) {
+                        chatActionButton(
+                            icon: "folder.badge.plus",
+                            title: "New Project",
+                            isEnabled: !chatViewModel.isStreaming,
+                            action: { startNewChat() }
+                        )
+                        .help("New project")
+
+                        chatActionButton(
+                            icon: "arrow.up.right.square",
+                            title: "Pop Out",
+                            action: { onOpenFloatingChat?() }
+                        )
+                        .help("Open separate chat window")
                     }
-                    .buttonStyle(.plain)
-                    .help("New chat")
-                    .disabled(chatViewModel.isStreaming)
-                    Button(action: { onOpenFloatingChat?() }) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open in floating window")
+                    .padding(2)
+                    .background(Color.secondary.opacity(0.08), in: .rect(cornerRadius: 7))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -117,6 +136,64 @@ struct ToolsPanel: View {
         chatViewModel.startNewChat()
         appState.clearCurrentProject()
         appState.currentMode = .design
+    }
+
+    private func toolsTabButton(_ tab: ToolsFeedTab, icon: String, title: String) -> some View {
+        let isSelected = selectedToolsTab == tab
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                selectedToolsTab = tab
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .fontDesign(.rounded)
+            }
+            .foregroundStyle(isSelected ? .blue : .secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(isSelected ? Color.blue.opacity(0.12) : Color.clear, in: .rect(cornerRadius: 5))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func chatActionButton(
+        icon: String,
+        title: String,
+        isEnabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .fontDesign(.rounded)
+            }
+            .foregroundStyle(isEnabled ? Color.secondary : Color.secondary.opacity(0.45))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 5))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+    }
+
+    private func emptyToolsState(icon: String, title: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary.opacity(0.6))
+            Text(title)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
     }
 }
 

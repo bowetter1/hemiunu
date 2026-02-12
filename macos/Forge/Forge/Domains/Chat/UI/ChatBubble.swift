@@ -126,29 +126,46 @@ private struct DeployLinkCard: View {
     }
 }
 
-/// Extract a Daytona deploy URL from message content
+/// Extract a deploy URL (Daytona or Railway) from message content
 private func extractDeployURL(from content: String) -> String? {
-    guard let range = content.range(of: #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#, options: .regularExpression) else {
-        return nil
+    let patterns = [
+        #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#,
+        #"https://[\w-]+-production\.up\.railway\.app"#,
+    ]
+
+    for pattern in patterns {
+        if let range = content.range(of: pattern, options: .regularExpression) {
+            return String(content[range])
+        }
     }
-    return String(content[range])
+    return nil
 }
 
 /// Strip deploy URLs and markdown link wrappers from message text
 private func stripDeployURL(from content: String) -> String {
+    let patterns = [
+        #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#,
+        #"https://[\w-]+-production\.up\.railway\.app"#,
+    ]
+
     var result = content
-    // Remove markdown links: [url](url)
-    result = result.replacingOccurrences(
-        of: #"\[https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+\]\(https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+\)"#,
-        with: "",
-        options: .regularExpression
-    )
-    // Remove bare URLs
-    result = result.replacingOccurrences(
-        of: #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#,
-        with: "",
-        options: .regularExpression
-    )
+
+    for pattern in patterns {
+        // Remove markdown links: [url](url)
+        let markdownPattern = "\\[\(pattern)\\]\\(\(pattern)\\)"
+        result = result.replacingOccurrences(
+            of: markdownPattern,
+            with: "",
+            options: .regularExpression
+        )
+        // Remove bare URLs
+        result = result.replacingOccurrences(
+            of: pattern,
+            with: "",
+            options: .regularExpression
+        )
+    }
+
     // Clean up leftover whitespace/newlines
     result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
     result = result.trimmingCharacters(in: .whitespacesAndNewlines)

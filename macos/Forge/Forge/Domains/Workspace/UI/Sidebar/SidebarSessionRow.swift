@@ -79,12 +79,12 @@ struct SidebarSessionRow: View {
                                 Button(action: { onSelect(project.name) }) {
                                     HStack(spacing: 6) {
                                         Image(systemName: isSelected(project) ? "chevron.down" : "chevron.right")
-                                            .font(.system(size: 7, weight: .semibold))
+                                            .font(.system(size: 8, weight: .semibold))
                                             .foregroundStyle(.tertiary)
                                             .frame(width: 8)
 
                                         Text(project.agentName ?? "Layout \(index + 1)")
-                                            .font(.system(size: 11, weight: isSelected(project) ? .medium : .regular))
+                                            .font(.system(size: 12, weight: isSelected(project) ? .medium : .regular))
                                             .foregroundStyle(isSelected(project) ? .primary : .tertiary)
                                             .lineLimit(1)
 
@@ -144,11 +144,11 @@ struct SidebarSessionRow: View {
                 Button(action: { onSelectPage?(page.id) }) {
                     HStack(spacing: 5) {
                         Image(systemName: "doc.text")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
 
                         Text(pageDisplayName(page.name))
-                            .font(.system(size: 10))
+                            .font(.system(size: 12))
                             .foregroundStyle(selectedPageId == page.id ? .primary : .tertiary)
                             .lineLimit(1)
 

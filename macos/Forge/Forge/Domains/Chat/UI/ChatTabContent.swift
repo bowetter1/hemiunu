@@ -29,7 +29,7 @@ struct ChatTabContent: View {
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    if messages.isEmpty {
+                if messages.isEmpty {
                         welcomeMessage
                     }
 
@@ -44,7 +44,8 @@ struct ChatTabContent: View {
                         streamingIndicator
                     }
                 }
-                .padding(12)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 12)
             }
             .onChange(of: messages.count) { _, _ in
                 if let last = messages.last {
