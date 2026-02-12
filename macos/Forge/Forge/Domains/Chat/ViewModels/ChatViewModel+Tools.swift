@@ -217,6 +217,12 @@ extension ChatViewModel {
         case "download_image": return "⬇️"
         case "take_screenshot": return "📸"
         case "review_screenshot": return "🔎"
+        case "deploy_to_sandbox": return "🚀"
+        case "sandbox_create": return "📦"
+        case "sandbox_upload": return "⬆️"
+        case "sandbox_exec": return "⚡"
+        case "sandbox_preview_url": return "🔗"
+        case "sandbox_stop": return "⏹️"
         default: return "🔧"
         }
     }
@@ -238,6 +244,12 @@ extension ChatViewModel {
         case "download_image": return "Downloading image"
         case "take_screenshot": return "Taking screenshot"
         case "review_screenshot": return "Reviewing screenshot"
+        case "deploy_to_sandbox": return "Deploying to sandbox"
+        case "sandbox_create": return "Creating sandbox"
+        case "sandbox_upload": return "Uploading files"
+        case "sandbox_exec": return "Running command"
+        case "sandbox_preview_url": return "Getting preview URL"
+        case "sandbox_stop": return "Stopping sandbox"
         default: return name
         }
     }

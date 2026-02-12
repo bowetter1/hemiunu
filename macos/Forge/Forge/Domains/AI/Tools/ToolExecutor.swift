@@ -92,6 +92,58 @@ struct ToolExecutor: ToolExecuting {
             let focus = args["focus"] as? String ?? "overall"
             return executeReviewScreenshot(focus: focus)
 
+        // MARK: - Daytona Sandbox Tools
+
+        case "sandbox_create":
+            guard let name = args["name"] as? String else {
+                throw ToolError.missingParameter("name")
+            }
+            let sandboxId = try await DaytonaService.createSandbox(name: name)
+            return "Sandbox created. ID: \(sandboxId)"
+
+        case "sandbox_upload":
+            guard let sandboxId = args["sandbox_id"] as? String,
+                  let files = args["files"] as? [[String: Any]] else {
+                throw ToolError.missingParameter("sandbox_id and files")
+            }
+            let skipPrefixes = ["node_modules/", ".git/", ".next/"]
+            let skipFiles: Set<String> = ["build-log.md", "agent-name.txt", "brief.md", "project-name.txt"]
+            var uploaded = 0
+            for fileEntry in files {
+                guard let remotePath = fileEntry["path"] as? String,
+                      let projectPath = fileEntry["project_path"] as? String else { continue }
+                if skipPrefixes.contains(where: { projectPath.hasPrefix($0) }) { continue }
+                if skipFiles.contains(projectPath) { continue }
+                let localURL = workspace.projectPath(projectName).appendingPathComponent(projectPath)
+                guard let data = try? Data(contentsOf: localURL) else { continue }
+                try await DaytonaService.uploadFile(sandboxId: sandboxId, remotePath: remotePath, localData: data)
+                uploaded += 1
+            }
+            return "Uploaded \(uploaded) files to sandbox \(sandboxId)."
+
+        case "sandbox_exec":
+            guard let sandboxId = args["sandbox_id"] as? String,
+                  let command = args["command"] as? String else {
+                throw ToolError.missingParameter("sandbox_id and command")
+            }
+            let timeout = args["timeout"] as? Int ?? 120
+            let result = try await DaytonaService.exec(sandboxId: sandboxId, command: command, timeout: timeout)
+            return "Exit code: \(result.exitCode)\n\(result.output)"
+
+        case "sandbox_preview_url":
+            guard let sandboxId = args["sandbox_id"] as? String,
+                  let port = args["port"] as? Int else {
+                throw ToolError.missingParameter("sandbox_id and port")
+            }
+            return DaytonaService.previewURL(sandboxId: sandboxId, port: port)
+
+        case "sandbox_stop":
+            guard let sandboxId = args["sandbox_id"] as? String else {
+                throw ToolError.missingParameter("sandbox_id")
+            }
+            try await DaytonaService.stopSandbox(id: sandboxId)
+            return "Sandbox \(sandboxId) stopped."
+
         default:
             throw ToolError.unknownTool(call.name)
         }

@@ -113,6 +113,9 @@
 		A10001000000000000000085 /* GeminiBossService+Cache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000085 /* GeminiBossService+Cache.swift */; };
 		A10001000000000000000086 /* GeminiBossService+Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000086 /* GeminiBossService+Conversion.swift */; };
 		A10001000000000000000087 /* GeminiBossService+Parsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001000000000000000087 /* GeminiBossService+Parsing.swift */; };
+		A100010000000000000000A1 /* DaytonaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A1 /* DaytonaService.swift */; };
+		A100010000000000000000A2 /* DeployPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A2 /* DeployPopover.swift */; };
+		A100010000000000000000A3 /* BossToolExecutor+Deploy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010000000000000000A3 /* BossToolExecutor+Deploy.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -223,6 +226,9 @@
 		B10001000000000000000083 /* BossToolExecutor+Checklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Checklist.swift"; sourceTree = "<group>"; };
 		B10001000000000000000084 /* BossToolExecutor+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Helpers.swift"; sourceTree = "<group>"; };
 		B10001000000000000000051 /* ChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistView.swift; sourceTree = "<group>"; };
+		B100010000000000000000A1 /* DaytonaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaytonaService.swift; sourceTree = "<group>"; };
+		B100010000000000000000A2 /* DeployPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeployPopover.swift; sourceTree = "<group>"; };
+		B100010000000000000000A3 /* BossToolExecutor+Deploy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BossToolExecutor+Deploy.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -328,6 +334,7 @@
 				D10001000000000000000058 /* AI */,
 				D10001000000000000000051 /* Auth */,
 				D10001000000000000000059 /* Chat */,
+				D100010000000000000000A0 /* Deploy */,
 				D1000100000000000000006D /* Design */,
 				D1000100000000000000005F /* Editor */,
 				D1000100000000000000005D /* Preview */,
@@ -336,6 +343,31 @@
 				D10001000000000000000063 /* Workspace */,
 			);
 			path = Domains;
+			sourceTree = "<group>";
+		};
+		D100010000000000000000A0 /* Deploy */ = {
+			isa = PBXGroup;
+			children = (
+				D100010000000000000000A1 /* Services */,
+				D100010000000000000000A2 /* UI */,
+			);
+			path = Deploy;
+			sourceTree = "<group>";
+		};
+		D100010000000000000000A1 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B100010000000000000000A1 /* DaytonaService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		D100010000000000000000A2 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				B100010000000000000000A2 /* DeployPopover.swift */,
+			);
+			path = UI;
 			sourceTree = "<group>";
 		};
 		D10001000000000000000051 /* Auth */ = {
@@ -478,6 +510,7 @@
 					B10001000000000000000082 /* BossToolExecutor+Build.swift */,
 					B10001000000000000000083 /* BossToolExecutor+Checklist.swift */,
 					B10001000000000000000084 /* BossToolExecutor+Helpers.swift */,
+					B100010000000000000000A3 /* BossToolExecutor+Deploy.swift */,
 					B10001000000000000000062 /* ActivityLog.swift */,
 					B10001000000000000000064 /* BuildLogger.swift */,
 					B10001000000000000000065 /* MemoryService.swift */,
@@ -931,6 +964,9 @@
 				A10001000000000000000064 /* BuildLogger.swift in Sources */,
 				A10001000000000000000065 /* MemoryService.swift in Sources */,
 				A10001000000000000000066 /* PromptLoader.swift in Sources */,
+				A100010000000000000000A1 /* DaytonaService.swift in Sources */,
+				A100010000000000000000A2 /* DeployPopover.swift in Sources */,
+				A100010000000000000000A3 /* BossToolExecutor+Deploy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

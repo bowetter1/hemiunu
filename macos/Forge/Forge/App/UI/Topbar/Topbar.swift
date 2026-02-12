@@ -22,6 +22,7 @@ struct Topbar: View {
     var onOpenInBrowser: (() -> Void)? = nil
 
     @State private var keyMonitor: Any?
+    @State private var showDeployPopover = false
 
     private let height: CGFloat = 38
     private let itemHeight: CGFloat = 26
@@ -203,8 +204,11 @@ struct Topbar: View {
             // Services
             IconButton(icon: "arrow.triangle.branch", size: iconSize) { }
                 .help("GitHub")
-            IconButton(icon: "paperplane", size: iconSize) { }
+            IconButton(icon: "paperplane", size: iconSize) { showDeployPopover.toggle() }
                 .help("Deploy")
+                .popover(isPresented: $showDeployPopover) {
+                    DeployPopover(appState: appState, chatViewModel: chatViewModel)
+                }
             IconButton(icon: "terminal", size: iconSize) { }
                 .help("Sandbox")
 

@@ -20,6 +20,9 @@ enum PromptLoader {
     /// Load tester.md — visual QA agent prompt
     static var tester: String { load("tester.md") }
 
+    /// Load deployer.md — sandbox deploy agent prompt
+    static var deployer: String { load("deployer.md") }
+
     // MARK: - Private
 
     private static func load(_ filename: String) -> String {

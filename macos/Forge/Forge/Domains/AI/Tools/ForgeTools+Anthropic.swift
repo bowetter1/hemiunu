@@ -94,6 +94,20 @@ extension ForgeTools {
                 "required": ["builder", "version", "instructions", "design_direction"],
             ] as [String: Any],
         ])
+        tools.append([
+            "name": "deploy_to_sandbox",
+            "description": "Deploy a version of the project to a public Daytona sandbox. An AI agent will create a sandbox, upload project files, install dependencies, fix any issues, and start a server. Returns the public preview URL.",
+            "input_schema": [
+                "type": "object",
+                "properties": [
+                    "version": [
+                        "type": "string",
+                        "description": "Which version to deploy (e.g. 'v1', 'v2')",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["version"],
+            ] as [String: Any],
+        ])
         return tools
     }
 
@@ -311,6 +325,96 @@ extension ForgeTools {
                         ],
                     ] as [String: Any],
                     "required": [String](),
+                ] as [String: Any],
+            ],
+            [
+                "name": "sandbox_create",
+                "description": "Create a public Daytona sandbox. Returns the sandbox ID.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "name": [
+                            "type": "string",
+                            "description": "Name for the sandbox (e.g. 'my-site-deploy')",
+                        ],
+                    ],
+                    "required": ["name"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "sandbox_upload",
+                "description": "Upload project files to a Daytona sandbox. Pass an array of files to upload. Each entry: path = destination in sandbox, project_path = relative path in the local project. Returns count of uploaded files.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "sandbox_id": [
+                            "type": "string",
+                            "description": "The sandbox ID",
+                        ],
+                        "files": [
+                            "type": "array",
+                            "items": [
+                                "type": "object",
+                                "properties": [
+                                    "path": ["type": "string", "description": "Destination path in sandbox"] as [String: Any],
+                                    "project_path": ["type": "string", "description": "Relative path in the local project"] as [String: Any],
+                                ] as [String: Any],
+                                "required": ["path", "project_path"],
+                            ] as [String: Any],
+                            "description": "Files to upload",
+                        ] as [String: Any],
+                    ] as [String: Any],
+                    "required": ["sandbox_id", "files"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "sandbox_exec",
+                "description": "Run a shell command in a Daytona sandbox. Returns stdout+stderr and exit code. Use for npm install, npm run build, starting servers, debugging.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "sandbox_id": [
+                            "type": "string",
+                            "description": "The sandbox ID",
+                        ],
+                        "command": [
+                            "type": "string",
+                            "description": "The shell command to run",
+                        ],
+                    ],
+                    "required": ["sandbox_id", "command"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "sandbox_preview_url",
+                "description": "Get the public preview URL for a Daytona sandbox on a given port.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "sandbox_id": [
+                            "type": "string",
+                            "description": "The sandbox ID",
+                        ],
+                        "port": [
+                            "type": "integer",
+                            "description": "The port number (e.g. 3000)",
+                        ],
+                    ],
+                    "required": ["sandbox_id", "port"],
+                ] as [String: Any],
+            ],
+            [
+                "name": "sandbox_stop",
+                "description": "Stop a Daytona sandbox.",
+                "input_schema": [
+                    "type": "object",
+                    "properties": [
+                        "sandbox_id": [
+                            "type": "string",
+                            "description": "The sandbox ID",
+                        ],
+                    ],
+                    "required": ["sandbox_id"],
                 ] as [String: Any],
             ],
         ]

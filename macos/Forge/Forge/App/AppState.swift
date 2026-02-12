@@ -126,6 +126,11 @@ class AppState {
         return !key.isEmpty
     }
 
+    /// Whether the Daytona API key is configured (needed for deploy)
+    var hasDaytonaKey: Bool {
+        KeychainHelper.load(key: "forge.api.daytona") != nil
+    }
+
     /// Boss orchestrator service (Gemini 3 Flash with context caching)
     var bossService: GeminiBossService { geminiBossService }
 

@@ -52,6 +52,8 @@ class BossToolExecutor: ToolExecuting {
             return try await executeDelegateTask(call)
         case "build_version":
             return try await executeBuildVersion(call)
+        case "deploy_to_sandbox":
+            return try await executeDeployToSandbox(call)
         case "update_checklist":
             return executeUpdateChecklist(call)
         default:

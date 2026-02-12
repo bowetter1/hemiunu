@@ -17,6 +17,9 @@ enum BossSystemPrompts {
     /// Tester prompt — loaded from tester.md
     static var tester: String { PromptLoader.tester }
 
+    /// Deployer prompt — loaded from deployer.md
+    static var deployer: String { PromptLoader.deployer }
+
     /// Sub-agent system prompt — role-specific instructions
     static func subAgent(role: SubAgentRole, instructions: String) -> String {
         let roleDescription: String
@@ -27,6 +30,8 @@ enum BossSystemPrompts {
             roleDescription = reviewer
         case .tester:
             roleDescription = tester
+        case .deployer:
+            roleDescription = deployer
         }
 
         return """

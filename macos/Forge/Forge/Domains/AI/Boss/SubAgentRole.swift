@@ -5,6 +5,7 @@ enum SubAgentRole: String, Sendable, CaseIterable {
     case coder
     case reviewer
     case tester
+    case deployer
 
     /// Which AI provider this role prefers
     var preferredProvider: AIProvider {
@@ -12,12 +13,16 @@ enum SubAgentRole: String, Sendable, CaseIterable {
         case .coder: return .codex
         case .reviewer: return .gemini
         case .tester: return .gemini
+        case .deployer: return .claude
         }
     }
 
     /// Optional builder name override — uses builderServiceResolver for model-specific services (e.g. Opus)
     var preferredBuilder: String? {
-        return nil
+        switch self {
+        case .deployer: return "opus"
+        default: return nil
+        }
     }
 
     /// Tool names this role is allowed to use
@@ -29,6 +34,8 @@ enum SubAgentRole: String, Sendable, CaseIterable {
             return ["list_files", "read_file"]
         case .tester:
             return ["list_files", "read_file", "take_screenshot", "review_screenshot"]
+        case .deployer:
+            return ["list_files", "read_file", "sandbox_create", "sandbox_upload", "sandbox_exec", "sandbox_preview_url", "sandbox_stop", "run_command"]
         }
     }
 
@@ -38,6 +45,7 @@ enum SubAgentRole: String, Sendable, CaseIterable {
         case .coder: return 50
         case .reviewer: return 10
         case .tester: return 10
+        case .deployer: return 30
         }
     }
 }

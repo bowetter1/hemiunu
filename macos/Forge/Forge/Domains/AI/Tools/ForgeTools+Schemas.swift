@@ -255,6 +255,111 @@ extension ForgeTools {
                     ] as [String: Any],
                 ] as [String: Any],
             ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "sandbox_create",
+                    "description": "Create a public Daytona sandbox. Returns the sandbox ID.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "name": [
+                                "type": "string",
+                                "description": "Name for the sandbox (e.g. 'my-site-deploy')",
+                            ],
+                        ],
+                        "required": ["name"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "sandbox_upload",
+                    "description": "Upload project files to a Daytona sandbox. Pass an array of files to upload. Each entry: path = destination in sandbox, project_path = relative path in the local project. Returns count of uploaded files.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "sandbox_id": [
+                                "type": "string",
+                                "description": "The sandbox ID",
+                            ],
+                            "files": [
+                                "type": "array",
+                                "items": [
+                                    "type": "object",
+                                    "properties": [
+                                        "path": ["type": "string", "description": "Destination path in sandbox"] as [String: Any],
+                                        "project_path": ["type": "string", "description": "Relative path in the local project"] as [String: Any],
+                                    ] as [String: Any],
+                                    "required": ["path", "project_path"],
+                                ] as [String: Any],
+                                "description": "Files to upload",
+                            ] as [String: Any],
+                        ] as [String: Any],
+                        "required": ["sandbox_id", "files"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "sandbox_exec",
+                    "description": "Run a shell command in a Daytona sandbox. Returns stdout+stderr and exit code. Use for npm install, npm run build, starting servers, debugging.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "sandbox_id": [
+                                "type": "string",
+                                "description": "The sandbox ID",
+                            ],
+                            "command": [
+                                "type": "string",
+                                "description": "The shell command to run",
+                            ],
+                        ],
+                        "required": ["sandbox_id", "command"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "sandbox_preview_url",
+                    "description": "Get the public preview URL for a Daytona sandbox on a given port.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "sandbox_id": [
+                                "type": "string",
+                                "description": "The sandbox ID",
+                            ],
+                            "port": [
+                                "type": "integer",
+                                "description": "The port number (e.g. 3000)",
+                            ],
+                        ],
+                        "required": ["sandbox_id", "port"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
+            [
+                "type": "function",
+                "function": [
+                    "name": "sandbox_stop",
+                    "description": "Stop a Daytona sandbox.",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "sandbox_id": [
+                                "type": "string",
+                                "description": "The sandbox ID",
+                            ],
+                        ],
+                        "required": ["sandbox_id"],
+                    ] as [String: Any],
+                ] as [String: Any],
+            ],
         ]
     }
 
@@ -361,6 +466,23 @@ extension ForgeTools {
                         ] as [String: Any],
                     ] as [String: Any],
                     "required": ["builder", "version", "instructions", "design_direction"],
+                ] as [String: Any],
+            ] as [String: Any],
+        ])
+        tools.append([
+            "type": "function",
+            "function": [
+                "name": "deploy_to_sandbox",
+                "description": "Deploy a version of the project to a public Daytona sandbox. An AI agent will create a sandbox, upload project files, install dependencies, fix any issues, and start a server. Returns the public preview URL.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "version": [
+                            "type": "string",
+                            "description": "Which version to deploy (e.g. 'v1', 'v2')",
+                        ] as [String: Any],
+                    ] as [String: Any],
+                    "required": ["version"],
                 ] as [String: Any],
             ] as [String: Any],
         ])
