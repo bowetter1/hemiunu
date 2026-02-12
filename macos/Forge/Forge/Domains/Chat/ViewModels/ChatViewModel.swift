@@ -21,11 +21,18 @@ class ChatViewModel {
     let memoryService = MemoryService()
     /// Full agent conversation history (including tool calls) for context caching
     var agentRawHistory: [[String: Any]] = []
+    var isRestoringProjectPanelState = false
 
     init(appState: AppState, projectUpdater: (any ChatProjectUpdating)? = nil) {
         self.appState = appState
         self.projectUpdater = projectUpdater ?? AppStateChatProjectCoordinator(appState: appState)
         self.requestLogger = RequestLogger(logDirectory: appState.workspace.rootDirectory)
+        self.activityLog.onChange = { [weak self] in
+            self?.saveProjectPanelState()
+        }
+        self.checklist.onChange = { [weak self] in
+            self?.saveProjectPanelState()
+        }
     }
 
     func sendMessage(_ text: String) {

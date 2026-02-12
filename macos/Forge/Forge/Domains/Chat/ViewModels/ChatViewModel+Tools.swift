@@ -66,6 +66,7 @@ extension ChatViewModel {
                         appState.setSelectedProjectId(projectId)
                         appState.setLocalPreviewURL(appState.workspace.projectPath(name))
                         appState.setLocalFiles(appState.workspace.listFiles(project: name))
+                        self?.saveProjectPanelState()
                     }
                     // Always refresh sidebar so version projects show up
                     appState.refreshLocalProjects()
@@ -82,6 +83,7 @@ extension ChatViewModel {
                     let projectId = "local:\(versionProjectName)"
                     appState.setSelectedProjectId(projectId)
                     appState.setLocalFiles(appState.workspace.listFiles(project: versionProjectName))
+                    self.saveProjectPanelState()
                     // Use resolvePreviewURL to start dev server for framework projects
                     Task {
                         let url = await appState.workspace.resolvePreviewURL(project: versionProjectName)

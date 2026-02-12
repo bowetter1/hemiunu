@@ -1,7 +1,7 @@
 import Foundation
 
 /// Status for a checklist item
-enum ChecklistStatus: String, Sendable {
+enum ChecklistStatus: String, Sendable, Codable {
     case pending
     case inProgress = "in_progress"
     case done
@@ -9,10 +9,16 @@ enum ChecklistStatus: String, Sendable {
 }
 
 /// A single step in the Boss checklist
-struct ChecklistItem: Sendable, Identifiable {
-    let id = UUID()
+struct ChecklistItem: Sendable, Identifiable, Codable {
+    let id: UUID
     let step: String
     var status: ChecklistStatus
+
+    init(id: UUID = UUID(), step: String, status: ChecklistStatus) {
+        self.id = id
+        self.step = step
+        self.status = status
+    }
 }
 
 /// Observable model tracking Boss agent progress via a checklist
@@ -20,6 +26,7 @@ struct ChecklistItem: Sendable, Identifiable {
 @Observable
 class ChecklistModel {
     var items: [ChecklistItem] = []
+    var onChange: (() -> Void)?
 
     var isActive: Bool { !items.isEmpty }
 
@@ -38,9 +45,11 @@ class ChecklistModel {
 
     func update(_ newItems: [ChecklistItem]) {
         items = newItems
+        onChange?()
     }
 
     func reset() {
         items = []
+        onChange?()
     }
 }
