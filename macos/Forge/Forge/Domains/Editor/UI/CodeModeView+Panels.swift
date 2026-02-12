@@ -286,13 +286,13 @@ extension CodeModeView {
             .foregroundStyle(.secondary)
     }
 
-    private func insightSectionHeader(_ title: String) -> some View {
+    func insightSectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
     }
 
-    private func insightInfo(_ text: String) -> some View {
+    func insightInfo(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
@@ -301,7 +301,7 @@ extension CodeModeView {
             .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 6))
     }
 
-    private func insightRow(
+    func insightRow(
         title: String,
         subtitle: String,
         badge: String?,
@@ -463,7 +463,7 @@ extension CodeModeView {
         return ordered
     }
 
-    private func openFile(_ path: String) {
+    func openFile(_ path: String) {
         viewModel.selectedFilePath = path
         viewModel.loadFileContent(path)
     }
