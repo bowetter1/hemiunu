@@ -8,7 +8,10 @@ struct DeployPopover: View {
     @State private var apiKey = ""
     @State private var selectedVersion = "v1"
     @State private var isDeploying = false
+    @State private var isRestarting = false
     @State private var deployURL: String?
+    @State private var savedSandbox: SandboxInfo?
+    @State private var sandboxState: String?
 
     private var hasKey: Bool { DaytonaService.hasAPIKey }
 
@@ -38,6 +41,31 @@ struct DeployPopover: View {
         return parts.count == 2 ? parts[1] : "v1"
     }
 
+    /// Resolve project name for current selection
+    private var currentProjectName: String {
+        guard let selectedId = appState.selectedProjectId,
+              selectedId.hasPrefix("local:") else { return "" }
+        return String(selectedId.dropFirst(6))
+    }
+
+    /// Parent project name (e.g. "coffee-shop" from "coffee-shop/v1")
+    private var parentProjectName: String {
+        let name = currentProjectName
+        return name.components(separatedBy: "/").first ?? name
+    }
+
+    /// Read agent-name.txt for a version to get the builder name
+    private func builderName(for version: String) -> String? {
+        let project = "\(parentProjectName)/\(version)"
+        return try? appState.workspace.readFile(project: project, path: "agent-name.txt")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Builder name for the currently viewed version
+    private var currentBuilderName: String? {
+        builderName(for: currentVersion)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !hasKey {
@@ -49,9 +77,10 @@ struct DeployPopover: View {
             }
         }
         .padding(16)
-        .frame(width: 260)
+        .frame(width: 280)
         .onAppear {
             selectedVersion = currentVersion
+            loadSandboxInfo()
         }
     }
 
@@ -85,15 +114,33 @@ struct DeployPopover: View {
 
     private var deployReady: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Deploy to Daytona")
-                .font(.system(size: 12, weight: .semibold))
+            // Header with current builder
+            HStack(spacing: 6) {
+                Text("Daytona Sandbox")
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                if let builder = currentBuilderName {
+                    Text(builder)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
 
+            // Previous sandbox info
+            if let sandbox = savedSandbox {
+                previousSandbox(sandbox)
+            }
+
+            Divider().opacity(savedSandbox != nil ? 0.5 : 0)
+
+            // Version picker with builder names
             if versions.count > 1 {
-                Picker("Version", selection: $selectedVersion) {
+                Picker("", selection: $selectedVersion) {
                     ForEach(versions, id: \.self) { v in
-                        Text(v).tag(v)
+                        Text(builderName(for: v) ?? v).tag(v)
                     }
                 }
+                .labelsHidden()
                 .pickerStyle(.segmented)
                 .controlSize(.small)
             }
@@ -106,7 +153,7 @@ struct DeployPopover: View {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Text(isDeploying ? "Deploying..." : "Deploy \(selectedVersion)")
+                    Text(isDeploying ? "Deploying..." : "Deploy")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -119,6 +166,71 @@ struct DeployPopover: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: - Previous Sandbox
+
+    private func previousSandbox(_ sandbox: SandboxInfo) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(stateColor)
+                    .frame(width: 7, height: 7)
+                Text(sandboxState ?? "unknown")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let created = sandbox.createdAt {
+                    Text(created, style: .relative)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if let url = sandbox.previewURL {
+                Button {
+                    if let nsURL = URL(string: url) {
+                        NSWorkspace.shared.open(nsURL)
+                    }
+                } label: {
+                    Text(url)
+                        .font(.system(size: 10, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
+            }
+
+            // Restart button for stopped sandboxes
+            if sandboxState == "stopped" || sandboxState == "archived" {
+                Button {
+                    restartSandbox(sandbox)
+                } label: {
+                    HStack(spacing: 6) {
+                        if isRestarting {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(isRestarting ? "Starting..." : "Restart Sandbox")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isRestarting)
+            }
+        }
+    }
+
+    private var stateColor: Color {
+        switch sandboxState {
+        case "started", "running": return .green
+        case "stopped": return .orange
+        case "archived": return .secondary
+        default: return .secondary
         }
     }
 
@@ -150,6 +262,7 @@ struct DeployPopover: View {
             Button("Deploy Again") {
                 deployURL = nil
                 isDeploying = false
+                loadSandboxInfo()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -164,7 +277,7 @@ struct DeployPopover: View {
 
         // Poll chat messages for deploy URL
         Task {
-            for _ in 0..<120 { // Poll for up to 2 minutes
+            for _ in 0..<120 {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 if let url = findDeployURL() {
                     await MainActor.run {
@@ -180,12 +293,60 @@ struct DeployPopover: View {
         }
     }
 
+    private func restartSandbox(_ sandbox: SandboxInfo) {
+        isRestarting = true
+        Task {
+            do {
+                try await DaytonaService.startSandbox(id: sandbox.sandboxId)
+                await MainActor.run {
+                    sandboxState = "started"
+                    isRestarting = false
+                }
+            } catch {
+                await MainActor.run {
+                    isRestarting = false
+                }
+            }
+        }
+    }
+
+    private func loadSandboxInfo() {
+        let projectName = currentProjectName
+        guard !projectName.isEmpty else { return }
+        let file = appState.workspace.projectPath(projectName).appendingPathComponent("sandbox.json")
+        guard let data = try? Data(contentsOf: file),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let sandboxId = json["sandbox_id"] as? String else { return }
+
+        let previewURL = json["preview_url"] as? String
+        var createdAt: Date?
+        if let dateStr = json["created_at"] as? String {
+            createdAt = ISO8601DateFormatter().date(from: dateStr)
+        }
+
+        savedSandbox = SandboxInfo(sandboxId: sandboxId, previewURL: previewURL, createdAt: createdAt)
+
+        // Fetch live state
+        Task {
+            let state = await DaytonaService.sandboxState(id: sandboxId)
+            await MainActor.run { sandboxState = state }
+        }
+    }
+
     private func findDeployURL() -> String? {
         for message in chatViewModel.messages.reversed() {
-            if let range = message.content.range(of: #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.works"#, options: .regularExpression) {
+            if let range = message.content.range(of: #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#, options: .regularExpression) {
                 return String(message.content[range])
             }
         }
         return nil
     }
+}
+
+// MARK: - Sandbox Info
+
+private struct SandboxInfo {
+    let sandboxId: String
+    let previewURL: String?
+    let createdAt: Date?
 }

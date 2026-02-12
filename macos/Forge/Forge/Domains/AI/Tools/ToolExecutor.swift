@@ -99,6 +99,8 @@ struct ToolExecutor: ToolExecuting {
                 throw ToolError.missingParameter("name")
             }
             let sandboxId = try await DaytonaService.createSandbox(name: name)
+            // Persist sandbox ID for restart later
+            saveSandboxInfo(["sandbox_id": sandboxId, "name": name, "created_at": ISO8601DateFormatter().string(from: Date())])
             return "Sandbox created. ID: \(sandboxId)"
 
         case "sandbox_upload":
@@ -107,7 +109,7 @@ struct ToolExecutor: ToolExecuting {
                 throw ToolError.missingParameter("sandbox_id and files")
             }
             let skipPrefixes = ["node_modules/", ".git/", ".next/"]
-            let skipFiles: Set<String> = ["build-log.md", "agent-name.txt", "brief.md", "project-name.txt"]
+            let skipFiles: Set<String> = ["build-log.md", "agent-name.txt", "brief.md", "project-name.txt", "sandbox.json"]
             var uploaded = 0
             for fileEntry in files {
                 guard let remotePath = fileEntry["path"] as? String,
@@ -135,7 +137,10 @@ struct ToolExecutor: ToolExecuting {
                   let port = args["port"] as? Int else {
                 throw ToolError.missingParameter("sandbox_id and port")
             }
-            return DaytonaService.previewURL(sandboxId: sandboxId, port: port)
+            let previewURL = DaytonaService.previewURL(sandboxId: sandboxId, port: port)
+            // Persist preview URL for the popover
+            saveSandboxInfo(["sandbox_id": sandboxId, "preview_url": previewURL, "port": port])
+            return previewURL
 
         case "sandbox_stop":
             guard let sandboxId = args["sandbox_id"] as? String else {
@@ -146,6 +151,20 @@ struct ToolExecutor: ToolExecuting {
 
         default:
             throw ToolError.unknownTool(call.name)
+        }
+    }
+
+    /// Merge sandbox info into project's sandbox.json (persists sandbox_id, URL, port across deploys)
+    private func saveSandboxInfo(_ newFields: [String: Any]) {
+        let sandboxFile = workspace.projectPath(projectName).appendingPathComponent("sandbox.json")
+        var info: [String: Any] = [:]
+        if let data = try? Data(contentsOf: sandboxFile),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            info = existing
+        }
+        for (key, value) in newFields { info[key] = value }
+        if let data = try? JSONSerialization.data(withJSONObject: info, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: sandboxFile)
         }
     }
 }

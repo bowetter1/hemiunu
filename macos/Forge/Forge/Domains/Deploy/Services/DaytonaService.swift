@@ -28,6 +28,7 @@ enum DaytonaService {
             "name": name,
             "target": "eu",
             "public": true,
+            "auto_stop_interval": 0,
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -39,9 +40,9 @@ enum DaytonaService {
             throw DaytonaError.invalidResponse("No sandbox ID in response")
         }
 
-        // Poll until sandbox is running (up to 60s)
+        // Poll until sandbox is running (up to 30s, check every 1s)
         for _ in 0..<30 {
-            try await Task.sleep(nanoseconds: 2_000_000_000)
+            try await Task.sleep(nanoseconds: 1_000_000_000)
             if try await isSandboxRunning(id: sandboxId, apiKey: apiKey) {
                 return sandboxId
             }
@@ -61,6 +62,37 @@ enum DaytonaService {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try checkResponse(response, data: data)
+    }
+
+    /// Start a stopped sandbox
+    static func startSandbox(id: String) async throws {
+        let apiKey = try requireAPIKey()
+        let url = URL(string: "\(baseURL)/sandbox/\(id)/start")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+
+        // Poll until running (up to 30s)
+        for _ in 0..<15 {
+            try await Task.sleep(nanoseconds: 2_000_000_000)
+            if try await isSandboxRunning(id: id, apiKey: apiKey) { return }
+        }
+    }
+
+    /// Get sandbox state (started, stopped, archived, etc.)
+    static func sandboxState(id: String) async -> String? {
+        guard let apiKey = try? requireAPIKey() else { return nil }
+        let url = URL(string: "\(baseURL)/sandbox/\(id)")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let state = json["state"] as? String else { return nil }
+        return state
     }
 
     // MARK: - File Operations

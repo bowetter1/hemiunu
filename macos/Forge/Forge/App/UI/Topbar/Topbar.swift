@@ -202,15 +202,39 @@ struct Topbar: View {
             topbarDivider
 
             // Services
-            IconButton(icon: "arrow.triangle.branch", size: iconSize) { }
-                .help("GitHub")
-            IconButton(icon: "train.side.front.car", size: iconSize) { }
-                .help("Deploy (Railway)")
-            IconButton(icon: "cube", size: iconSize) { showDeployPopover.toggle() }
-                .help("Sandbox (Daytona)")
-                .popover(isPresented: $showDeployPopover) {
-                    DeployPopover(appState: appState, chatViewModel: chatViewModel)
-                }
+            Button { } label: {
+                Image("github")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: iconSize + 1, height: iconSize + 1)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help("GitHub")
+            Button { } label: {
+                Image("railway")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: iconSize + 1, height: iconSize + 1)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help("Deploy (Railway)")
+            Button { showDeployPopover.toggle() } label: {
+                Image("daytona")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: iconSize + 1, height: iconSize + 1)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help("Sandbox (Daytona)")
+            .popover(isPresented: $showDeployPopover) {
+                DeployPopover(appState: appState, chatViewModel: chatViewModel)
+            }
 
             topbarDivider
 
