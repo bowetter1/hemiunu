@@ -23,19 +23,6 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// Send a notification
-    func notify(title: String, body: String, id: String = UUID().uuidString) {
-        guard Bundle.main.bundleIdentifier != nil else { return }
-
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-
-        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
-    }
-
     // MARK: - UNUserNotificationCenterDelegate
 
     nonisolated func userNotificationCenter(

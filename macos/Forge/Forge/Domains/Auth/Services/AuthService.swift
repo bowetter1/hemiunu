@@ -59,7 +59,9 @@ struct AuthService {
         let redirectURI = "\(config.reversedClientID):/oauthredirect"
 
         let nonce = UUID().uuidString
-        var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+        guard var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth") else {
+            throw AuthError.configMissing("Cannot build Google auth URL")
+        }
         components.queryItems = [
             URLQueryItem(name: "client_id", value: config.clientID),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
@@ -67,7 +69,9 @@ struct AuthService {
             URLQueryItem(name: "scope", value: "openid email profile"),
             URLQueryItem(name: "nonce", value: nonce),
         ]
-        let authURL = components.url!
+        guard let authURL = components.url else {
+            throw AuthError.configMissing("Cannot build Google auth URL")
+        }
 
         let callbackScheme = config.reversedClientID
         let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
@@ -111,7 +115,10 @@ struct AuthService {
         clientID: String,
         redirectURI: String
     ) async throws -> (idToken: String, accessToken: String) {
-        var request = URLRequest(url: URL(string: Self.tokenEndpoint)!)
+        guard let tokenURL = URL(string: Self.tokenEndpoint) else {
+            throw AuthError.tokenExchangeFailed("Invalid token endpoint URL")
+        }
+        var request = URLRequest(url: tokenURL)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
@@ -121,7 +128,7 @@ struct AuthService {
             "redirect_uri": redirectURI,
             "grant_type": "authorization_code",
         ]
-        request.httpBody = body.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)" }
+        request.httpBody = body.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.value)" }
             .joined(separator: "&")
             .data(using: .utf8)
 

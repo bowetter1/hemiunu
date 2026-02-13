@@ -12,64 +12,13 @@ struct DeployPopover: View {
     @State private var deployURL: String?
     @State private var savedSandbox: SandboxInfo?
     @State private var sandboxState: String?
+    @State private var errorMessage: String?
+    @State private var pollingTask: Task<Void, Never>?
 
     private var hasKey: Bool { DaytonaService.hasAPIKey }
 
-    /// Available version directories for current project
-    private var versions: [String] {
-        guard let selectedId = appState.selectedProjectId,
-              selectedId.hasPrefix("local:") else { return ["v1"] }
-        let projectName = String(selectedId.dropFirst(6))
-        let parts = projectName.components(separatedBy: "/")
-        if parts.count == 2 {
-            // Already a version project — find siblings
-            let parent = parts[0]
-            return appState.localProjects
-                .filter { $0.name.hasPrefix("\(parent)/v") }
-                .map { $0.name.components(separatedBy: "/").last ?? $0.name }
-                .sorted()
-        }
-        return ["v1"]
-    }
-
-    /// Current project's version label
-    private var currentVersion: String {
-        guard let selectedId = appState.selectedProjectId,
-              selectedId.hasPrefix("local:") else { return "v1" }
-        let name = String(selectedId.dropFirst(6))
-        let parts = name.components(separatedBy: "/")
-        return parts.count == 2 ? parts[1] : "v1"
-    }
-
-    /// Resolve project name for current selection
-    private var currentProjectName: String {
-        guard let selectedId = appState.selectedProjectId,
-              selectedId.hasPrefix("local:") else { return "" }
-        return String(selectedId.dropFirst(6))
-    }
-
-    /// Parent project name (e.g. "coffee-shop" from "coffee-shop/v1")
-    private var parentProjectName: String {
-        let name = currentProjectName
-        return name.components(separatedBy: "/").first ?? name
-    }
-
-    /// Read agent-name.txt for a version to get the builder name
-    private func builderName(for version: String) -> String? {
-        let project = "\(parentProjectName)/\(version)"
-        return try? appState.workspace.readFile(project: project, path: "agent-name.txt")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Builder name for the selected version
-    private var selectedBuilderName: String? {
-        builderName(for: selectedVersion)
-    }
-
-    /// Project name for selected deploy target (e.g. "coffee-shop/v2")
-    private var selectedProjectName: String {
-        guard !parentProjectName.isEmpty else { return "" }
-        return "\(parentProjectName)/\(selectedVersion)"
+    private var helper: ProjectVersionHelper {
+        ProjectVersionHelper(appState: appState, selectedVersion: selectedVersion)
     }
 
     var body: some View {
@@ -85,11 +34,14 @@ struct DeployPopover: View {
         .padding(16)
         .frame(width: 280)
         .onAppear {
-            selectedVersion = currentVersion
+            selectedVersion = helper.currentVersion
             loadSandboxInfo()
         }
         .onChange(of: selectedVersion) { _, _ in
             loadSandboxInfo()
+        }
+        .onDisappear {
+            pollingTask?.cancel()
         }
     }
 
@@ -128,7 +80,7 @@ struct DeployPopover: View {
                 Text("Daytona Sandbox")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                if let builder = selectedBuilderName {
+                if let builder = helper.selectedBuilderName {
                     Text(builder)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -143,10 +95,10 @@ struct DeployPopover: View {
             Divider().opacity(savedSandbox != nil ? 0.5 : 0)
 
             // Version picker with builder names
-            if versions.count > 1 {
+            if helper.versions.count > 1 {
                 Picker("", selection: $selectedVersion) {
-                    ForEach(versions, id: \.self) { v in
-                        Text(builderName(for: v) ?? v).tag(v)
+                    ForEach(helper.versions, id: \.self) { v in
+                        Text(helper.builderName(for: v) ?? v).tag(v)
                     }
                 }
                 .labelsHidden()
@@ -162,7 +114,7 @@ struct DeployPopover: View {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Text(isDeploying ? "Deploying..." : "Deploy")
+                    Text(isDeploying ? "Deploying..." : "Deploy to Daytona")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -174,6 +126,12 @@ struct DeployPopover: View {
                 Text("Check activity log for progress")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
+            }
+
+            if let error = errorMessage {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
             }
         }
     }
@@ -281,18 +239,23 @@ struct DeployPopover: View {
     // MARK: - Actions
 
     private func deploy() {
-        let projectName = selectedProjectName
+        let projectName = helper.selectedProjectName
         guard !projectName.isEmpty else { return }
 
         isDeploying = true
+        errorMessage = nil
         let deployStartedAt = Date()
         let baseline = readSandboxInfo(projectName: projectName)
         chatViewModel.sendMessage("Deploy version \(selectedVersion) to Daytona sandbox")
 
         // Poll sandbox.json for an updated deployment result.
-        Task {
+        pollingTask = Task {
             let url = await waitForDeploymentURL(projectName: projectName, baseline: baseline, startedAt: deployStartedAt)
+            guard !Task.isCancelled else { return }
             await MainActor.run {
+                if url == nil {
+                    errorMessage = "Deploy timed out — check activity log for details"
+                }
                 deployURL = url
                 isDeploying = false
                 loadSandboxInfo()
@@ -302,6 +265,7 @@ struct DeployPopover: View {
 
     private func restartSandbox(_ sandbox: SandboxInfo) {
         isRestarting = true
+        errorMessage = nil
         Task {
             do {
                 try await DaytonaService.startSandbox(id: sandbox.sandboxId)
@@ -311,6 +275,7 @@ struct DeployPopover: View {
                 }
             } catch {
                 await MainActor.run {
+                    errorMessage = error.localizedDescription
                     isRestarting = false
                 }
             }
@@ -318,7 +283,7 @@ struct DeployPopover: View {
     }
 
     private func loadSandboxInfo() {
-        let projectName = selectedProjectName
+        let projectName = helper.selectedProjectName
         guard !projectName.isEmpty else {
             savedSandbox = nil
             sandboxState = nil
@@ -358,7 +323,9 @@ struct DeployPopover: View {
 
     private func waitForDeploymentURL(projectName: String, baseline: SandboxInfo?, startedAt: Date) async -> String? {
         for _ in 0..<180 {
+            guard !Task.isCancelled else { return nil }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return nil }
             guard let latest = readSandboxInfo(projectName: projectName) else { continue }
             guard isNewDeployment(latest, baseline: baseline, startedAt: startedAt) else { continue }
             if let url = latest.previewURL, !url.isEmpty {

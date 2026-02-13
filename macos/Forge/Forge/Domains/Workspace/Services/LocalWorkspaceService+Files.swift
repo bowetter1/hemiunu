@@ -5,13 +5,13 @@ extension LocalWorkspaceService {
 
     /// Read a file from a local project
     func readFile(project: String, path: String) throws -> String {
-        let filePath = projectPath(project).appendingPathComponent(path)
+        let filePath = try validatedPath(project: project, path: path)
         return try String(contentsOf: filePath, encoding: .utf8)
     }
 
     /// Write a file to a local project
     func writeFile(project: String, path: String, content: String) throws {
-        let filePath = projectPath(project).appendingPathComponent(path)
+        let filePath = try validatedPath(project: project, path: path)
         let dir = filePath.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try content.write(to: filePath, atomically: true, encoding: .utf8)
@@ -19,7 +19,7 @@ extension LocalWorkspaceService {
 
     /// Write binary data to a local project
     func writeBinary(project: String, path: String, data: Data) throws {
-        let filePath = projectPath(project).appendingPathComponent(path)
+        let filePath = try validatedPath(project: project, path: path)
         let dir = filePath.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try data.write(to: filePath)
@@ -27,15 +27,19 @@ extension LocalWorkspaceService {
 
     /// Delete a file from a local project
     func deleteFile(project: String, path: String) throws {
-        let filePath = projectPath(project).appendingPathComponent(path)
+        let filePath = try validatedPath(project: project, path: path)
         try FileManager.default.removeItem(at: filePath)
     }
 
     /// List files in a project directory (recursive)
     func listFiles(project: String, directory: String = "") -> [LocalFileInfo] {
-        let dir = directory.isEmpty
-            ? projectPath(project)
-            : projectPath(project).appendingPathComponent(directory)
+        let dir: URL
+        if directory.isEmpty {
+            dir = projectPath(project)
+        } else {
+            guard let validated = try? validatedPath(project: project, path: directory) else { return [] }
+            dir = validated
+        }
 
         guard let enumerator = FileManager.default.enumerator(
             at: dir,

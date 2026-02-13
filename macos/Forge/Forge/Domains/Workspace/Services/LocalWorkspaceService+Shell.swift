@@ -1,6 +1,13 @@
 import Foundation
 
 extension LocalWorkspaceService {
+    // MARK: - Shell Helpers
+
+    /// Wrap a value in single quotes for safe shell interpolation.
+    func shellQuote(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
     // MARK: - Shell Execution
 
     /// Run a shell command and return result

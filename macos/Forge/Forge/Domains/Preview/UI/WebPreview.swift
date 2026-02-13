@@ -124,8 +124,8 @@ struct HTMLWebView: NSViewRepresentable {
                 tag: tag, text: text, selector: selector,
                 screenX: x, screenY: y
             )
-            Task { @MainActor in
-                onElementClicked?(element)
+            Task { @MainActor [weak self] in
+                self?.onElementClicked?(element)
             }
         }
     }

@@ -9,10 +9,21 @@ final class GeminiBossService: AIService, @unchecked Sendable {
     let baseURL = "https://generativelanguage.googleapis.com/v1beta"
     let cacheTTL = "1800s" // 30 minutes
 
+    /// Protects mutable cache state from concurrent access.
+    private let lock = NSLock()
+    private var _cachedContentName: String?
+    private var _cacheMessageCount: Int = 0
+
     /// Current cache name (e.g. "cachedContents/abc123") — set after first session.
-    var cachedContentName: String?
+    var cachedContentName: String? {
+        get { lock.withLock { _cachedContentName } }
+        set { lock.withLock { _cachedContentName = newValue } }
+    }
     /// How many messages from the conversation are stored in the cache.
-    var cacheMessageCount: Int = 0
+    var cacheMessageCount: Int {
+        get { lock.withLock { _cacheMessageCount } }
+        set { lock.withLock { _cacheMessageCount = newValue } }
+    }
 
     init(model: String = "gemini-3-flash-preview") {
         self.modelName = model
@@ -39,7 +50,9 @@ final class GeminiBossService: AIService, @unchecked Sendable {
             throw AIError.noAPIKey(provider: .gemini)
         }
 
-        let url = URL(string: "\(baseURL)/models/\(modelName):generateContent?key=\(apiKey)")!
+        guard let url = URL(string: "\(baseURL)/models/\(modelName):generateContent?key=\(apiKey)") else {
+            throw AIError.invalidResponse
+        }
 
         var payload: [String: Any] = [:]
 

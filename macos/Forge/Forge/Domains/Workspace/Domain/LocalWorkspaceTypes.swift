@@ -15,6 +15,8 @@ enum WorkspaceError: LocalizedError {
     case installFailed(String)
     case buildFailed(String)
     case processLaunchFailed(String)
+    case pathOutsideProject(String)
+    case invalidArgument(String)
 
     var errorDescription: String? {
         switch self {
@@ -23,6 +25,8 @@ enum WorkspaceError: LocalizedError {
         case .installFailed(let output): return "Install failed: \(output)"
         case .buildFailed(let output): return "Build failed: \(output)"
         case .processLaunchFailed(let msg): return "Process launch failed: \(msg)"
+        case .pathOutsideProject(let path): return "Path outside project: \(path)"
+        case .invalidArgument(let msg): return "Invalid argument: \(msg)"
         }
     }
 }

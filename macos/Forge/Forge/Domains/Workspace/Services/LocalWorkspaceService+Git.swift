@@ -19,7 +19,7 @@ extension LocalWorkspaceService {
         if FileManager.default.fileExists(atPath: dest.path) {
             try FileManager.default.removeItem(at: dest)
         }
-        return try await exec("git clone --branch \(branch) --single-branch \(url) \(dest.path)")
+        return try await exec("git clone --branch \(shellQuote(branch)) --single-branch \(shellQuote(url)) \(shellQuote(dest.path))")
     }
 
     /// Git status for a project
@@ -104,6 +104,9 @@ extension LocalWorkspaceService {
 
     /// Restore workspace files to a specific git commit
     func gitRestore(project: String, commitHash: String) async throws {
+        guard commitHash.allSatisfy({ $0.isHexDigit }) && !commitHash.isEmpty else {
+            throw WorkspaceError.invalidArgument("Invalid commit hash: \(commitHash)")
+        }
         let dir = projectPath(project)
         _ = try await exec("git checkout \(commitHash) -- .", cwd: dir)
     }

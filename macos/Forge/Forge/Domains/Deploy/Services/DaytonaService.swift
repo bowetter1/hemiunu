@@ -17,7 +17,7 @@ enum DaytonaService {
     /// Create a public sandbox, poll until it starts, return sandbox ID
     static func createSandbox(name: String) async throws -> String {
         let apiKey = try requireAPIKey()
-        let url = URL(string: "\(baseURL)/sandbox")!
+        let url = try makeURL("\(baseURL)/sandbox")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -54,7 +54,7 @@ enum DaytonaService {
     /// Stop a sandbox
     static func stopSandbox(id: String) async throws {
         let apiKey = try requireAPIKey()
-        let url = URL(string: "\(baseURL)/sandbox/\(id)/stop")!
+        let url = try makeURL("\(baseURL)/sandbox/\(id)/stop")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -67,7 +67,7 @@ enum DaytonaService {
     /// Start a stopped sandbox
     static func startSandbox(id: String) async throws {
         let apiKey = try requireAPIKey()
-        let url = URL(string: "\(baseURL)/sandbox/\(id)/start")!
+        let url = try makeURL("\(baseURL)/sandbox/\(id)/start")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -85,8 +85,8 @@ enum DaytonaService {
 
     /// Get sandbox state (started, stopped, archived, etc.)
     static func sandboxState(id: String) async -> String? {
-        guard let apiKey = try? requireAPIKey() else { return nil }
-        let url = URL(string: "\(baseURL)/sandbox/\(id)")!
+        guard let apiKey = try? requireAPIKey(),
+              let url = URL(string: "\(baseURL)/sandbox/\(id)") else { return nil }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         guard let (data, _) = try? await URLSession.shared.data(for: request),
@@ -97,25 +97,11 @@ enum DaytonaService {
 
     // MARK: - File Operations
 
-    /// Create a directory in the sandbox
-    static func createFolder(sandboxId: String, path: String) async throws {
-        let apiKey = try requireAPIKey()
-        let encodedPath = path.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? path
-        let url = URL(string: "\(baseURL)/toolbox/\(sandboxId)/toolbox/files/folder?path=\(encodedPath)")!
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try checkResponse(response, data: data)
-    }
-
     /// Upload a single file (multipart form-data)
     static func uploadFile(sandboxId: String, remotePath: String, localData: Data) async throws {
         let apiKey = try requireAPIKey()
         let encodedPath = remotePath.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? remotePath
-        let url = URL(string: "\(baseURL)/toolbox/\(sandboxId)/toolbox/files/upload?path=\(encodedPath)")!
+        let url = try makeURL("\(baseURL)/toolbox/\(sandboxId)/toolbox/files/upload?path=\(encodedPath)")
 
         let boundary = UUID().uuidString
         var request = URLRequest(url: url)
@@ -124,11 +110,11 @@ enum DaytonaService {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
         var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"upload\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"upload\"\r\n".utf8))
+        body.append(Data("Content-Type: application/octet-stream\r\n\r\n".utf8))
         body.append(localData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         request.httpBody = body
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -140,7 +126,7 @@ enum DaytonaService {
     /// Execute a command in the sandbox (sync, with timeout)
     static func exec(sandboxId: String, command: String, timeout: Int = 120) async throws -> (exitCode: Int, output: String) {
         let apiKey = try requireAPIKey()
-        let url = URL(string: "\(baseURL)/toolbox/\(sandboxId)/toolbox/process/execute")!
+        let url = try makeURL("\(baseURL)/toolbox/\(sandboxId)/toolbox/process/execute")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -182,8 +168,15 @@ enum DaytonaService {
         return key
     }
 
+    private static func makeURL(_ string: String) throws -> URL {
+        guard let url = URL(string: string) else {
+            throw DaytonaError.invalidResponse("Invalid URL: \(string)")
+        }
+        return url
+    }
+
     private static func isSandboxRunning(id: String, apiKey: String) async throws -> Bool {
-        let url = URL(string: "\(baseURL)/sandbox/\(id)")!
+        let url = try makeURL("\(baseURL)/sandbox/\(id)")
         var request = URLRequest(url: url)
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 

@@ -130,7 +130,7 @@ private struct DeployLinkCard: View {
 private func extractDeployURL(from content: String) -> String? {
     let patterns = [
         #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#,
-        #"https://[\w-]+-production\.up\.railway\.app"#,
+        #"https://[\w-]+\.up\.railway\.app"#,
     ]
 
     for pattern in patterns {
@@ -145,7 +145,7 @@ private func extractDeployURL(from content: String) -> String? {
 private func stripDeployURL(from content: String) -> String {
     let patterns = [
         #"https://\d+-[a-f0-9-]+\.proxy\.daytona\.\w+"#,
-        #"https://[\w-]+-production\.up\.railway\.app"#,
+        #"https://[\w-]+\.up\.railway\.app"#,
     ]
 
     var result = content

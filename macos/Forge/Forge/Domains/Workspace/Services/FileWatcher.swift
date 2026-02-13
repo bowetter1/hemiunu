@@ -7,9 +7,10 @@ import CoreServices
 /// (create, modify, delete, rename) recursively within a directory.
 /// Events are batched using a configurable latency window (default 0.5s)
 /// so rapid writes (e.g. a builder saving 10 files) produce a single callback.
+@MainActor
 final class FileWatcher {
     private var stream: FSEventStreamRef?
-    nonisolated(unsafe) private var callback: (() -> Void)?
+    private var callback: (() -> Void)?
 
     /// Start watching a directory tree. Calls onChange on main thread when files change.
     func watch(directory: URL, onChange: @escaping () -> Void) {
@@ -51,8 +52,10 @@ final class FileWatcher {
         callback = nil
     }
 
-    fileprivate func handleEvents() {
-        callback?()
+    nonisolated fileprivate func handleEvents() {
+        Task { @MainActor in
+            callback?()
+        }
     }
 }
 

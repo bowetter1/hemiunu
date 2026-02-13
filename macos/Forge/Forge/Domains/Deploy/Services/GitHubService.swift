@@ -132,14 +132,11 @@ enum GitHubService {
 
 enum GitHubError: LocalizedError {
     case pushFailed(String)
-    case notAuthenticated
 
     var errorDescription: String? {
         switch self {
         case .pushFailed(let detail):
             return "GitHub push failed: \(detail.prefix(200))"
-        case .notAuthenticated:
-            return "Not logged in to GitHub. Run `gh auth login` in Terminal."
         }
     }
 }

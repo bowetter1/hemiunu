@@ -17,60 +17,8 @@ struct GitHubPopover: View {
 
     private var ghAvailable: Bool { GitHubService.isAvailable }
 
-    /// Available version directories for current project
-    private var versions: [String] {
-        guard let selectedId = appState.selectedProjectId,
-              selectedId.hasPrefix("local:") else { return ["v1"] }
-        let projectName = String(selectedId.dropFirst(6))
-        let parts = projectName.components(separatedBy: "/")
-        if parts.count == 2 {
-            let parent = parts[0]
-            return appState.localProjects
-                .filter { $0.name.hasPrefix("\(parent)/v") }
-                .map { $0.name.components(separatedBy: "/").last ?? $0.name }
-                .sorted()
-        }
-        return ["v1"]
-    }
-
-    /// Current project's version label
-    private var currentVersion: String {
-        guard let selectedId = appState.selectedProjectId,
-              selectedId.hasPrefix("local:") else { return "v1" }
-        let name = String(selectedId.dropFirst(6))
-        let parts = name.components(separatedBy: "/")
-        return parts.count == 2 ? parts[1] : "v1"
-    }
-
-    /// Resolve project name for current selection
-    private var currentProjectName: String {
-        guard let selectedId = appState.selectedProjectId,
-              selectedId.hasPrefix("local:") else { return "" }
-        return String(selectedId.dropFirst(6))
-    }
-
-    /// Parent project name (e.g. "coffee-shop" from "coffee-shop/v1")
-    private var parentProjectName: String {
-        let name = currentProjectName
-        return name.components(separatedBy: "/").first ?? name
-    }
-
-    /// Read agent-name.txt for a version to get the builder name
-    private func builderName(for version: String) -> String? {
-        let project = "\(parentProjectName)/\(version)"
-        return try? appState.workspace.readFile(project: project, path: "agent-name.txt")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Builder name for the selected version
-    private var selectedBuilderName: String? {
-        builderName(for: selectedVersion)
-    }
-
-    /// Project name for selected target (e.g. "coffee-shop/v2")
-    private var selectedProjectName: String {
-        guard !parentProjectName.isEmpty else { return "" }
-        return "\(parentProjectName)/\(selectedVersion)"
+    private var helper: ProjectVersionHelper {
+        ProjectVersionHelper(appState: appState, selectedVersion: selectedVersion)
     }
 
     var body: some View {
@@ -90,8 +38,8 @@ struct GitHubPopover: View {
         .padding(16)
         .frame(width: 280)
         .onAppear {
-            selectedVersion = currentVersion
-            repoName = parentProjectName
+            selectedVersion = helper.currentVersion
+            repoName = helper.parentProjectName
             loadGitHubInfo()
             checkAuth()
         }
@@ -177,7 +125,7 @@ struct GitHubPopover: View {
                 Text("Push to GitHub")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                if let builder = selectedBuilderName {
+                if let builder = helper.selectedBuilderName {
                     Text(builder)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -206,10 +154,10 @@ struct GitHubPopover: View {
             }
 
             // Version picker with builder names
-            if versions.count > 1 {
+            if helper.versions.count > 1 {
                 Picker("", selection: $selectedVersion) {
-                    ForEach(versions, id: \.self) { v in
-                        Text(builderName(for: v) ?? v).tag(v)
+                    ForEach(helper.versions, id: \.self) { v in
+                        Text(helper.builderName(for: v) ?? v).tag(v)
                     }
                 }
                 .labelsHidden()
@@ -325,7 +273,7 @@ struct GitHubPopover: View {
     }
 
     private func pushToGitHub() {
-        let projectName = selectedProjectName
+        let projectName = helper.selectedProjectName
         guard !projectName.isEmpty, !repoName.isEmpty else { return }
 
         isPushing = true
@@ -335,10 +283,10 @@ struct GitHubPopover: View {
         Task {
             do {
                 let url: String
-                if savedGitHub != nil {
+                if let github = savedGitHub {
                     // Subsequent push — just git push
                     _ = try await GitHubService.push(cwd: cwd)
-                    url = savedGitHub!.url
+                    url = github.url
                 } else {
                     // First push — create repo
                     url = try await GitHubService.createAndPush(name: repoName, isPrivate: isPrivate, cwd: cwd)
@@ -358,7 +306,7 @@ struct GitHubPopover: View {
     }
 
     private func loadGitHubInfo() {
-        let projectName = selectedProjectName
+        let projectName = helper.selectedProjectName
         guard !projectName.isEmpty else {
             savedGitHub = nil
             return

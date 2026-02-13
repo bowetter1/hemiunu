@@ -189,7 +189,7 @@ extension BossToolExecutor {
             )
         }
 
-        if let range = result.text.range(of: #"https://[\w-]+-production\.up\.railway\.app"#, options: .regularExpression) {
+        if let range = result.text.range(of: #"https://[\w-]+\.up\.railway\.app"#, options: .regularExpression) {
             let url = String(result.text[range])
             // Ensure Railway popover can resolve deploy state even when agent fallback succeeded.
             let serviceName = project.replacingOccurrences(of: "/", with: "-")

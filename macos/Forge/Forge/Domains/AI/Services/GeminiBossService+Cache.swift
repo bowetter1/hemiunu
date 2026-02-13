@@ -32,7 +32,7 @@ extension GeminiBossService {
 
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
 
-        let url = URL(string: "\(baseURL)/cachedContents?key=\(apiKey)")!
+        guard let url = URL(string: "\(baseURL)/cachedContents?key=\(apiKey)") else { return }
         let headers = ["Content-Type": "application/json"]
 
         do {
@@ -62,7 +62,7 @@ extension GeminiBossService {
     /// Delete a cache by name.
     private func deleteCache(name: String) async {
         guard let apiKey else { return }
-        let url = URL(string: "\(baseURL)/\(name)?key=\(apiKey)")!
+        guard let url = URL(string: "\(baseURL)/\(name)?key=\(apiKey)") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         _ = try? await URLSession.shared.data(for: request)

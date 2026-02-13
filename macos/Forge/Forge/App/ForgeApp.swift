@@ -37,11 +37,7 @@ struct ForgeApp: App {
 
 // MARK: - AppDelegate
 
-class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationWillTerminate(_ notification: Notification) {
-        // Clean shutdown
-    }
-}
+class AppDelegate: NSObject, NSApplicationDelegate {}
 
 // MARK: - Window Configuration
 

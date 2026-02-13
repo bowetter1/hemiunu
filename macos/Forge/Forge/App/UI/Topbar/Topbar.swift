@@ -230,16 +230,6 @@ struct Topbar: View {
             .popover(isPresented: $showRailwayPopover) {
                 RailwayDeployPopover(appState: appState, chatViewModel: chatViewModel)
             }
-            Button { } label: {
-                Image("supabase")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: iconSize + 1, height: iconSize + 1)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.plain)
-            .help("Supabase")
             Button { showDeployPopover.toggle() } label: {
                 Image("daytona")
                     .resizable()

@@ -37,6 +37,17 @@ class LocalWorkspaceService {
         rootDirectory.appendingPathComponent(name)
     }
 
+    /// Resolve and validate that a file path stays within the project directory.
+    /// Prevents path traversal attacks (e.g. "../../.ssh/id_rsa").
+    func validatedPath(project: String, path: String) throws -> URL {
+        let projectDir = projectPath(project).standardizedFileURL
+        let resolved = projectDir.appendingPathComponent(path).standardizedFileURL
+        guard resolved.path.hasPrefix(projectDir.path + "/") || resolved.path == projectDir.path else {
+            throw WorkspaceError.pathOutsideProject(path)
+        }
+        return resolved
+    }
+
     /// Check if a project directory exists locally
     func projectExists(_ name: String) -> Bool {
         FileManager.default.fileExists(atPath: projectPath(name).path)
